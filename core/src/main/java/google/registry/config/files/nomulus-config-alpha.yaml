@@ -15,8 +15,10 @@ gcpProject:
 
 registryTool:
   # OAuth client ID used by the tool.
-  # clientId: 241446389074-8sm6m1316j5b5h6bescp76746li4g9o1.apps.googleusercontent.com
   # OAuth client secret used by the tool.
+
+  clientId: PLACEHOLDER
+  clientSecret: PLACEHOLDER
 
 oAuth:
   availableOauthScopes:
@@ -26,7 +28,6 @@ oAuth:
   - https://www.googleapis.com/auth/appengine.admin
   requiredOauthScopes:
   - https://www.googleapis.com/auth/userinfo.email
-credentialFilePath: /Users/tjones/Downloads/client_secret_264643765037-vnrded4suhjfdm8ovguff2f9vgssbm1p.apps.googleusercontent.com.json
 
 cloudSql:
   jdbcUrl: jdbc:postgresql://localhost:15432/
@@ -40,3 +41,4 @@ auth:
   # as it allows requests bearing a token with this audience to be accepted by
   # both IAP or regular OIDC. The clientId value in proxy config file should be
   # the same as this one.
+  oauthClientId: PLACEHOLDER

@@ -5,6 +5,7 @@
 
 From the repository root directory:
 
+ 1. update nomulus-config-alpha.yaml with teh oauth client id and secret. you'll have to ask for this.
  1. `./nom_build build`
     ```
     For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
@@ -104,9 +105,13 @@ From the repository root directory:
 
  # How to run nomulus CLI tool locally
  From the repository root directory:
-
+ 1. ask to get your user added to the oauth client test user credential list
  1. `nom_build buildToolImage`
+
+    note: your nomulus-config-*.yaml gets baked into the jar that is produced! so any changes to your config needs to have a rebuild
+
  1. `alias nomulus='java -jar  /Users/tjones/UDtorrey/nomulus/core/build/libs/nomulus.jar'`
+ 1. `nomulus -e alpha login`
  1. `nomulus -e alpha  --canary --gae list_tlds`
 
  note: depending on the GAE service it communicates with, sometimes you have to use `--canary --use_gae`
