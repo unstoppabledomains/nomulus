@@ -852,8 +852,7 @@ CREATE TABLE public."PasswordResetRequest" (
     requester text NOT NULL,
     fulfillment_time timestamp with time zone,
     destination_email text NOT NULL,
-    verification_code text NOT NULL,
-    registrar_id text NOT NULL
+    verification_code text NOT NULL
 );
 
 
