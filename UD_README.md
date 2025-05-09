@@ -114,8 +114,59 @@ From the repository root directory:
  1. `nomulus -e alpha login`
  1. `nomulus -e alpha  --canary --gae list_tlds`
 
- note: depending on the GAE service it communicates with, sometimes you have to use `--canary --use_gae`
 
+ Notes
+
+* make sure you have been granted access (audience tab) to the oauth client in the GCP console
+* a nomulus user also needs created (and optionally provided admin rights)
+* depending on the GAE service it communicates with, sometimes you have to use `--canary --use_gae`
+
+### creation of nomulus user
+1.  `nomulus -e alpha create_user --email aaron.quirk@unstoppabledomains.com --global_role FTE`
+1. (Optional for admin access) `nomulus -e alpha update_user --email aaron.quirk@unstoppabledomains.com --admin true`
+
+```
+➜  nomulus git:(torrey/may6-nomulus-pre-alpha2) ✗ nomulus -e alpha create_user --email aaron.quirk@unstoppabledomains.com --global_role FTE
+Perform this command? (y/N): y
+Running ...
+May 09, 2025 6:28:31 AM google.registry.model.console.User grantIapPermission
+INFO: Granting IAP role to user aaron.quirk@unstoppabledomains.com
+Saved user with email aaron.quirk@unstoppabledomains.com
+➜  nomulus git:(torrey/may6-nomulus-pre-alpha2) ✗ nomulus -e alpha get_user aaron.quirk@unstoppabledomains.com
+User: {
+    emailAddress=aaron.quirk@unstoppabledomains.com
+    registryLockEmailAddress=null
+    registryLockPasswordHash=null
+    registryLockPasswordSalt=null
+    updateTimestamp=UpdateAutoTimestamp: {
+        lastUpdateTime=2025-05-09T12:28:30.498Z
+    }
+    userRoles=UserRoles: {
+        globalRole=FTE
+        isAdmin=false
+        registrarRoles={}
+    }
+}
+➜  nomulus git:(torrey/may6-nomulus-pre-alpha2) ✗ nomulus -e alpha update_user --email aaron.quirk@unstoppabledomains.com --admin true
+Perform this command? (y/N): y
+Running ...
+Saved user with email aaron.quirk@unstoppabledomains.com
+➜  nomulus git:(torrey/may6-nomulus-pre-alpha2) ✗ nomulus -e alpha get_user aaron.quirk@unstoppabledomains.com
+User: {
+    emailAddress=aaron.quirk@unstoppabledomains.com
+    registryLockEmailAddress=null
+    registryLockPasswordHash=null
+    registryLockPasswordSalt=null
+    updateTimestamp=UpdateAutoTimestamp: {
+        lastUpdateTime=2025-05-09T12:30:19.679Z
+    }
+    userRoles=UserRoles: {
+        globalRole=FTE
+        isAdmin=true
+        registrarRoles={}
+    }
+}
+```
 
  
 
