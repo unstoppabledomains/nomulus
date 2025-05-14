@@ -34,8 +34,8 @@ then
   mkdir -p "${dest}"
 
   ./gradlew :core:buildToolImage \
-    -PmavenUrl="${gcs_prefix}"/maven \
-    -PpluginsUrl="${gcs_prefix}"/plugins
+    -PmavenUrl="https://repo.maven.apache.org/maven2" \
+    -PpluginsUrl="https://plugins.gradle.org/m2"
 
   mv core/build/libs/nomulus.jar "${dest}"
 else
@@ -43,8 +43,8 @@ else
   mkdir -p "${dest}"
 
   ./gradlew stage -Penvironment="${environment}" \
-    -PmavenUrl="${gcs_prefix}"/maven \
-    -PpluginsUrl="${gcs_prefix}"/plugins
+    -PmavenUrl="https://repo.maven.apache.org/maven2" \
+    -PpluginsUrl="https://plugins.gradle.org/m2"
 
   for service in default pubapi backend bsa tools
   do

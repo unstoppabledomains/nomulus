@@ -1,0 +1,47 @@
+steps:
+# Build the builder image first
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build', 
+    '-t', '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}',
+    '-f', 'release/builder/Dockerfile',
+    'release/builder'
+  ]
+
+# 2. Run build commands in container with workspace mounted
+- name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+  volumes:
+  - name: 'workspace'
+    path: '/workspace'
+  - name: 'gcloud-config' 
+    path: '/root/.config/gcloud'
+  entrypoint: './nom_build'
+  args: [
+    'build',
+    '--environment=${_ENV}'
+  ]
+
+# 3. Deploy to App Engine
+- name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+  volumes:
+  - name: 'workspace' 
+    path: '/workspace'
+  - name: 'gcloud-config'
+    path: '/root/.config/gcloud'
+  entrypoint: './nom_build'
+  args: [
+    'build',
+    'appengineDeploy',
+    '--environment=${_ENV}'
+  ]
+
+substitutions:
+  _ENV: alpha  # Default environment
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  
+timeout: 3600s # 1 hour
+
+images:
+  - '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}'

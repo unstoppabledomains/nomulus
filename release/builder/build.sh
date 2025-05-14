@@ -67,10 +67,10 @@ apt-get install git -y
 # Install docker
 apt-get install docker.io -y
 
-# Install Chrome
-apt-get install wget -y
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-apt install ./google-chrome-stable_current_amd64.deb -y
+# Install Chrome - anhan: skip installing Chrome
+# apt-get install wget -y
+# wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+# apt install ./google-chrome-stable_current_amd64.deb -y
 
 # Install libxss1 (needed by Karma)
 apt install libxss1
