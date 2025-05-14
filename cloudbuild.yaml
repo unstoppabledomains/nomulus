@@ -12,7 +12,7 @@ steps:
 - name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
   volumes:
   - name: 'workspace'
-    path: '/workspace'
+    path: '/build'
   - name: 'gcloud-config' 
     path: '/root/.config/gcloud'
   entrypoint: './nom_build'
@@ -25,7 +25,7 @@ steps:
 - name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
   volumes:
   - name: 'workspace' 
-    path: '/workspace'
+    path: '/build'
   - name: 'gcloud-config'
     path: '/root/.config/gcloud'
   entrypoint: './nom_build'
