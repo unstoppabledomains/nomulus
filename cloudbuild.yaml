@@ -52,7 +52,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
 
-timeout: 3600s # 1 hour
+timeout: 7200s # 2 hour
 
 images:
   - '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
