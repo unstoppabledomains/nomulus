@@ -26,7 +26,7 @@ steps:
     ':console-webapp:runConsoleWebappUnitTests',
     '--exclude-task',
     ':javaIncrementalFormatCheck',
-    '--Penvironment=${_ENV}'
+    '-Penvironment=${_ENV}'
   ]
 
 # 3. Deploy to App Engine
