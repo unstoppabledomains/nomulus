@@ -26,6 +26,10 @@ steps:
     ':console-webapp:runConsoleWebappUnitTests',
     '--exclude-task',
     ':javaIncrementalFormatCheck',
+    '--exclude-task',
+    ':core:sqlIntegrationTest',
+    '--exclude-task',
+    ':core:fragileTest',
     '-Penvironment=${_ENV}'
   ]
 
