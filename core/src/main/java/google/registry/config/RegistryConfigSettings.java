@@ -63,6 +63,7 @@ public class RegistryConfigSettings {
   public static class PowerDns {
     public String baseUrl;
     public String apiKey;
+    public Boolean dnssecEnabled;
     public String defaultSoaMName;
     public String defaultSoaRName;
   }

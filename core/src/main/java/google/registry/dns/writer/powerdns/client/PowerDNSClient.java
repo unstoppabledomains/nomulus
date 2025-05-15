@@ -16,11 +16,14 @@ package google.registry.dns.writer.powerdns.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.flogger.FluentLogger;
+import google.registry.dns.writer.powerdns.client.model.Cryptokey;
+import google.registry.dns.writer.powerdns.client.model.Metadata;
 import google.registry.dns.writer.powerdns.client.model.Server;
 import google.registry.dns.writer.powerdns.client.model.Zone;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -59,7 +62,11 @@ public class PowerDNSClient {
     this.apiKey = apiKey;
 
     // initialize the base URL, API key, and HTTP client
-    this.httpClient = new OkHttpClient();
+    this.httpClient =
+        new OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
+            .build();
     this.objectMapper = new ObjectMapper();
 
     // initialize the Server ID
@@ -119,6 +126,7 @@ public class PowerDNSClient {
     return response;
   }
 
+  /** ZONE AND SERVER MANAGEMENT */
   public List<Server> listServers() throws IOException {
     Request request =
         new Request.Builder().url(baseUrl + "/servers").header("X-API-Key", apiKey).get().build();
@@ -235,6 +243,24 @@ public class PowerDNSClient {
     }
   }
 
+  public void putZone(Zone zone) throws IOException {
+    String json = objectMapper.writeValueAsString(zone);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zone.getId())
+            .header("X-API-Key", apiKey)
+            .put(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to patch zone: " + response);
+      }
+    }
+  }
+
   public void notifyZone(String zoneId) throws IOException {
     Request request =
         new Request.Builder()
@@ -246,6 +272,224 @@ public class PowerDNSClient {
     try (Response response = logAndExecuteRequest(request)) {
       if (!response.isSuccessful()) {
         throw new IOException("Failed to notify zone: " + response);
+      }
+    }
+  }
+
+  public void rectifyZone(String zoneId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/rectify")
+            .header("X-API-Key", apiKey)
+            .put(RequestBody.create("", MediaType.parse("application/json")))
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to notify zone: " + response);
+      }
+    }
+  }
+
+  /** DNSSEC key management */
+  public List<Cryptokey> listCryptokeys(String zoneId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/cryptokeys")
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to list cryptokeys: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(),
+          objectMapper.getTypeFactory().constructCollectionType(List.class, Cryptokey.class));
+    }
+  }
+
+  public Cryptokey createCryptokey(String zoneId, Cryptokey cryptokey) throws IOException {
+    String json = objectMapper.writeValueAsString(cryptokey);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/cryptokeys")
+            .header("X-API-Key", apiKey)
+            .post(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to create cryptokey: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), Cryptokey.class);
+    }
+  }
+
+  public Cryptokey getCryptokey(String zoneId, int cryptokeyId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl
+                    + "/servers/"
+                    + serverId
+                    + "/zones/"
+                    + zoneId
+                    + "/cryptokeys/"
+                    + cryptokeyId)
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to get cryptokey: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), Cryptokey.class);
+    }
+  }
+
+  public void modifyCryptokey(String zoneId, Cryptokey cryptokey) throws IOException {
+    String json = objectMapper.writeValueAsString(cryptokey);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl
+                    + "/servers/"
+                    + serverId
+                    + "/zones/"
+                    + zoneId
+                    + "/cryptokeys/"
+                    + cryptokey.getId())
+            .header("X-API-Key", apiKey)
+            .put(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to modify cryptokey: " + response);
+      }
+    }
+  }
+
+  public void deleteCryptokey(String zoneId, int cryptokeyId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl
+                    + "/servers/"
+                    + serverId
+                    + "/zones/"
+                    + zoneId
+                    + "/cryptokeys/"
+                    + cryptokeyId)
+            .header("X-API-Key", apiKey)
+            .delete()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to delete cryptokey: " + response);
+      }
+    }
+  }
+
+  /** ZONE METADATA MANAGEMENT */
+  public List<Metadata> listMetadata(String zoneId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/metadata")
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to list metadata: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(),
+          objectMapper.getTypeFactory().constructCollectionType(List.class, Metadata.class));
+    }
+  }
+
+  public void createMetadata(String zoneId, Metadata metadata) throws IOException {
+    String json = objectMapper.writeValueAsString(metadata);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/metadata")
+            .header("X-API-Key", apiKey)
+            .post(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to create metadata: " + response);
+      }
+    }
+  }
+
+  public Metadata getMetadata(String zoneId, String metadataKind) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/metadata/" + metadataKind)
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to get metadata: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), Metadata.class);
+    }
+  }
+
+  public Metadata modifyMetadata(String zoneId, String metadataKind, Metadata metadata)
+      throws IOException {
+    String json = objectMapper.writeValueAsString(metadata);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/metadata/" + metadataKind)
+            .header("X-API-Key", apiKey)
+            .put(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to modify metadata: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), Metadata.class);
+    }
+  }
+
+  public void deleteMetadata(String zoneId, String metadataKind) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(
+                baseUrl + "/servers/" + serverId + "/zones/" + zoneId + "/metadata/" + metadataKind)
+            .header("X-API-Key", apiKey)
+            .delete()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to delete metadata: " + response);
       }
     }
   }

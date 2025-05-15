@@ -134,7 +134,7 @@ public final class RegistryConfig {
     @Provides
     @Config("powerDnsBaseUrl")
     public static String providePowerDnsBaseUrl(RegistryConfigSettings config) {
-      if (config.powerDns != null && config.powerDns.baseUrl != null) {
+      if (config.powerDns.baseUrl != null) {
         return config.powerDns.baseUrl;
       }
       return "http://localhost:8081/api/v1";
@@ -144,17 +144,27 @@ public final class RegistryConfig {
     @Provides
     @Config("powerDnsApiKey")
     public static String providePowerDnsApiKey(RegistryConfigSettings config) {
-      if (config.powerDns != null && config.powerDns.apiKey != null) {
+      if (config.powerDns.apiKey != null) {
         return config.powerDns.apiKey;
       }
-      return "dummy-api-key";
+      return "example-api-key";
+    }
+
+    /** Whether DNSSEC is enabled for the PowerDNS server. */
+    @Provides
+    @Config("powerDnsDnssecEnabled")
+    public static Boolean providePowerDnsDnssecEnabled(RegistryConfigSettings config) {
+      if (config.powerDns.dnssecEnabled != null) {
+        return config.powerDns.dnssecEnabled;
+      }
+      return false;
     }
 
     /** Default SOA MNAME for the TLD zone. */
     @Provides
     @Config("powerDnsDefaultSoaMName")
     public static String providePowerDnsDefaultSoaMName(RegistryConfigSettings config) {
-      if (config.powerDns != null && config.powerDns.defaultSoaMName != null) {
+      if (config.powerDns.defaultSoaMName != null) {
         return config.powerDns.defaultSoaMName;
       }
       return "a.gtld-servers.net.";
@@ -164,7 +174,7 @@ public final class RegistryConfig {
     @Provides
     @Config("powerDnsDefaultSoaRName")
     public static String providePowerDnsDefaultSoaRName(RegistryConfigSettings config) {
-      if (config.powerDns != null && config.powerDns.defaultSoaRName != null) {
+      if (config.powerDns.defaultSoaRName != null) {
         return config.powerDns.defaultSoaRName;
       }
       return "nstld.verisign-grs.com.";

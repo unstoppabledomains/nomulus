@@ -14,11 +14,16 @@
 
 package google.registry.dns.writer.powerdns;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
 import com.google.common.flogger.FluentLogger;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.dns.writer.DnsWriterZone;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriter;
 import google.registry.dns.writer.powerdns.client.PowerDNSClient;
+import google.registry.dns.writer.powerdns.client.model.Cryptokey;
+import google.registry.dns.writer.powerdns.client.model.Cryptokey.KeyType;
+import google.registry.dns.writer.powerdns.client.model.Metadata;
 import google.registry.dns.writer.powerdns.client.model.RRSet;
 import google.registry.dns.writer.powerdns.client.model.RecordObject;
 import google.registry.dns.writer.powerdns.client.model.Zone;
@@ -43,17 +48,36 @@ import org.xbill.DNS.Update;
  * This request is then converted into a PowerDNS Zone object and sent to the PowerDNS API.
  */
 public class PowerDnsWriter extends DnsUpdateWriter {
+  // Class configuration
   public static final String NAME = "PowerDnsWriter";
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
+  // PowerDNS configuration
   private final String tldZoneName;
-  private final String powerDnsDefaultSoaMName;
-  private final String powerDnsDefaultSoaRName;
+  private final String defaultSoaMName;
+  private final String defaultSoaRName;
+  private final Boolean dnssecEnabled;
   private final PowerDNSClient powerDnsClient;
 
-  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+  // Supported record types to synchronize with PowerDNS
   private static final ArrayList<String> supportedRecordTypes =
       new ArrayList<>(Arrays.asList("A", "AAAA", "DS", "NS"));
+
+  // Zone ID cache configuration
   private static final ConcurrentHashMap<String, String> zoneIdCache = new ConcurrentHashMap<>();
+  private static long zoneIdCacheExpiration = 0;
+  private static int defaultZoneTtl = 3600; // 1 hour in seconds
+
+  // DNSSEC configuration
+  private static final String DNSSEC_ALGORITHM = "rsasha256";
+  private static final String DNSSEC_SOA_EDIT = "INCREMENT-WEEKS";
+  private static final int DNSSEC_KSK_BITS = 2048;
+  private static final int DNSSEC_ZSK_BITS = 1024;
+  private static final long DNSSEC_ZSK_EXPIRY_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
+  private static final long DNSSEC_ZSK_ACTIVATION_MS =
+      1000L * 2 * defaultZoneTtl; // twice the default zone TTL in milliseconds
+  private static final String DNSSEC_ZSK_EXPIRE_FLAG = "DNSSEC-ZSK-EXPIRE-DATE";
+  private static final String DNSSEC_ZSK_ACTIVATION_FLAG = "DNSSEC-ZSK-ACTIVATION-DATE";
 
   /**
    * Class constructor.
@@ -76,6 +100,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       @Config("powerDnsApiKey") String powerDnsApiKey,
       @Config("powerDnsDefaultSoaMName") String powerDnsDefaultSoaMName,
       @Config("powerDnsDefaultSoaRName") String powerDnsDefaultSoaRName,
+      @Config("powerDnsDnssecEnabled") Boolean powerDnsDnssecEnabled,
       Clock clock) {
 
     // call the DnsUpdateWriter constructor, omitting the transport parameter
@@ -84,8 +109,9 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
     // Initialize the PowerDNS client
     this.tldZoneName = getCanonicalHostName(tldZoneName);
-    this.powerDnsDefaultSoaMName = powerDnsDefaultSoaMName;
-    this.powerDnsDefaultSoaRName = powerDnsDefaultSoaRName;
+    this.defaultSoaMName = powerDnsDefaultSoaMName;
+    this.defaultSoaRName = powerDnsDefaultSoaRName;
+    this.dnssecEnabled = powerDnsDnssecEnabled;
     this.powerDnsClient = new PowerDNSClient(powerDnsBaseUrl, powerDnsApiKey);
   }
 
@@ -258,6 +284,215 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
+   * Create a new TLD zone for the TLD associated with the PowerDnsWriter. The zone will be created
+   * with a basic SOA record and not yet configured with DNSSEC.
+   *
+   * @return the new TLD zone
+   * @throws IOException if the TLD zone is not found
+   */
+  private Zone createZone() throws IOException {
+    // base TLD zone object
+    logger.atInfo().log("Creating new PowerDNS TLD zone %s", tldZoneName);
+    Zone newTldZone = new Zone();
+    newTldZone.setName(tldZoneName);
+    newTldZone.setKind(Zone.ZoneKind.Master);
+
+    // create an initial SOA record, which may be modified later by an administrator
+    // or an automated onboarding process
+    RRSet soaRecord = new RRSet();
+    soaRecord.setChangeType(RRSet.ChangeType.REPLACE);
+    soaRecord.setName(tldZoneName);
+    soaRecord.setTtl(defaultZoneTtl);
+    soaRecord.setType("SOA");
+
+    // add content to the SOA record content from default configuration
+    RecordObject soaRecordContent = new RecordObject();
+    soaRecordContent.setContent(
+        String.format(
+            "%s %s 1 900 1800 6048000 %s", defaultSoaMName, defaultSoaRName, defaultZoneTtl));
+    soaRecordContent.setDisabled(false);
+    soaRecord.setRecords(new ArrayList<RecordObject>(Arrays.asList(soaRecordContent)));
+
+    // add the SOA record to the new TLD zone
+    newTldZone.setRrsets(new ArrayList<RRSet>(Arrays.asList(soaRecord)));
+
+    // create the TLD zone and log the result
+    Zone createdTldZone = powerDnsClient.createZone(newTldZone);
+    logger.atInfo().log("Successfully created PowerDNS TLD zone %s", tldZoneName);
+
+    // return the created TLD zone
+    return createdTldZone;
+  }
+
+  /**
+   * Validate the DNSSEC configuration for the TLD zone. If DNSSEC is not enabled, it will be
+   * enabled and the KSK and ZSK entries will be created. If DNSSEC is enabled, the ZSK expiration
+   * date will be checked and the ZSK will be rolled over if it has expired.
+   *
+   * @param zone the TLD zone to validate
+   */
+  private void validateDnssecConfig(Zone zone) {
+    // check if DNSSEC configuration is required
+    if (!dnssecEnabled) {
+      logger.atInfo().log(
+          "DNSSEC validation is not required for PowerDNS TLD zone %s", zone.getName());
+      return;
+    }
+
+    try {
+      // check if DNSSEC is already enabled for the TLD zone
+      if (!zone.getDnssec()) {
+        // DNSSEC is not enabled, so we need to enable it
+        logger.atInfo().log("Enabling DNSSEC for PowerDNS TLD zone %s", zone.getName());
+
+        // create the KSK and ZSK entries for the TLD zone
+        powerDnsClient.createCryptokey(
+            zone.getId(),
+            Cryptokey.createCryptokey(KeyType.ksk, DNSSEC_KSK_BITS, true, true, DNSSEC_ALGORITHM));
+        powerDnsClient.createCryptokey(
+            zone.getId(),
+            Cryptokey.createCryptokey(KeyType.zsk, DNSSEC_ZSK_BITS, true, true, DNSSEC_ALGORITHM));
+
+        // create the SOA-EDIT metadata entry for the TLD zone
+        powerDnsClient.createMetadata(
+            zone.getId(), Metadata.createMetadata("SOA-EDIT", Arrays.asList(DNSSEC_SOA_EDIT)));
+
+        // update the zone account field with the expiration timestamp
+        Zone updatedZone = new Zone();
+        updatedZone.setId(zone.getId());
+        updatedZone.setApiRectify(true);
+        updatedZone.setAccount(
+            String.format(
+                "%s:%s",
+                DNSSEC_ZSK_EXPIRE_FLAG, System.currentTimeMillis() + DNSSEC_ZSK_EXPIRY_MS));
+        powerDnsClient.putZone(updatedZone);
+
+        // attempt to manually rectify the TLD zone
+        try {
+          logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
+          powerDnsClient.rectifyZone(zone.getId());
+        } catch (Exception rectifyException) {
+          logger.atWarning().withCause(rectifyException).log(
+              "Failed to complete rectification of PowerDNS TLD zone %s", zone.getName());
+        }
+
+        // retrieve the zone and print the new DS values
+        logger.atInfo().log("Successfully enabled DNSSEC for PowerDNS TLD zone %s", zone.getName());
+      } else {
+        // DNSSEC is enabled, so we need to validate the configuration
+        logger.atInfo().log(
+            "Validating existing DNSSEC configuration for PowerDNS TLD zone %s", zone.getName());
+
+        // check for a ZSK expiration flag
+        if (zone.getAccount().contains(DNSSEC_ZSK_EXPIRE_FLAG)) {
+          // check for an expired ZSK expiration date
+          String dnssecZskExpireDate = Iterables.get(Splitter.on(':').split(zone.getAccount()), 1);
+          if (System.currentTimeMillis() > Long.parseLong(dnssecZskExpireDate)) {
+            // start a ZSK rollover
+            logger.atInfo().log(
+                "ZSK has expired, starting rollover for PowerDNS TLD zone %s", zone.getName());
+
+            // create a new inactive ZSK
+            powerDnsClient.createCryptokey(
+                zone.getId(),
+                Cryptokey.createCryptokey(
+                    KeyType.zsk, DNSSEC_ZSK_BITS, false, true, DNSSEC_ALGORITHM));
+
+            // update the zone account field with the activation timestamp
+            Zone updatedZone = new Zone();
+            updatedZone.setId(zone.getId());
+            updatedZone.setAccount(
+                String.format(
+                    "%s:%s",
+                    DNSSEC_ZSK_ACTIVATION_FLAG,
+                    System.currentTimeMillis() + DNSSEC_ZSK_ACTIVATION_MS));
+            powerDnsClient.putZone(updatedZone);
+
+            // log the rollover event
+            logger.atInfo().log(
+                "Successfully started ZSK rollover for PowerDNS TLD zone %s", zone.getName());
+          } else {
+            // ZSK is not expired, so we need to log the current ZSK activation date
+            logger.atInfo().log(
+                "DNSSEC configuration for PowerDNS TLD zone %s is valid for another %s seconds",
+                zone.getName(),
+                (Long.parseLong(dnssecZskExpireDate) - System.currentTimeMillis()) / 1000);
+          }
+        }
+
+        // check for a ZSK rollover key activation flag
+        else if (zone.getAccount().contains(DNSSEC_ZSK_ACTIVATION_FLAG)) {
+          // check for a ZSK activation date
+          String dnssecZskActivationDate =
+              Iterables.get(Splitter.on(':').split(zone.getAccount()), 1);
+          if (System.currentTimeMillis() > Long.parseLong(dnssecZskActivationDate)) {
+            // ZSK activation window has elapsed, so we need to activate the ZSK
+            logger.atInfo().log(
+                "ZSK activation window has elapsed, activating ZSK for PowerDNS TLD zone %s",
+                zone.getName());
+
+            // list all crypto keys for the TLD zone
+            List<Cryptokey> cryptokeys = powerDnsClient.listCryptokeys(zone.getId());
+
+            // identify the active and inactive ZSKs
+            Cryptokey activeZsk =
+                cryptokeys.stream()
+                    .filter(c -> c.getActive() && c.getKeytype() == KeyType.zsk)
+                    .findFirst()
+                    .orElse(null);
+            Cryptokey inactiveZsk =
+                cryptokeys.stream()
+                    .filter(c -> !c.getActive() && c.getKeytype() == KeyType.zsk)
+                    .findFirst()
+                    .orElse(null);
+
+            // if both keys are found, complete the ZSK rollover
+            if (activeZsk != null && inactiveZsk != null) {
+              // activate the inactive ZSK
+              inactiveZsk.setActive(true);
+              powerDnsClient.modifyCryptokey(zone.getId(), inactiveZsk);
+
+              // delete the active ZSK
+              powerDnsClient.deleteCryptokey(zone.getId(), activeZsk.getId());
+
+              // update the zone account field with the expiration timestamp
+              Zone updatedZone = new Zone();
+              updatedZone.setId(zone.getId());
+              updatedZone.setAccount(
+                  String.format(
+                      "%s:%s",
+                      DNSSEC_ZSK_EXPIRE_FLAG, System.currentTimeMillis() + DNSSEC_ZSK_EXPIRY_MS));
+              powerDnsClient.putZone(updatedZone);
+
+              // log the ZSK rollover event
+              logger.atInfo().log(
+                  "Successfully completed ZSK rollover for PowerDNS TLD zone %s", zone.getName());
+            } else {
+              // unable to complete the ZSK rollover
+              logger.atSevere().log(
+                  "Unable to locate active and inactive ZSKs for PowerDNS TLD zone %s. Manual"
+                      + " intervention required to complete the ZSK rollover.",
+                  zone.getName());
+              return;
+            }
+          } else {
+            // ZSK activation date has not yet elapsed, so we need to log the current ZSK activation
+            // date
+            logger.atInfo().log(
+                "ZSK rollover for PowerDNS TLD zone %s is in progress for another %s seconds",
+                zone.getName(),
+                (Long.parseLong(dnssecZskActivationDate) - System.currentTimeMillis()) / 1000);
+          }
+        }
+      }
+    } catch (Exception e) {
+      // log the error gracefully and allow processing to continue
+      logger.atSevere().withCause(e).log(
+          "Failed to validate DNSSEC configuration for PowerDNS TLD zone %s", zone.getName());
+    }
+  }
+
+  /**
    * Returns the presentation format ending in a dot used for an given hostname.
    *
    * @param hostName the fully qualified hostname
@@ -288,7 +523,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param records the set of RRSet records that will be sent to the PowerDNS API
    * @return the prepared TLD zone
    */
-  private Zone getTldZoneForUpdate(List<RRSet> records) {
+  private Zone getTldZoneForUpdate(List<RRSet> records) throws IOException {
     Zone tldZone = new Zone();
     tldZone.setId(getTldZoneId());
     tldZone.setName(getSanitizedHostName(tldZoneName));
@@ -297,52 +532,29 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
-   * Get the TLD zone by name.
+   * Get the TLD zone by name and validate the zone's configuration before returning.
    *
    * @return the TLD zone
    * @throws IOException if the TLD zone is not found
    */
-  private Zone getTldZoneByName() throws IOException {
+  private Zone getAndValidateTldZoneByName() throws IOException {
     // retrieve an existing TLD zone by name
     for (Zone zone : powerDnsClient.listZones()) {
-      if (zone.getName().equals(tldZoneName)) {
+      if (getSanitizedHostName(zone.getName()).equals(getSanitizedHostName(tldZoneName))) {
+        // validate the DNSSEC configuration and return the TLD zone
+        validateDnssecConfig(zone);
         return zone;
       }
     }
 
-    // Attempt to create a new TLD zone if it does not exist. The zone will have a
-    // basic SOA record, but will not have DNSSEC enabled. Adding DNSSEC is a follow
-    // up step using pdnsutil command line tool.
+    // attempt to create a new TLD zone if it does not exist
     try {
-      // base TLD zone object
-      logger.atInfo().log("Creating new PowerDNS TLD zone %s", tldZoneName);
-      Zone newTldZone = new Zone();
-      newTldZone.setName(tldZoneName);
-      newTldZone.setKind(Zone.ZoneKind.Master);
+      // create a new TLD zone
+      Zone zone = createZone();
 
-      // create an initial SOA record, which may be modified later by an administrator
-      // or an automated onboarding process
-      RRSet soaRecord = new RRSet();
-      soaRecord.setChangeType(RRSet.ChangeType.REPLACE);
-      soaRecord.setName(tldZoneName);
-      soaRecord.setTtl(3600);
-      soaRecord.setType("SOA");
-
-      // add content to the SOA record content from default configuration
-      RecordObject soaRecordContent = new RecordObject();
-      soaRecordContent.setContent(
-          String.format(
-              "%s %s 1 900 1800 6048000 3600", powerDnsDefaultSoaMName, powerDnsDefaultSoaRName));
-      soaRecordContent.setDisabled(false);
-      soaRecord.setRecords(new ArrayList<RecordObject>(Arrays.asList(soaRecordContent)));
-
-      // add the SOA record to the new TLD zone
-      newTldZone.setRrsets(new ArrayList<RRSet>(Arrays.asList(soaRecord)));
-
-      // create the TLD zone and log the result
-      Zone createdTldZone = powerDnsClient.createZone(newTldZone);
-      logger.atInfo().log("Successfully created PowerDNS TLD zone %s", tldZoneName);
-      return createdTldZone;
+      // configure DNSSEC and return the TLD zone
+      validateDnssecConfig(zone);
+      return zone;
     } catch (Exception e) {
       // log the error and continue
       logger.atWarning().log("Failed to create PowerDNS TLD zone %s: %s", tldZoneName, e);
@@ -354,23 +566,47 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
   /**
    * Get the TLD zone ID for the given TLD zone name from the cache, or compute it if it is not
-   * present in the cache.
+   * present in the cache. This method is synchronized since it may result in a new TLD zone being
+   * created and DNSSEC being configured, and this should only happen once.
    *
    * @return the ID of the TLD zone
    */
-  private String getTldZoneId() {
-    return zoneIdCache.computeIfAbsent(
-        tldZoneName,
-        key -> {
-          try {
-            return getTldZoneByName().getId();
-          } catch (Exception e) {
-            // TODO: throw this exception once PowerDNS is available, but for now we are just
-            // going to return a dummy ID
-            logger.atWarning().log("Failed to get PowerDNS TLD zone ID for %s: %s", tldZoneName, e);
-            return tldZoneName;
-          }
-        });
+  private synchronized String getTldZoneId() throws IOException {
+    // clear the cache if it has expired
+    if (zoneIdCacheExpiration < System.currentTimeMillis()) {
+      logger.atInfo().log("Clearing PowerDNS TLD zone ID cache");
+      zoneIdCache.clear();
+      zoneIdCacheExpiration = System.currentTimeMillis() + 1000 * 60 * 60; // 1 hour
+    }
+
+    // retrieve the TLD zone ID from the cache or retrieve it from the PowerDNS API
+    // if not available in the cache
+    String zoneId =
+        zoneIdCache.computeIfAbsent(
+            tldZoneName,
+            key -> {
+              try {
+                // retrieve the TLD zone by name, which may result from an existing zone or
+                // be dynamically created if the zone does not exist
+                Zone tldZone = getAndValidateTldZoneByName();
+
+                // return the TLD zone ID, which will be cached for the next hour
+                return tldZone.getId();
+              } catch (IOException e) {
+                // log the error and return a null value to indicate failure
+                logger.atWarning().log(
+                    "Failed to get PowerDNS TLD zone ID for %s: %s", tldZoneName, e);
+                return null;
+              }
+            });
+
+    // if the TLD zone ID is not found, throw an exception
+    if (zoneId == null) {
+      throw new IOException("TLD zone not found: " + tldZoneName);
+    }
+
+    // return the TLD zone ID
+    return zoneId;
   }
 
   /**
