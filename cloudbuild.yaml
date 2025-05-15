@@ -1,19 +1,19 @@
 steps:
 # Build the builder image first
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: /bin/bash
-  args:
-    - -c
-    - |
-      set -e
-      docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} .
-      docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
-      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
-      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
-  dir: 'release/builder/'
+# - name: 'gcr.io/cloud-builders/docker'
+#   entrypoint: /bin/bash
+#   args:
+#     - -c
+#     - |
+#       set -e
+#       docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} .
+#       docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+#       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
+#       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+#   dir: 'release/builder/'
 
 # Run build commands in container with workspace mounted
-- name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+- name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:latest'
   volumes:
   - name: 'workspace'
     path: '/build'
