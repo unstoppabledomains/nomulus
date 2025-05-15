@@ -12,7 +12,7 @@ steps:
       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
   dir: 'release/builder/'
 
-# 2. Run build commands in container with workspace mounted
+# Run build commands in container with workspace mounted
 - name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
   volumes:
   - name: 'workspace'
@@ -22,8 +22,28 @@ steps:
   entrypoint: './nom_build'
   args: [
     'build',
+    '--exclude-task',
+    ':console-webapp:runConsoleWebappUnitTests',
+    '--exclude-task',
+    ':javaIncrementalFormatCheck',
     '--environment=${_ENV}'
   ]
+- name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+  volumes:
+  - name: 'workspace'
+    path: '/build'
+  - name: 'gcloud-config' 
+    path: '/root/.config/gcloud'
+  entrypoint: './nom_build'
+  args: [
+    ':console-webapp:build',
+    '--exclude-task',
+    ':console-webapp:runConsoleWebappUnitTests',
+    '--exclude-task',
+    ':javaIncrementalFormatCheck',
+    '--environment=${_ENV}'
+  ]
+
 
 # 3. Deploy to App Engine
 - name: '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
