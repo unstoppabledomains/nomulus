@@ -221,7 +221,7 @@ images:
   - '$_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}'
 timeout: 7200s
 options:
-  machineType: 'E2_HIGHCPU_8'
+  machineType: 'E2_HIGHCPU_32'
 
 substitutions:
   _ENV: crash  # Default environment
