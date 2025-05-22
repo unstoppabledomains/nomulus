@@ -5,7 +5,7 @@
 # https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
 steps:
 # Build the builder image first
-- name: 'gcr.io/cloud-builders/docker'
+- name: '$_GCR_HOSTNAME/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
     - -c
@@ -17,10 +17,10 @@ steps:
       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
   dir: 'builder/'
 # Create a directory to store the artifacts
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   args: ['mkdir', 'nomulus']
 # Run tests
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -32,7 +32,7 @@ steps:
   ]
 # Build and package the deployment files for each environment, and the tool
 # binary and image.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -46,11 +46,11 @@ steps:
     done
 # Save TAG_NAME in ./output/tag_name, to be uploaded later. This file is purely
 # informational. It makes it easier to tell the tag of the current 'live' release.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args: [ '-c', 'echo ${COMMIT_SHA} > output/tag_name' ]
 # Build Nomulus, tool and proxy image, them upload them to GCR.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -61,54 +61,54 @@ steps:
     ./gradlew :jetty:buildNomulusImage :proxy:buildProxyImage :core:buildToolImage\
       -PmavenUrl=https://repo.maven.apache.org/maven2 \
       -PpluginsUrl=https://plugins.gradle.org/m2
-    docker tag nomulus gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}
-    docker tag nomulus gcr.io/${PROJECT_ID}/nomulus:latest
-    docker push gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/nomulus:latest
-    docker tag proxy gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}
-    docker tag proxy gcr.io/${PROJECT_ID}/proxy:latest
-    docker push gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/proxy:latest
-    docker tag nomulus-tool gcr.io/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
-    docker tag nomulus-tool gcr.io/${PROJECT_ID}/nomulus-tool:latest
-    docker push gcr.io/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/nomulus-tool:latest
+    docker tag nomulus $_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}
+    docker tag nomulus $_GCR_HOSTNAME/${PROJECT_ID}/nomulus:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus:latest
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/proxy:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/proxy:latest
+    docker tag nomulus-tool $_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
+    docker tag nomulus-tool $_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:latest
 # Sign nomulus and proxy images.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
-    nomulus_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/nomulus \
+    nomulus_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus \
     --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
-    proxy_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/proxy \
+    proxy_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/proxy \
     --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     gcloud --project=${PROJECT_ID} beta container binauthz attestations \
-      sign-and-create --artifact-url=gcr.io/${PROJECT_ID}/nomulus@$nomulus_digest \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus@$nomulus_digest \
       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
       --keyversion-project=${PROJECT_ID} --keyversion-location=global \
       --keyversion-keyring=attestor-keys --keyversion-key=signing \
       --keyversion=1
     gcloud --project=${PROJECT_ID} beta container binauthz attestations \
-      sign-and-create --artifact-url=gcr.io/${PROJECT_ID}/proxy@$proxy_digest \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/proxy@$proxy_digest \
       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
       --keyversion-project=${PROJECT_ID} --keyversion-location=global \
       --keyversion-keyring=attestor-keys --keyversion-key=signing \
       --keyversion=1
 # Get the tool image digest and substitute in the digest in other GCB files.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/nomulus-tool \
+    digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool \
       --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     # schema-deploy and schema-verify scripts
     sed -i s/nomulus-tool:latest/nomulus-tool@$digest/g release/cloudbuild-schema-*.yaml
 # Build and upload the prober_cert_updater image. This image extends from the `builder` and the
 # nomulus.jar built earlier.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -116,16 +116,16 @@ steps:
     set -e
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
-    docker build -t gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
       --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
-      gcr.io/${PROJECT_ID}/prober_cert_updater:latest
-    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:latest
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:latest
   dir: 'release/prober-cert-updater/'
 # Build and upload the db_object_updater image. This image extends from the `builder` and the
 # nomulus.jar built earlier.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -133,15 +133,15 @@ steps:
     set -e
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
-    docker build -t gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
       --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
-      gcr.io/${PROJECT_ID}/db_object_updater:latest
-    docker push gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/db_object_updater:latest
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/db_object_updater:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/db_object_updater:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/db_object_updater:latest
   dir: 'release/db-object-updater/'
 # Build and stage Dataflow Flex templates.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with the previous steps above
   # and ./build_nomulus_for_env.sh
@@ -168,7 +168,7 @@ steps:
       google/registry/beam/wipe_out_contact_history_pii_pipeline_metadata.json
 # Tentatively build and publish Cloud SQL schema jar here, before the schema release process is
 # finalized. Also publish nomulus:core jars that are needed for server/schema compatibility tests.
-- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with previous steps above
   # and ./build_nomulus_for_env.sh
@@ -216,8 +216,16 @@ artifacts:
 # The images are already uploaded, but we still need to include them there so that
 # the GCB pubsub message contains them (for Spinnaker to consume).
 images:
-  - 'gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
-  - 'gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}'
 timeout: 7200s
 options:
   machineType: 'E2_HIGHCPU_8'
+
+substitutions:
+  _ENV: crash  # Default environment
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
