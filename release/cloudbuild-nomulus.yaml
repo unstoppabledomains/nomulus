@@ -4,11 +4,23 @@
 # To trigger a build automatically, follow the instructions below and add a trigger:
 # https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
 steps:
+# Build the builder image first
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+    - -c
+    - |
+      set -e
+      docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} .
+      docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
+      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+  dir: 'builder/'
 # Create a directory to store the artifacts
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   args: ['mkdir', 'nomulus']
 # Run tests
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -20,7 +32,7 @@ steps:
   ]
 # Build and package the deployment files for each environment, and the tool
 # binary and image.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -34,11 +46,11 @@ steps:
     done
 # Save TAG_NAME in ./output/tag_name, to be uploaded later. This file is purely
 # informational. It makes it easier to tell the tag of the current 'live' release.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args: [ '-c', 'echo ${COMMIT_SHA} > output/tag_name' ]
 # Build Nomulus, tool and proxy image, them upload them to GCR.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
@@ -62,7 +74,7 @@ steps:
     docker push gcr.io/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/nomulus-tool:latest
 # Sign nomulus and proxy images.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -84,7 +96,7 @@ steps:
       --keyversion-keyring=attestor-keys --keyversion-key=signing \
       --keyversion=1
 # Get the tool image digest and substitute in the digest in other GCB files.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -96,7 +108,7 @@ steps:
     sed -i s/nomulus-tool:latest/nomulus-tool@$digest/g release/cloudbuild-schema-*.yaml
 # Build and upload the prober_cert_updater image. This image extends from the `builder` and the
 # nomulus.jar built earlier.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -113,7 +125,7 @@ steps:
   dir: 'release/prober-cert-updater/'
 # Build and upload the db_object_updater image. This image extends from the `builder` and the
 # nomulus.jar built earlier.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -129,7 +141,7 @@ steps:
     docker push gcr.io/${PROJECT_ID}/db_object_updater:latest
   dir: 'release/db-object-updater/'
 # Build and stage Dataflow Flex templates.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with the previous steps above
   # and ./build_nomulus_for_env.sh
@@ -156,7 +168,7 @@ steps:
       google/registry/beam/wipe_out_contact_history_pii_pipeline_metadata.json
 # Tentatively build and publish Cloud SQL schema jar here, before the schema release process is
 # finalized. Also publish nomulus:core jars that are needed for server/schema compatibility tests.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: 'gcr.io/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with previous steps above
   # and ./build_nomulus_for_env.sh
