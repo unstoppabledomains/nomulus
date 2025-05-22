@@ -36,7 +36,7 @@ steps:
 # informational. It makes it easier to tell the tag of the current 'live' release.
 - name: 'gcr.io/${PROJECT_ID}/builder:latest'
   entrypoint: /bin/bash
-  args: [ '-c', 'echo ${TAG_NAME} > output/tag_name' ]
+  args: [ '-c', 'echo ${COMMIT_SHA} > output/tag_name' ]
 # Build Nomulus, tool and proxy image, them upload them to GCR.
 - name: 'gcr.io/${PROJECT_ID}/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
@@ -49,17 +49,17 @@ steps:
     ./gradlew :jetty:buildNomulusImage :proxy:buildProxyImage :core:buildToolImage\
       -PmavenUrl=https://repo.maven.apache.org/maven2 \
       -PpluginsUrl=https://plugins.gradle.org/m2
-    docker tag nomulus gcr.io/${PROJECT_ID}/nomulus:${TAG_NAME}
+    docker tag nomulus gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}
     docker tag nomulus gcr.io/${PROJECT_ID}/nomulus:latest
-    docker push gcr.io/${PROJECT_ID}/nomulus:${TAG_NAME}
+    docker push gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/nomulus:latest
-    docker tag proxy gcr.io/${PROJECT_ID}/proxy:${TAG_NAME}
+    docker tag proxy gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}
     docker tag proxy gcr.io/${PROJECT_ID}/proxy:latest
-    docker push gcr.io/${PROJECT_ID}/proxy:${TAG_NAME}
+    docker push gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/proxy:latest
-    docker tag nomulus-tool gcr.io/${PROJECT_ID}/nomulus-tool:${TAG_NAME}
+    docker tag nomulus-tool gcr.io/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
     docker tag nomulus-tool gcr.io/${PROJECT_ID}/nomulus-tool:latest
-    docker push gcr.io/${PROJECT_ID}/nomulus-tool:${TAG_NAME}
+    docker push gcr.io/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/nomulus-tool:latest
 # Sign nomulus and proxy images.
 - name: 'gcr.io/${PROJECT_ID}/builder:latest'
@@ -68,9 +68,9 @@ steps:
   - -c
   - |
     nomulus_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/nomulus \
-    --format="get(digest)" --filter="tags = ${TAG_NAME}")
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     proxy_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/proxy \
-    --format="get(digest)" --filter="tags = ${TAG_NAME}")
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     gcloud --project=${PROJECT_ID} beta container binauthz attestations \
       sign-and-create --artifact-url=gcr.io/${PROJECT_ID}/nomulus@$nomulus_digest \
       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
@@ -91,7 +91,7 @@ steps:
   - |
     set -e
     digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/nomulus-tool \
-      --format="get(digest)" --filter="tags = ${TAG_NAME}")
+      --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     # schema-deploy and schema-verify scripts
     sed -i s/nomulus-tool:latest/nomulus-tool@$digest/g release/cloudbuild-schema-*.yaml
 # Build and upload the prober_cert_updater image. This image extends from the `builder` and the
@@ -104,11 +104,11 @@ steps:
     set -e
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
-    docker build -t gcr.io/${PROJECT_ID}/prober_cert_updater:${TAG_NAME} \
-      --build-arg TAG_NAME=${TAG_NAME} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag gcr.io/${PROJECT_ID}/prober_cert_updater:${TAG_NAME} \
+    docker build -t gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
+      --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
+    docker tag gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
       gcr.io/${PROJECT_ID}/prober_cert_updater:latest
-    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:${TAG_NAME}
+    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/prober_cert_updater:latest
   dir: 'release/prober-cert-updater/'
 # Build and upload the db_object_updater image. This image extends from the `builder` and the
@@ -121,11 +121,11 @@ steps:
     set -e
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
-    docker build -t gcr.io/${PROJECT_ID}/db_object_updater:${TAG_NAME} \
-      --build-arg TAG_NAME=${TAG_NAME} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag gcr.io/${PROJECT_ID}/db_object_updater:${TAG_NAME} \
+    docker build -t gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
+      --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
+    docker tag gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA} \
       gcr.io/${PROJECT_ID}/db_object_updater:latest
-    docker push gcr.io/${PROJECT_ID}/db_object_updater:${TAG_NAME}
+    docker push gcr.io/${PROJECT_ID}/db_object_updater:${COMMIT_SHA}
     docker push gcr.io/${PROJECT_ID}/db_object_updater:latest
   dir: 'release/db-object-updater/'
 # Build and stage Dataflow Flex templates.
@@ -140,7 +140,7 @@ steps:
     ./release/stage_beam_pipeline.sh \
       beamPipelineCommon \
       beam_pipeline_common \
-      ${TAG_NAME} \
+      ${COMMIT_SHA} \
       ${PROJECT_ID} \
       google.registry.beam.spec11.Spec11Pipeline \
       google/registry/beam/spec11_pipeline_metadata.json \
@@ -170,13 +170,13 @@ steps:
       -PmavenUrl=https://repo.maven.apache.org/maven2 \
       -PpluginsUrl=https://plugins.gradle.org/m2 \
       -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
-      -Pschema_version=${TAG_NAME}
+      -Pschema_version=${COMMIT_SHA}
     ./gradlew \
       :core:publish \
       -PmavenUrl=https://repo.maven.apache.org/maven2 \
       -PpluginsUrl=https://plugins.gradle.org/m2 \
       -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
-      -Pnomulus_version=${TAG_NAME}
+      -Pnomulus_version=${COMMIT_SHA}
     # Upload schema jar for use by schema deployment.
     # TODO(weiminyu): consider using the jar in maven repo during deployment and
     # stop the  upload here.
@@ -184,7 +184,7 @@ steps:
 # The tarballs and jars to upload to GCS.
 artifacts:
   objects:
-    location: 'gs://${PROJECT_ID}-deploy/${TAG_NAME}'
+    location: 'gs://${PROJECT_ID}-deploy/${COMMIT_SHA}'
     paths:
     - 'output/*.tar'
     - 'output/tag_name'
@@ -204,8 +204,8 @@ artifacts:
 # The images are already uploaded, but we still need to include them there so that
 # the GCB pubsub message contains them (for Spinnaker to consume).
 images:
-  - 'gcr.io/${PROJECT_ID}/nomulus:${TAG_NAME}'
-  - 'gcr.io/${PROJECT_ID}/proxy:${TAG_NAME}'
+  - 'gcr.io/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
+  - 'gcr.io/${PROJECT_ID}/proxy:${COMMIT_SHA}'
 timeout: 7200s
 options:
   machineType: 'E2_HIGHCPU_8'
