@@ -5,7 +5,7 @@
 # https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
 steps:
 # Build the builder image first
-- name: '$_GCR_HOSTNAME/cloud-builders/docker'
+- name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
     - -c
