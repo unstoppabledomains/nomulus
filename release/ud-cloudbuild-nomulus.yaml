@@ -190,10 +190,10 @@ artifacts:
     - 'jetty/kubernetes/gateway/*.yaml'
 # The images are already uploaded, but we still need to include them there so that
 # the GCB pubsub message contains them (for Spinnaker to consume).
-images:
-  - '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}'
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}'
+# images:
+#   - '$_GCR_HOSTNAME/$PROJECT_ID/nomulus/builder:${COMMIT_SHA}'
+#   - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}'
+#   - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}'
 timeout: 7200s
 options:
   machineType: 'E2_HIGHCPU_32'
