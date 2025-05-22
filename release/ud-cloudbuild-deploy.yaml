@@ -34,15 +34,18 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
+    echo "Copying files from GCS"
     gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus-config-${_ENV}.yaml .
     gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/cloud-scheduler-tasks-${_ENV}.xml .
     gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/cloud-tasks-queue.xml .
+    echo "Deploying Cloud Scheduler and Cloud Tasks"
     deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-scheduler-tasks-${_ENV}.xml $project_id
     deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-tasks-queue.xml $project_id
 # Deploy the GAE config files.
 # First authorize the gcloud tool to use the credential json file, then
 # download and unzip the tarball that contains the relevant config files
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+- id: Deploy-GAE-Config
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -59,7 +62,8 @@ steps:
     gcloud -q --project $project_id app deploy default/WEB-INF/appengine-generated/dispatch.yaml
 # Save the deployed tag for the current environment on GCS, and update the
 # mappings from Nomulus releases to Appengine versions.
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+- id: Save-Deployed-Tag
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -96,7 +100,7 @@ options:
   machineType: 'E2_HIGHCPU_8'
 
 substitutions:
-  _ENV: crash  # Default environment
+  _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
 

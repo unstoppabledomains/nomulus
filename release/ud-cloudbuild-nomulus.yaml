@@ -199,7 +199,7 @@ options:
   machineType: 'E2_HIGHCPU_32'
 
 substitutions:
-  _ENV: crash  # Default environment
+  _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
 
