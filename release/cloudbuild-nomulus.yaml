@@ -15,7 +15,7 @@ steps:
       docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
       docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
-  dir: 'builder/'
+  dir: 'release/builder/'
 # Create a directory to store the artifacts
 - name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   args: ['mkdir', 'nomulus']
