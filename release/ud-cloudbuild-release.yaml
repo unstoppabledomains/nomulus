@@ -43,7 +43,8 @@ steps:
 #     cp -rf nomulus-internal/* .
 #     rm -rf nomulus-internal
 # Build the builder image and pull the base images, them upload them to GCR.
-- name: 'gcr.io/cloud-builders/docker'
+- id: Build-Builder-Base-Images-And-Push
+  name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
   - -c
@@ -64,34 +65,37 @@ steps:
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:latest
   dir: 'release/builder/'
-# Build and upload the schema_deployer image.
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
-      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
-  dir: 'release/schema-deployer/'
-# Build and upload the schema_verifier image.
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} \
-      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:latest
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA}
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:latest
-  dir: 'release/schema-verifier/'
+# Build and upload the schema_deployer image. skipping database builds until i can figure out how to mount the database secrets...
+# - id: Build-Schema-Deployer-Image-And-Push
+#   name: 'gcr.io/cloud-builders/docker'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+#     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
+#       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
+#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+#   dir: 'release/schema-deployer/'
+# # Build and upload the schema_verifier image.
+# - id: Build-Schema-Verifier-Image-And-Push
+#   name: 'gcr.io/cloud-builders/docker'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+#     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} \
+#       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:latest
+#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA}
+#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_verifier:latest
+#   dir: 'release/schema-verifier/'
 # Upload the Gradle binary to GCS if it does not exist and point URL in Gradle wrapper to it.
-- name: 'gcr.io/cloud-builders/gcloud'
+- id: Upload-Gradle-Binary-To-GCS
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: /bin/bash
   args:
   - -c
