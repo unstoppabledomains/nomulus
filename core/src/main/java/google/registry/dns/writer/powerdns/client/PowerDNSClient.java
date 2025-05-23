@@ -19,6 +19,7 @@ import com.google.common.flogger.FluentLogger;
 import google.registry.dns.writer.powerdns.client.model.Cryptokey;
 import google.registry.dns.writer.powerdns.client.model.Metadata;
 import google.registry.dns.writer.powerdns.client.model.Server;
+import google.registry.dns.writer.powerdns.client.model.TSIGKey;
 import google.registry.dns.writer.powerdns.client.model.Zone;
 import java.io.IOException;
 import java.util.List;
@@ -490,6 +491,77 @@ public class PowerDNSClient {
     try (Response response = logAndExecuteRequest(request)) {
       if (!response.isSuccessful()) {
         throw new IOException("Failed to delete metadata: " + response);
+      }
+    }
+  }
+
+  /** TSIG KEY MANAGEMENT */
+  public List<TSIGKey> listTSIGKeys() throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/tsigkeys")
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to list TSIG keys: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(),
+          objectMapper.getTypeFactory().constructCollectionType(List.class, TSIGKey.class));
+    }
+  }
+
+  public TSIGKey createTSIGKey(TSIGKey tsigKey) throws IOException {
+    String json = objectMapper.writeValueAsString(tsigKey);
+    RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/tsigkeys")
+            .header("X-API-Key", apiKey)
+            .post(body)
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to create TSIG key: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), TSIGKey.class);
+    }
+  }
+
+  public TSIGKey getTSIGKey(String tsigKeyId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/tsigkeys/" + tsigKeyId)
+            .header("X-API-Key", apiKey)
+            .get()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to get TSIG key: " + response);
+      }
+      return objectMapper.readValue(
+          Objects.requireNonNull(response.body()).string(), TSIGKey.class);
+    }
+  }
+
+  public void deleteTSIGKey(String tsigKeyId) throws IOException {
+    Request request =
+        new Request.Builder()
+            .url(baseUrl + "/servers/" + serverId + "/tsigkeys/" + tsigKeyId)
+            .header("X-API-Key", apiKey)
+            .delete()
+            .build();
+
+    try (Response response = logAndExecuteRequest(request)) {
+      if (!response.isSuccessful()) {
+        throw new IOException("Failed to delete TSIG key: " + response);
       }
     }
   }

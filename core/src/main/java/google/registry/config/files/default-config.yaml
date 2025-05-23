@@ -31,8 +31,11 @@ powerDns:
   baseUrl: http://localhost:8081/api/v1
   apiKey: example-api-key
   dnssecEnabled: false
-  defaultSoaMName: a.example.com.
-  defaultSoaRName: nstld.example.com.
+  tsigEnabled: true
+  rootNameServers:
+  - ns1.example.com.
+  - ns2.example.com.
+  soaName: nstld.example.com.
 
 gSuite:
   # Publicly accessible domain name of the running G Suite instance.

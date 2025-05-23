@@ -15,6 +15,7 @@
 package google.registry.dns.writer.powerdns;
 
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.FluentLogger;
 import google.registry.config.RegistryConfig.Config;
@@ -26,6 +27,7 @@ import google.registry.dns.writer.powerdns.client.model.Cryptokey.KeyType;
 import google.registry.dns.writer.powerdns.client.model.Metadata;
 import google.registry.dns.writer.powerdns.client.model.RRSet;
 import google.registry.dns.writer.powerdns.client.model.RecordObject;
+import google.registry.dns.writer.powerdns.client.model.TSIGKey;
 import google.registry.dns.writer.powerdns.client.model.Zone;
 import google.registry.util.Clock;
 import jakarta.inject.Inject;
@@ -54,9 +56,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
   // PowerDNS configuration
   private final String tldZoneName;
-  private final String defaultSoaMName;
-  private final String defaultSoaRName;
+  private final ImmutableList<String> rootNameServers;
+  private final String soaName;
   private final Boolean dnssecEnabled;
+  private final Boolean tsigEnabled;
   private final PowerDNSClient powerDnsClient;
 
   // Supported record types to synchronize with PowerDNS
@@ -79,6 +82,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private static final String DNSSEC_ZSK_EXPIRE_FLAG = "DNSSEC-ZSK-EXPIRE-DATE";
   private static final String DNSSEC_ZSK_ACTIVATION_FLAG = "DNSSEC-ZSK-ACTIVATION-DATE";
 
+  // TSIG key configuration
+  private static final String TSIG_KEY_NAME = "tsig";
+  private static final String TSIG_KEY_ALGORITHM = "hmac-sha256";
+
   /**
    * Class constructor.
    *
@@ -98,9 +105,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       @Config("dnsDefaultDsTtl") Duration dnsDefaultDsTtl,
       @Config("powerDnsBaseUrl") String powerDnsBaseUrl,
       @Config("powerDnsApiKey") String powerDnsApiKey,
-      @Config("powerDnsDefaultSoaMName") String powerDnsDefaultSoaMName,
-      @Config("powerDnsDefaultSoaRName") String powerDnsDefaultSoaRName,
+      @Config("powerDnsRootNameServers") ImmutableList<String> powerDnsRootNameServers,
+      @Config("powerDnsSoaName") String powerDnsSoaName,
       @Config("powerDnsDnssecEnabled") Boolean powerDnsDnssecEnabled,
+      @Config("powerDnsTsigEnabled") Boolean powerDnsTsigEnabled,
       Clock clock) {
 
     // call the DnsUpdateWriter constructor, omitting the transport parameter
@@ -109,9 +117,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
     // Initialize the PowerDNS client
     this.tldZoneName = getCanonicalHostName(tldZoneName);
-    this.defaultSoaMName = powerDnsDefaultSoaMName;
-    this.defaultSoaRName = powerDnsDefaultSoaRName;
+    this.rootNameServers = powerDnsRootNameServers;
+    this.soaName = powerDnsSoaName;
     this.dnssecEnabled = powerDnsDnssecEnabled;
+    this.tsigEnabled = powerDnsTsigEnabled;
     this.powerDnsClient = new PowerDNSClient(powerDnsBaseUrl, powerDnsApiKey);
   }
 
@@ -309,12 +318,32 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     RecordObject soaRecordContent = new RecordObject();
     soaRecordContent.setContent(
         String.format(
-            "%s %s 1 900 1800 6048000 %s", defaultSoaMName, defaultSoaRName, defaultZoneTtl));
+            "%s %s 1 900 1800 6048000 %s", rootNameServers.get(0), soaName, defaultZoneTtl));
     soaRecordContent.setDisabled(false);
     soaRecord.setRecords(new ArrayList<RecordObject>(Arrays.asList(soaRecordContent)));
 
-    // add the SOA record to the new TLD zone
-    newTldZone.setRrsets(new ArrayList<RRSet>(Arrays.asList(soaRecord)));
+    // create NS records, which may be modified later by an administrator
+    RRSet nsRecord = new RRSet();
+    nsRecord.setChangeType(RRSet.ChangeType.REPLACE);
+    nsRecord.setName(tldZoneName);
+    nsRecord.setTtl(defaultZoneTtl);
+    nsRecord.setType("NS");
+
+    // add content to the NS record content from default configuration
+    nsRecord.setRecords(
+        new ArrayList<RecordObject>(
+            rootNameServers.stream()
+                .map(
+                    ns -> {
+                      RecordObject nsRecordContent = new RecordObject();
+                      nsRecordContent.setContent(ns);
+                      nsRecordContent.setDisabled(false);
+                      return nsRecordContent;
+                    })
+                .collect(Collectors.toList())));
+
+    // add the SOA and NS record to the new TLD zone
+    newTldZone.setRrsets(new ArrayList<RRSet>(Arrays.asList(soaRecord, nsRecord)));
 
     // create the TLD zone and log the result
     Zone createdTldZone = powerDnsClient.createZone(newTldZone);
@@ -322,6 +351,63 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
     // return the created TLD zone
     return createdTldZone;
+  }
+
+  /**
+   * Validate the TSIG key configuration for the PowerDNS server. Ensures a TSIG key associated with
+   * the TLD zone is available for use, and detects whether the TLD zone has been configured to use
+   * the TSIG key during AXFR replication. Instructions are provided in the logs on how to configure
+   * both the primary and secondary DNS servers with the expected TSIG key.
+   *
+   * @param zone the TLD zone to validate
+   */
+  private void validateTsigConfig(Zone zone) throws IOException {
+    // check if TSIG configuration is required
+    if (!tsigEnabled) {
+      logger.atInfo().log(
+          "TSIG validation is not required for PowerDNS TLD zone %s", zone.getName());
+      return;
+    }
+
+    // calculate the zone TSIG key name
+    logger.atInfo().log("Validating TSIG configuration for PowerDNS TLD zone %s", zone.getName());
+    String zoneTsigKeyName =
+        String.format("%s-%s", getSanitizedHostName(zone.getName()), TSIG_KEY_NAME);
+
+    // validate the named TSIG key is present in the PowerDNS server
+    try {
+      // check for existing TSIG key, which throws an exception if it is not found
+      powerDnsClient.getTSIGKey(zoneTsigKeyName);
+    } catch (Exception e) {
+      // create the TSIG key
+      logger.atInfo().log(
+          "Creating TSIG key '%s' for PowerDNS TLD zone %s", zoneTsigKeyName, zone.getName());
+      powerDnsClient.createTSIGKey(TSIGKey.createTSIGKey(zoneTsigKeyName, TSIG_KEY_ALGORITHM));
+    }
+    logger.atInfo().log(
+        "Validated TSIG key '%s' (%s) is available for AXFR replication to secondary servers for"
+            + " TLD zone %s. Retrieve the key using 'pdnsutil list-tsig-keys' in a secure"
+            + " environment and apply the key to the secondary server configuration.",
+        zoneTsigKeyName, TSIG_KEY_ALGORITHM, zone.getName());
+
+    // ensure the TSIG-ALLOW-AXFR metadata is set to the current TSIG key name
+    try {
+      Metadata metadata = powerDnsClient.getMetadata(zone.getId(), "TSIG-ALLOW-AXFR");
+      // validate the metadata contains the expected TSIG key name
+      if (!metadata.getMetadata().contains(zoneTsigKeyName)) {
+        throw new IOException("missing expected TSIG-ALLOW-AXFR value");
+      }
+      logger.atInfo().log(
+          "Validated PowerDNS TLD zone %s is ready for AXFR replication using TSIG key '%s'",
+          zone.getName(), zoneTsigKeyName);
+    } catch (IOException e) {
+      // log the missing metadata with instructions on how to configure it
+      logger.atSevere().log(
+          "PowerDNS TLD zone %s is not configured for AXFR replication using TSIG key '%s'."
+              + " Configure the replication using 'pdnsutil activate-tsig-key %s %s primary' in a"
+              + " secure environment.",
+          zoneTsigKeyName, zone.getName(), zone.getName(), zoneTsigKeyName);
+    }
   }
 
   /**
@@ -346,9 +432,11 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         logger.atInfo().log("Enabling DNSSEC for PowerDNS TLD zone %s", zone.getName());
 
         // create the KSK and ZSK entries for the TLD zone
-        powerDnsClient.createCryptokey(
-            zone.getId(),
-            Cryptokey.createCryptokey(KeyType.ksk, DNSSEC_KSK_BITS, true, true, DNSSEC_ALGORITHM));
+        Cryptokey newKsk =
+            powerDnsClient.createCryptokey(
+                zone.getId(),
+                Cryptokey.createCryptokey(
+                    KeyType.ksk, DNSSEC_KSK_BITS, true, true, DNSSEC_ALGORITHM));
         powerDnsClient.createCryptokey(
             zone.getId(),
             Cryptokey.createCryptokey(KeyType.zsk, DNSSEC_ZSK_BITS, true, true, DNSSEC_ALGORITHM));
@@ -377,11 +465,49 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         }
 
         // retrieve the zone and print the new DS values
-        logger.atInfo().log("Successfully enabled DNSSEC for PowerDNS TLD zone %s", zone.getName());
+        logger.atInfo().log(
+            "Successfully enabled DNSSEC for PowerDNS TLD zone %s, expected root DS=%s",
+            zone.getName(),
+            newKsk.getDs().stream()
+                .map(ds -> String.format("IN DS %s", ds))
+                .collect(Collectors.toList()));
       } else {
         // DNSSEC is enabled, so we need to validate the configuration
         logger.atInfo().log(
             "Validating existing DNSSEC configuration for PowerDNS TLD zone %s", zone.getName());
+
+        // list all crypto keys for the TLD zone
+        List<Cryptokey> cryptokeys = powerDnsClient.listCryptokeys(zone.getId());
+
+        // identify the KSK and ZSK records
+        Cryptokey activeZsk =
+            cryptokeys.stream()
+                .filter(c -> c.getActive() && c.getKeytype() == KeyType.zsk)
+                .findFirst()
+                .orElse(null);
+        Cryptokey activeKsk =
+            cryptokeys.stream()
+                .filter(c -> c.getActive() && c.getKeytype() == KeyType.ksk)
+                .findFirst()
+                .orElse(null);
+
+        // validate the KSK and ZSK records are present
+        if (activeKsk == null || activeZsk == null) {
+          // log the error and continue
+          logger.atWarning().log(
+              "Unable to validate DNSSEC configuration with active KSK and ZSK records for PowerDNS"
+                  + " TLD zone %s",
+              zone.getName());
+          return;
+        }
+
+        // log the DS records associated with the KSK record
+        logger.atInfo().log(
+            "Validated KSK and ZSK records for PowerDNS TLD zone %s, expected root DS=%s",
+            zone.getName(),
+            activeKsk.getDs().stream()
+                .map(ds -> String.format("IN DS %s", ds))
+                .collect(Collectors.toList()));
 
         // check for a ZSK expiration flag
         if (zone.getAccount().contains(DNSSEC_ZSK_EXPIRE_FLAG)) {
@@ -431,15 +557,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
                 "ZSK activation window has elapsed, activating ZSK for PowerDNS TLD zone %s",
                 zone.getName());
 
-            // list all crypto keys for the TLD zone
-            List<Cryptokey> cryptokeys = powerDnsClient.listCryptokeys(zone.getId());
-
-            // identify the active and inactive ZSKs
-            Cryptokey activeZsk =
-                cryptokeys.stream()
-                    .filter(c -> c.getActive() && c.getKeytype() == KeyType.zsk)
-                    .findFirst()
-                    .orElse(null);
+            // identify the inactive ZSK
             Cryptokey inactiveZsk =
                 cryptokeys.stream()
                     .filter(c -> !c.getActive() && c.getKeytype() == KeyType.zsk)
@@ -541,6 +659,9 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     // retrieve an existing TLD zone by name
     for (Zone zone : powerDnsClient.listZones()) {
       if (getSanitizedHostName(zone.getName()).equals(getSanitizedHostName(tldZoneName))) {
+        // validate the zone's TSIG key configuration
+        validateTsigConfig(zone);
+
         // validate the DNSSEC configuration and return the TLD zone
         validateDnssecConfig(zone);
         return zone;
@@ -551,6 +672,9 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     try {
       // create a new TLD zone
       Zone zone = createZone();
+
+      // validate the zone's TSIG key configuration
+      validateTsigConfig(zone);
 
       // configure DNSSEC and return the TLD zone
       validateDnssecConfig(zone);

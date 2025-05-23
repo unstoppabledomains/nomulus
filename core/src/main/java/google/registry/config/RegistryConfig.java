@@ -134,50 +134,43 @@ public final class RegistryConfig {
     @Provides
     @Config("powerDnsBaseUrl")
     public static String providePowerDnsBaseUrl(RegistryConfigSettings config) {
-      if (config.powerDns.baseUrl != null) {
-        return config.powerDns.baseUrl;
-      }
-      return "http://localhost:8081/api/v1";
+      return config.powerDns.baseUrl;
     }
 
     /** API key for the PowerDNS server. */
     @Provides
     @Config("powerDnsApiKey")
     public static String providePowerDnsApiKey(RegistryConfigSettings config) {
-      if (config.powerDns.apiKey != null) {
-        return config.powerDns.apiKey;
-      }
-      return "example-api-key";
+      return config.powerDns.apiKey;
     }
 
     /** Whether DNSSEC is enabled for the PowerDNS server. */
     @Provides
     @Config("powerDnsDnssecEnabled")
     public static Boolean providePowerDnsDnssecEnabled(RegistryConfigSettings config) {
-      if (config.powerDns.dnssecEnabled != null) {
-        return config.powerDns.dnssecEnabled;
-      }
-      return false;
+      return config.powerDns.dnssecEnabled;
+    }
+
+    /** Whether TSIG is enabled for the PowerDNS server. */
+    @Provides
+    @Config("powerDnsTsigEnabled")
+    public static Boolean providePowerDnsTsigEnabled(RegistryConfigSettings config) {
+      return config.powerDns.tsigEnabled;
     }
 
     /** Default SOA MNAME for the TLD zone. */
     @Provides
-    @Config("powerDnsDefaultSoaMName")
-    public static String providePowerDnsDefaultSoaMName(RegistryConfigSettings config) {
-      if (config.powerDns.defaultSoaMName != null) {
-        return config.powerDns.defaultSoaMName;
-      }
-      return "a.gtld-servers.net.";
+    @Config("powerDnsRootNameServers")
+    public static ImmutableList<String> providePowerDnsRootNameServers(
+        RegistryConfigSettings config) {
+      return ImmutableList.copyOf(config.powerDns.rootNameServers);
     }
 
     /** Default SOA RNAME for the TLD zone. */
     @Provides
-    @Config("powerDnsDefaultSoaRName")
-    public static String providePowerDnsDefaultSoaRName(RegistryConfigSettings config) {
-      if (config.powerDns.defaultSoaRName != null) {
-        return config.powerDns.defaultSoaRName;
-      }
-      return "nstld.verisign-grs.com.";
+    @Config("powerDnsSoaName")
+    public static String providePowerDnsSoaName(RegistryConfigSettings config) {
+      return config.powerDns.soaName;
     }
 
     /**

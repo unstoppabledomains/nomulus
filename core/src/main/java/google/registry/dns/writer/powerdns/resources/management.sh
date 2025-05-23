@@ -118,3 +118,20 @@ dig DNSKEY $ZONE @127.0.0.1
 
 # After propagation, the old key may be removed.
 ./pdnsutil remove-zone-key $ZONE OLD-KSK-ID
+
+## AXFR Replication Setup on the Primary PowerDNS Server
+#
+#  The following commands are used to configure AXFR replication for a secondary
+#  PowerDNS server.
+
+# Assumes the TSIG was already created by PowerDnsWriter
+./pdnsutil activate-tsig-key $ZONE axfr-key-$ZONE primary
+
+## AXFR Replication Setup on the Secondary PowerDNS Server
+#
+#  The following commands are used to configure AXFR replication for a secondary
+#  PowerDNS server.
+
+./pdnsutil create-secondary-zone $ZONE $PRIMARY_IP:$PRIMARY_PORT
+./pdnsutil import-tsig-key axfr-key-$ZONE hmac-sha256 $TSIG_SHARED_SECRET
+./pdnsutil activate-tsig-key $ZONE axfr-key-$ZONE secondary
