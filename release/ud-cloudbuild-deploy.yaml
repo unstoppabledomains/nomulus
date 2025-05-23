@@ -34,13 +34,50 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo Using commit sha: $commit_sha
     echo "Copying files from GCS"
-    gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus-config-${_ENV}.yaml .
-    gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/cloud-scheduler-tasks-${_ENV}.xml .
-    gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/cloud-tasks-queue.xml .
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/nomulus-config-${_ENV}.yaml .
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/cloud-scheduler-tasks-${_ENV}.xml .
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/cloud-tasks-queue.xml .
     echo "Deploying Cloud Scheduler and Cloud Tasks"
     deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-scheduler-tasks-${_ENV}.xml $project_id
     deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-tasks-queue.xml $project_id
+# Deploy the GAE app services.
+- id: Deploy-GAE-App-Services
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo Using commit sha: $commit_sha
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/${_ENV}.tar .
+    tar -xvf ${_ENV}.tar
+    unzip default/WEB-INF/lib/core.jar
+    for _service in backend default bsa pubapi tools
+    do
+      gcloud -q --project $project_id app deploy ${_service}/app.yaml
+    done 
+- id: Deploy-GAE-Console-App
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    gcloud -q --project $project_id app deploy console/app.yaml
 # Deploy the GAE config files.
 # First authorize the gcloud tool to use the credential json file, then
 # download and unzip the tarball that contains the relevant config files
@@ -56,9 +93,7 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
-    gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/${_ENV}.tar .
-    tar -xvf ${_ENV}.tar
-    unzip default/WEB-INF/lib/core.jar
+    gcloud -q --project $project_id app deploy console/dispatch.yaml
     gcloud -q --project $project_id app deploy default/WEB-INF/appengine-generated/dispatch.yaml
 # Save the deployed tag for the current environment on GCS, and update the
 # mappings from Nomulus releases to Appengine versions.
@@ -69,7 +104,8 @@ steps:
   - -c
   - |
     set -e
-    echo ${COMMIT_SHA} | \
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo ${commit_sha} | \
       gcloud storage cp - gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tag
     # Update the release to AppEngine version mapping.
     if [ ${_ENV} == production ]; then
@@ -82,7 +118,7 @@ steps:
       --project $project_id --hide-no-traffic \
       --format="csv[no-heading](SERVICE,VERSION.ID)" | \
       grep -e "^backend\|^default\|^bsa\|^pubapi\|^tools" |\
-      while read line; do echo "${COMMIT_SHA},$line"; done | tee "$local_map"
+      while read line; do echo "${commit_sha},$line"; done | tee "$local_map"
     num_versions=$(cat "$local_map" | wc -l)
     if [ "$num_versions" -ne 5 ]; then
       echo "Expecting exactly five active services. Found $num_versions"
@@ -103,5 +139,6 @@ substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA: ${COMMIT_SHA}
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
