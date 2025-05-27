@@ -65,20 +65,20 @@ steps:
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:latest
   dir: 'release/builder/'
-# Build and upload the schema_deployer image. skipping database builds until i can figure out how to mount the database secrets...
-# - id: Build-Schema-Deployer-Image-And-Push
-#   name: 'gcr.io/cloud-builders/docker'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
-#     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
-#       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
-#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
-#     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
-#   dir: 'release/schema-deployer/'
+# Build and upload the schema_deployer image.
+- id: Build-Schema-Deployer-Image-And-Push
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+  dir: 'release/schema-deployer/'
 # # Build and upload the schema_verifier image.
 # - id: Build-Schema-Verifier-Image-And-Push
 #   name: 'gcr.io/cloud-builders/docker'
