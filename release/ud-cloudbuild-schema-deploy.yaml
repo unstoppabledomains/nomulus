@@ -25,7 +25,8 @@ steps:
 # start Cloud SQL proxy to all environments. This credential is also used to
 # authenticate the nomulus tool when fetching the schema deployer credential in
 # the next step.
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+- id: Get-Nomulus-Tool-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   volumes:
   - name: 'secrets'
     path: '/secrets'
@@ -38,7 +39,8 @@ steps:
       --secret nomulus-tool-cloudbuild-credential \
       > /secrets/cloud_sql_credential.json
 # Fetch the Cloud SQL credential for schema_deployer
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+- id: Get-Schema-Deployer-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
   volumes:
   - name: 'secrets'
     path: '/secrets'
@@ -53,7 +55,8 @@ steps:
   - --output
   - /secrets/schema_deployer_credential.dec
 # Download the schema jar to be deployed.
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+- id: Download-Schema-Jar
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   volumes:
   - name: 'flyway'
     path: '/flyway/jars'
@@ -62,10 +65,12 @@ steps:
   - -c
   - |
     set -e
-    gcloud storage cp gs://$PROJECT_ID-deploy/${COMMIT_SHA}/schema.jar \
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/schema.jar \
       /flyway/jars
 # Deploy SQL schema
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest'
+- id: Deploy-SQL-Schema
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest'
   volumes:
   - name: 'secrets'
     path: '/secrets'
@@ -76,15 +81,17 @@ steps:
 # location. Do not use the 'artifacts' section for this since it will
 # upload an extra metadata file every time and pollute the folder.
 # TODO(weiminyu): modify this step so that TAG_NAME may be 'live'.
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+- id: Save-Deployed-Tag
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    echo ${COMMIT_SHA} | \
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo ${commit_sha} | \
       gcloud storage cp - gs://$PROJECT_ID-deployed-tags/sql.${_ENV}.tag\
-timeout: 3600s
+timeout: 7200s
 options:
   machineType: 'E2_HIGHCPU_8'
 
@@ -92,6 +99,6 @@ substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _COMMIT_SHA: ${COMMIT_SHA}
+  _COMMIT_SHA:
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
