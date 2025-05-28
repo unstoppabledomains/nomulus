@@ -14,6 +14,7 @@
 
 ARG PROJECT_ID
 ARG TAG_NAME
+ARG GCR_HOSTNAME
 FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${TAG_NAME}
 
 COPY nomulus.jar /
