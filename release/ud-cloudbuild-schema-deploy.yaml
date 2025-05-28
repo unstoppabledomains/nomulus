@@ -94,6 +94,7 @@ steps:
 timeout: 7200s
 options:
   machineType: 'E2_HIGHCPU_8'
+  pool: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
 
 substitutions:
   _ENV: crash
