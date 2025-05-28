@@ -61,23 +61,23 @@ steps:
     gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/${_ENV}.tar .
     tar -xvf ${_ENV}.tar
     unzip default/WEB-INF/lib/core.jar
-    for _service in backend default bsa pubapi tools
+    for _service in backend default bsa pubapi tools console
     do
       gcloud -q --project $project_id app deploy ${_service}/app.yaml
     done 
-- id: Deploy-GAE-Console-App
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    if [ ${_ENV} == production ]; then
-      project_id="ud-registry"
-    else
-      project_id="ud-registry-${_ENV}"
-    fi
-    gcloud -q --project $project_id app deploy console/app.yaml
+# - id: Deploy-GAE-Console-App
+#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     if [ ${_ENV} == production ]; then
+#       project_id="ud-registry"
+#     else
+#       project_id="ud-registry-${_ENV}"
+#     fi
+#     gcloud -q --project $project_id app deploy console/app.yaml
 # Deploy the GAE config files.
 # First authorize the gcloud tool to use the credential json file, then
 # download and unzip the tarball that contains the relevant config files
@@ -93,6 +93,10 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
+    while [[ $(gcloud app operations list --filter="status=PENDING" --format="value(name)") ]]; do
+      echo "Waiting for pending App Engine operations to finish..."
+      sleep 10
+    done
     gcloud -q --project $project_id app deploy console/dispatch.yaml
     gcloud -q --project $project_id app deploy default/WEB-INF/appengine-generated/dispatch.yaml
 # Save the deployed tag for the current environment on GCS, and update the

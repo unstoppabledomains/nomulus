@@ -13,11 +13,23 @@ gcpProject:
   pubapiServiceUrl: https://pubapi-dot-ud-registry-crash.appspot.com
   baseDomain: ud-registry-crash.appspot.com
 
+powerDns:
+  baseUrl: {POWER_DNS_BASE_URL}
+  apiKey: {POWER_DNS_API_KEY}
+  dnssecEnabled: true
+  tsigEnabled: true
+  rootNameServers:
+  - a.gtld-servers.net.
+  - b.gtld-servers.net.
+  - c.gtld-servers.net.
+  - d.gtld-servers.net.
+  soaName: nstld.verisign-grs.com.
+
 registryTool:
   # OAuth client ID used by the tool.
   # OAuth client secret used by the tool.
 
-  clientId: 982350894596-fjvcp71ssf89okgpk7nen68e81an7lea.apps.googleusercontent.com
+  clientId: {OAUTH_CLIENT_ID}
   clientSecret: {OAUTH_CLIENT_SECRET}
 
 oAuth:
@@ -31,7 +43,7 @@ oAuth:
 
 cloudSql:
   jdbcUrl: jdbc:postgresql://localhost:15432/
-  instanceConnectionName: ud-registry-crash:us-central1:shared-298004a0
+  instanceConnectionName: {CLOUD_SQL_INSTANCE_CONNECTION_NAME}
 
 auth:
   # OAuth 2.0 client ID that will be used as the audience in OIDC ID tokens sent
@@ -41,4 +53,4 @@ auth:
   # as it allows requests bearing a token with this audience to be accepted by
   # both IAP or regular OIDC. The clientId value in proxy config file should be
   # the same as this one.
-  oauthClientId: 982350894596-fjvcp71ssf89okgpk7nen68e81an7lea.apps.googleusercontent.com
+  oauthClientId: {OAUTH_CLIENT_ID}

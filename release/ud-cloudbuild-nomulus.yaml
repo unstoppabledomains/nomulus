@@ -28,10 +28,22 @@ steps:
   - -c
   - |
     set -e
-    # Access the OAuth client secret from Secret Manager
+    # Access secrets from Secret Manager
+    POWER_DNS_BASE_URL=$(gcloud secrets versions access latest --secret="power-dns-base-url")
+    POWER_DNS_API_KEY=$(gcloud secrets versions access latest --secret="power-dns-api-key")
+    OAUTH_CLIENT_ID=$(gcloud secrets versions access latest --secret="oauth-client-id-nomulus-${_ENV}-desktop")
     OAUTH_SECRET=$(gcloud secrets versions access latest --secret="oauth-client-secret-nomulus-${_ENV}-desktop")
-    
-    # Replace the placeholder in the config file
+    CLOUD_SQL_INSTANCE_CONNECTION_NAME=$(gcloud secrets versions access latest --secret="keyring-sql-primary-conn-name")
+  
+    # Replace the placeholders in the config file
+    sed -i "s|{POWER_DNS_BASE_URL}|$${POWER_DNS_BASE_URL}|g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+    sed -i "s|{POWER_DNS_API_KEY}|$${POWER_DNS_API_KEY}|g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+    sed -i "s|{CLOUD_SQL_INSTANCE_CONNECTION_NAME}|$${CLOUD_SQL_INSTANCE_CONNECTION_NAME}|g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+    sed -i "s|{OAUTH_CLIENT_ID}|$${OAUTH_CLIENT_ID}|g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
     sed -i "s/{OAUTH_CLIENT_SECRET}/$${OAUTH_SECRET}/g" \
       core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
 # Build and package the deployment files for each environment, and the tool
