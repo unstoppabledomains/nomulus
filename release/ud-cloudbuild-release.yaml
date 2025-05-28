@@ -10,7 +10,7 @@
 # images in the merged code base (internal + public), which is tagged and pushed into the release
 # repo. Actual release artifacts are built from the release repo, ensuring reproducibility.
 steps:
-# Check the out internal repo. I dont know what this bullshit is for. Commenting out for now
+# Check the out internal repo. 
 # - name: 'gcr.io/cloud-builders/git'
 #   entrypoint: /bin/bash
 #   args:
@@ -31,7 +31,7 @@ steps:
 #     git tag ${TAG_NAME}
 #     git push origin ${TAG_NAME}
 #   dir: 'nomulus-internal'
-# Merge the repos. WHY?!?! ISN'T THIS MY REPO? IS THERE A PRIVATE ONE?!? Fuckers
+# Merge the repos. 
 # - name: 'gcr.io/cloud-builders/git'
 #   entrypoint: /bin/bash
 #   args:

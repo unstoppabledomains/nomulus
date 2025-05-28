@@ -18,7 +18,7 @@ registryTool:
   # OAuth client secret used by the tool.
 
   clientId: 982350894596-fjvcp71ssf89okgpk7nen68e81an7lea.apps.googleusercontent.com
-  clientSecret: PLACEHOLDER
+  clientSecret: {OAUTH_CLIENT_SECRET}
 
 oAuth:
   availableOauthScopes:

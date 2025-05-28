@@ -20,6 +20,20 @@ steps:
          '-PmavenUrl=https://repo.maven.apache.org/maven2',
          '-PpluginsUrl=https://plugins.gradle.org/m2'
   ]
+# Replace secrets in config file
+- id: Replace-Config-Secrets
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    # Access the OAuth client secret from Secret Manager
+    OAUTH_SECRET=$(gcloud secrets versions access latest --secret="oauth-client-secret-nomulus-${_ENV}-desktop")
+    
+    # Replace the placeholder in the config file
+    sed -i "s/{OAUTH_CLIENT_SECRET}/$${OAUTH_SECRET}/g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
 # Build and package the deployment files for each environment, and the tool
 # binary and image.
 - id: Build-Deployment-Files
