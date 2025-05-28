@@ -93,7 +93,6 @@ steps:
       gcloud storage cp - gs://$PROJECT_ID-deployed-tags/sql.${_ENV}.tag\
 timeout: 7200s
 options:
-  machineType: 'E2_HIGHCPU_8'
   pool: 
     name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
 
