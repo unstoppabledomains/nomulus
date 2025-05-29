@@ -42,7 +42,7 @@ oAuth:
   - https://www.googleapis.com/auth/userinfo.email
 
 cloudSql:
-  jdbcUrl: jdbc:postgresql://localhost:15432/
+  jdbcUrl: jdbc:postgresql://10.43.0.6:5432/nomulus
   instanceConnectionName: {CLOUD_SQL_INSTANCE_CONNECTION_NAME}
 
 auth:
