@@ -24,7 +24,7 @@
 
   <!-- Enable external traffic to go through VPC, required for static ip -->
   <vpc-access-connector>
-    <name>projects/ud-registry-crash/locations/us-central1/connectors/manual-test</name>
+    <name>projects/ud-registry-crash/locations/us-central1/connectors/static-ip-conn-a53d2913</name>
     <egress-setting>all-traffic</egress-setting>
   </vpc-access-connector>
 
