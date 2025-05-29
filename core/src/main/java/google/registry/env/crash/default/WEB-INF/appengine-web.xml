@@ -22,6 +22,11 @@
     <env-var name="GOOGLE_APPLICATION_CREDENTIALS_SKIP_APP_ENGINE" value="true"/>
   </env-variables>
 
+  <vpc-access-connector>
+    <name>projects/ud-registry-crash/locations/us-central1/connectors/dynamic-ip-conn-2defc355</name>
+    <egress-setting>all-traffic</egress-setting>
+  </vpc-access-connector>
+
   <static-files>
     <include path="/*.html" expiration="1m"/>
     <include path="/registrar/*.html" expiration="1m"/>
