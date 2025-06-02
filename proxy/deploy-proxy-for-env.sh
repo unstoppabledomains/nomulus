@@ -23,7 +23,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 environment=${1}
-project="domain-registry-"${environment}
+project="ud-registry-"${environment}
 current_context=$(kubectl config current-context)
 while read line
 do
@@ -35,7 +35,7 @@ do
   kubectl apply -f -
   kubectl apply -f "./kubernetes/proxy-service.yaml" --force
   # Alpha does not have canary
-  if [[ ${environment} != "alpha" ]]; then
+  if [[ ${environment} != "alpha" && ${environment} != "crash" ]]; then
     sed s/GCP_PROJECT/${project}/g "./kubernetes/proxy-deployment-${environment}-canary.yaml" | \
     kubectl apply -f -
     kubectl apply -f "./kubernetes/proxy-service-canary.yaml" --force

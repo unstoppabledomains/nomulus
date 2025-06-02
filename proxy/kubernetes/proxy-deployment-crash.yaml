@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: proxy
-        image: gcr.io/GCP_PROJECT/proxy
+        image: us-central1-docker.pkg.dev/ud-registry-crash/nomulus/proxy
         ports:
         - containerPort: 30000
           name: health-check
