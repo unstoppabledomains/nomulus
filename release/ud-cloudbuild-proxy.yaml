@@ -9,7 +9,7 @@
 steps:
 # Build the proxy docker image.
 - id: Build-Proxy-Image
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   args:
   - ./gradlew
   - :proxy:test
@@ -19,7 +19,7 @@ steps:
 # Tag and push the image. We can't let Cloud Build's default processing do that for us
 # because we need to push the image before we can sign it in the following step.
 - id: Tag-And-Push-Proxy-Image
-- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
