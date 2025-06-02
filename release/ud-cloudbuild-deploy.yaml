@@ -65,22 +65,6 @@ steps:
     do
       gcloud -q --project $project_id app deploy ${_service}/app.yaml
     done 
-# - id: Deploy-GAE-Console-App
-#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     if [ ${_ENV} == production ]; then
-#       project_id="ud-registry"
-#     else
-#       project_id="ud-registry-${_ENV}"
-#     fi
-#     gcloud -q --project $project_id app deploy console/app.yaml
-# Deploy the GAE config files.
-# First authorize the gcloud tool to use the credential json file, then
-# download and unzip the tarball that contains the relevant config files
 - id: Deploy-GAE-Config
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
@@ -130,6 +114,12 @@ steps:
     fi
     gcloud storage cp "$local_map" gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tmp
     # Atomically append uploaded tmp file to nomulus.${_ENV}.versions
+    # Check if versions file exists, if not create it
+    if ! gcloud storage ls gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions &>/dev/null; then
+      echo "Creating initial versions file..."
+      echo "# Initial deployment $(date)" | \
+        gcloud storage cp - gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions
+    fi
     gcloud storage objects compose \
       gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions \
       gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tmp \
@@ -137,7 +127,8 @@ steps:
 
 timeout: 3600s
 options:
-  machineType: 'E2_HIGHCPU_8'
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
 
 substitutions:
   _ENV: crash

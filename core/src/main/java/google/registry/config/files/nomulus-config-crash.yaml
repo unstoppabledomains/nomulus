@@ -19,11 +19,10 @@ powerDns:
   dnssecEnabled: true
   tsigEnabled: true
   rootNameServers:
-  - a.gtld-servers.net.
-  - b.gtld-servers.net.
-  - c.gtld-servers.net.
-  - d.gtld-servers.net.
-  soaName: nstld.verisign-grs.com.
+  - unstoppable1.d-zone.ca
+  - unstoppable2.d-zone.ca
+  - unstoppable3.d-zone.ca
+  soaName: dns-hostmaster.dnex-test.com
 
 registryTool:
   # OAuth client ID used by the tool.
@@ -54,3 +53,5 @@ auth:
   # both IAP or regular OIDC. The clientId value in proxy config file should be
   # the same as this one.
   oauthClientId: {OAUTH_CLIENT_ID}
+  allowedServiceAccountEmails:
+  - proxy-service-account@ud-registry-crash.iam.gserviceaccount.com
