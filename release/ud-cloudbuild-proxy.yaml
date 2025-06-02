@@ -1,0 +1,69 @@
+# This will create a docker image named gcr.io/[PROJECT_ID]/proxy:[TAG] locally.
+# The PROJECT_ID is the current project name that gcloud uses.
+#
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-proxy.yaml --substitutions TAG_NAME=[TAG] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+steps:
+# Build the proxy docker image.
+- id: Build-Proxy-Image
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  args:
+  - ./gradlew
+  - :proxy:test
+  - :proxy:buildProxyImage
+  - -PmavenUrl=https://repo.maven.apache.org/maven2
+  - -PpluginsUrl=https://plugins.gradle.org/m2
+# Tag and push the image. We can't let Cloud Build's default processing do that for us
+# because we need to push the image before we can sign it in the following step.
+- id: Tag-And-Push-Proxy-Image
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+  dir: 'proxy'
+# # Get the image digest, sign it and substitute in the digest in the tagging yaml file.
+# - name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy \
+#       --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
+#     gcloud --project=${PROJECT_ID} alpha container binauthz attestations \
+#       sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy@$digest \
+#       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
+#       --keyversion-project=${PROJECT_ID} --keyversion-location=global \
+#       --keyversion-keyring=attestor-keys --keyversion-key=signing \
+#       --keyversion=1
+# Images to upload to GCR. Even though the image has already been uploaded, we still include it
+# here so that the GCB pubsub message contains it (for Spinnaker to consume).
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}']
+# Config files to upload to GCS.
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}-deploy/${COMMIT_SHA}'
+    # This cannot be regexs because of how Spinnaker constructs artifact paths.
+    paths:
+    - 'proxy/kubernetes/proxy-*.yaml'
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA: ${COMMIT_SHA}
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
