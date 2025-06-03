@@ -54,7 +54,7 @@ kms:
 
 epp:
   port: 30002
-  relayHost: ud-registry-crash.appspot.com
+  relayHost: pubapi-dot-ud-registry-crash.uc.r.appspot.com
   relayPath: /_dr/epp
 
   # Maximum input message length in bytes.
@@ -65,7 +65,7 @@ epp:
   # top. In fact, we should probably limit this to a more reasonable number, as
   # a 1 GB message will likely cause the proxy to go out of memory.
   #
-  # See also: RFC 5734 4 Data Unit Format
+# See also: RFC 5734 4 Data Unit Format
   # (https://tools.ietf.org/html/rfc5734#section-4).
   maxMessageLengthBytes: 1073741824
 
@@ -120,7 +120,7 @@ epp:
 
 whois:
   port: 30001
-  relayHost: ud-registry-crash.appspot.com
+  relayHost: pubapi-dot-ud-registry-crash.uc.r.appspot.com
   relayPath: /_dr/whois
 
   # Maximum input message length in bytes.
