@@ -38,19 +38,19 @@ gcs:
   # GCS bucket that stores the encrypted PEM file.
   bucket: ud-registry-crash-nomulus-proxy-certificate-f7b380f2
   # Name of the encrypted PEM file.
-  sslPemFilename: ud-registry-crash-nomulus-proxy.pem
+  sslPemFilename: proxy-ssl-cert-key.pem.enc
 
 # Strings used to construct the KMS crypto key URL.
 # See: https://cloud.google.com/kms/docs/reference/rest/v1/projects.locations.keyRings.cryptoKeys
 kms:
   # Location where your key ring is stored (global, us-east1, etc).
-  location: your-kms-location
+  location: global
 
   # Name of the KeyRing that contains the CryptoKey file.
-  keyRing: your-kms-keyRing
+  keyRing: proxy-key-ring
 
   # Name of the CryptoKey used to encrypt the PEM file.
-  cryptoKey: your-kms-cryptoKey
+  cryptoKey: proxy-key
 
 epp:
   port: 30002
