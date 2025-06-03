@@ -16,8 +16,7 @@ steps:
   args:
   - -c
   - |
-    deploy-proxy-for-env.sh ${_ENV}
-  dir: 'proxy'
+    proxy/deploy-proxy-for-env.sh ${_ENV}
 timeout: 3600s
 options:
   pool: 
