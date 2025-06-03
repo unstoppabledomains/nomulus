@@ -42,9 +42,11 @@ do
     sed s/GCP_PROJECT/${project}/g "./kubernetes/proxy-deployment-${environment}-canary.yaml" | \
     kubectl apply -f -
     kubectl apply -f "./kubernetes/proxy-service-canary.yaml" --force
+    kubectl rollout restart deployment/proxy-deployment-canary
   fi
   # Restart all running pods, new pods created will be pulling the new image.
   kubectl rollout restart deployment/proxy-deployment
-  kubectl rollout restart deployment/proxy-deployment-canary
 done < <(gcloud container clusters list --project ${project} | grep proxy-cluster)
-kubectl config use-context "$current_context"
+if [[ -n "$current_context" ]]; then
+  kubectl config use-context "$current_context"
+fi
