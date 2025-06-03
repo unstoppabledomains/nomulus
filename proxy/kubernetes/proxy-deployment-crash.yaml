@@ -23,6 +23,8 @@ spec:
           name: health-check
         - containerPort: 30002
           name: epp
+        - containerPort: 30001
+          name: whois
         readinessProbe:
           tcpSocket:
             port: health-check
