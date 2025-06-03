@@ -54,7 +54,7 @@ kms:
 
 epp:
   port: 30002
-  relayHost: pubapi-dot-ud-registry-crash.uc.r.appspot.com
+  relayHost: ud-registry-crash.uc.r.appspot.com
   relayPath: /_dr/epp
 
   # Maximum input message length in bytes.
@@ -120,7 +120,7 @@ epp:
 
 whois:
   port: 30001
-  relayHost: pubapi-dot-ud-registry-crash.uc.r.appspot.com
+  relayHost: ud-registry-crash.uc.r.appspot.com
   relayPath: /_dr/whois
 
   # Maximum input message length in bytes.
