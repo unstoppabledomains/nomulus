@@ -25,10 +25,13 @@ fi
 environment=${1}
 project="ud-registry-"${environment}
 current_context=$(kubectl config current-context)
+
+echo "Current project: ${project}, environment: ${environment}"
 while read line
 do
   parts=(${line})
   echo "Updating cluster ${parts[0]} in zone ${parts[1]}..."
+  echo "Parts: ${parts[@]}"
   gcloud container clusters get-credentials "${parts[0]}" \
     --project "${project}" --zone "${parts[1]}"
   sed s/GCP_PROJECT/${project}/g "./kubernetes/proxy-deployment-${environment}.yaml" | \

@@ -10,13 +10,12 @@ steps:
 # Build the proxy docker image.
 - id: Deploy-Nomulus-Proxy
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-  # Set home for Gradle caches. 
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
   entrypoint: /bin/bash
   args:
   - -c
   - |
-    proxy/deploy-proxy-for-env.sh ${_ENV}
+    ./deploy-proxy-for-env.sh ${_ENV}
+  dir: 'proxy'
 timeout: 3600s
 options:
   pool: 
