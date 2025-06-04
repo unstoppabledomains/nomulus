@@ -75,8 +75,7 @@ public class ConsoleRegistryLockActionTest extends ConsoleActionBaseTestCase {
       Note: this code will expire in one hour.
 
       https://registrarconsole.tld/console/#/registry-lock-verify?lockVerificationCode=\
-      123456789ABCDEFGHJKLMNPQRSTUVWXY\
-      """;
+      123456789ABCDEFGHJKLMNPQRSTUVWXY""";
 
   @Mock GmailClient gmailClient;
   private ConsoleRegistryLockAction action;
@@ -207,7 +206,7 @@ public class ConsoleRegistryLockActionTest extends ConsoleActionBaseTestCase {
     // locks or completed unlocks
     assertThat(response.getPayload())
         .isEqualTo(
-"""
+            """
 [{"domainName":"adminexample.test","lockRequestTime":{"creationTime":"2024-04-16T00:00:00.001Z"},\
 "unlockRequestTime":"null","lockCompletionTime":"2024-04-16T00:00:00.001Z","unlockCompletionTime":\
 "null","isSuperuser":true},\
@@ -226,8 +225,7 @@ public class ConsoleRegistryLockActionTest extends ConsoleActionBaseTestCase {
 \
 {"domainName":"pending.test","registrarPocId":"johndoe@theregistrar.com","lockRequestTime":\
 {"creationTime":"2024-04-16T00:00:00.001Z"},"unlockRequestTime":"null","lockCompletionTime":"null",\
-"unlockCompletionTime":"null","isSuperuser":false}]\
-""");
+"unlockCompletionTime":"null","isSuperuser":false}]""");
   }
 
   @Test

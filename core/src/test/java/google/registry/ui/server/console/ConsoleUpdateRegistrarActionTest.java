@@ -38,8 +38,6 @@ import google.registry.request.Action;
 import google.registry.request.RequestModule;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.ConsoleApiParamsUtils;
-import google.registry.testing.FakeClock;
-import google.registry.testing.FakeResponse;
 import google.registry.testing.SystemPropertyExtension;
 import google.registry.util.EmailMessage;
 import google.registry.util.RegistryEnvironment;
@@ -56,11 +54,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Tests for {@link google.registry.ui.server.console.ConsoleUpdateRegistrarAction}. */
-class ConsoleUpdateRegistrarActionTest {
-  private static final Gson GSON = GsonUtils.provideGson();
-  private final FakeClock clock = new FakeClock(DateTime.parse("2025-01-01T00:00:00.000Z"));
-  private ConsoleApiParams consoleApiParams;
-  private FakeResponse response;
+class ConsoleUpdateRegistrarActionTest extends ConsoleActionBaseTestCase {
 
   private Registrar registrar;
 
@@ -73,10 +67,6 @@ class ConsoleUpdateRegistrarActionTest {
   @RegisterExtension
   @Order(Integer.MAX_VALUE)
   final SystemPropertyExtension systemPropertyExtension = new SystemPropertyExtension();
-
-  @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
 
   @BeforeEach
   void beforeEach() throws Exception {
@@ -106,7 +96,7 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2024-12-12T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     Registrar newRegistrar = Registrar.loadByRegistrarId("TheRegistrar").get();
     assertThat(newRegistrar.getAllowedTlds()).containsExactly("app", "dev");
@@ -139,8 +129,8 @@ class ConsoleUpdateRegistrarActionTest {
                 false,
                 "\"2025-02-01T00:00:00.000Z\""));
     action.run();
-    assertThat(((FakeResponse) consoleApiParams.response()).getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat((String) ((FakeResponse) consoleApiParams.response()).getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
+    assertThat((String) response.getPayload())
         .contains("Invalid value of LastPocVerificationDate - value is in the future");
   }
 
@@ -184,7 +174,7 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2024-12-12T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     Registrar newRegistrar = Registrar.loadByRegistrarId("TheRegistrar").get();
     assertThat(newRegistrar.getAllowedTlds()).containsExactly("app", "dev");
@@ -201,7 +191,7 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2024-12-12T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     verify(consoleApiParams.sendEmailUtils().gmailClient, times(1))
         .sendEmail(
@@ -215,7 +205,7 @@ class ConsoleUpdateRegistrarActionTest {
                         + "\n"
                         + "allowedTlds: null -> [app, dev]\n"
                         + "lastPocVerificationDate: 1970-01-01T00:00:00.000Z ->"
-                        + " 2024-12-12T00:00:00.000Z\n")
+                        + " 2023-12-12T00:00:00.000Z\n")
                 .setRecipients(ImmutableList.of(new InternetAddress("notification@test.example")))
                 .build());
   }
