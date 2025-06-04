@@ -12,7 +12,7 @@ projectId: ud-registry-crash
 # same as the auth.oauthClientId value in Nomulus config file, which usually is
 # the IAP client ID, to allow the request to access IAP protected endpoints.
 # Regular OIDC authentication mechanism also checks for this audience.
-oauthClientId: 982350894596-fjvcp71ssf89okgpk7nen68e81an7lea.apps.googleusercontent.com
+oauthClientId: 982350894596-r6s4rb20obj4sn5dptalki7fuhi95dob.apps.googleusercontent.com
 
 # OAuth scope that the GoogleCredential will be constructed with. This list
 # should include all service scopes that the proxy depends on.
