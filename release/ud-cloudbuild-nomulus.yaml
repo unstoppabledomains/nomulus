@@ -241,6 +241,7 @@ artifacts:
     - 'core/src/main/java/google/registry/config/files/nomulus-config-*.yaml'
     - 'core/src/main/java/google/registry/config/files/cloud-tasks-queue.xml'
     - 'core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-*.xml'
+    - 'core/src/main/java/google/registry/config/files/power-dns/env-*.yaml'
     - 'release/cloudbuild-sync-and-tag.yaml'
     - 'release/cloudbuild-deploy-*.yaml'
     - 'release/cloudbuild-delete-*.yaml'
