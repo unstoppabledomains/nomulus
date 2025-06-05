@@ -27,7 +27,7 @@ steps:
     set -e
     shopt -s dotglob
     rm -rf .git && rm -rf nomulus-internal/.git
-    cp -prf nomulus-internal/* .
+    cp -rf nomulus-internal/* .
     rm -rf nomulus-internal
 # Create a directory to store the artifacts
 - id: Create-Nomulus-Directory
