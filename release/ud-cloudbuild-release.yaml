@@ -11,16 +11,14 @@
 # repo. Actual release artifacts are built from the release repo, ensuring reproducibility.
 steps:
 # Check the out internal repo. 
-# - name: 'gcr.io/cloud-builders/git'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     git clone https://gerrit.googlesource.com/gcompute-tools
-#     sed -i s@/usr/bin/python@/usr/bin/python3@g ./gcompute-tools/git-cookie-authdaemon
-#     ./gcompute-tools/git-cookie-authdaemon
-#     git clone ${_INTERNAL_REPO_URL} nomulus-internal
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git
 # Tag and push the internal repo.
 # - name: 'gcr.io/cloud-builders/git'
 #   entrypoint: /bin/bash
