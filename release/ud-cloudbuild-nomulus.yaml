@@ -17,16 +17,6 @@ steps:
     git config --global credential.helper store
     echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
     git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
-# Tag and push the internal repo.
-# - name: 'gcr.io/cloud-builders/git'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     git tag ${TAG_NAME}
-#     git push origin ${TAG_NAME}
-#   dir: 'nomulus-internal'
 # Merge the repos. 
 - id: Merge-Internal-Repo
   name: 'gcr.io/cloud-builders/git'

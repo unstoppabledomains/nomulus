@@ -7,6 +7,30 @@
 # To trigger a build automatically, follow the instructions below and add a trigger:
 # https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
 steps:
+# Check the out internal repo. 
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
+- id: Merge-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    shopt -s dotglob
+    rm -rf .git && rm -rf nomulus-internal/.git
+    cp -prf nomulus-internal/* .
+    rm -rf nomulus-internal
 # Build the proxy docker image.
 - id: Deploy-Nomulus-Proxy
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
