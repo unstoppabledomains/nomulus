@@ -134,5 +134,5 @@ substitutions:
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 availableSecrets:
   secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/latest
+  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
     env: GITHUB_OAUTH_TOKEN
