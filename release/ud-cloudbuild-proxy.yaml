@@ -40,7 +40,7 @@ steps:
     set -e
     shopt -s dotglob
     rm -rf .git && rm -rf nomulus-internal/.git
-    cp -rf nomulus-internal/* .
+    cp -prf nomulus-internal/* .
     rm -rf nomulus-internal
 # Build the proxy docker image.
 - id: Build-Proxy-Image

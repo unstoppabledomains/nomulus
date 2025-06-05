@@ -43,7 +43,7 @@ steps:
     set -e
     shopt -s dotglob
     rm -rf .git && rm -rf nomulus-internal/.git
-    cp -rf nomulus-internal/* .
+    cp -prf nomulus-internal/* .
     rm -rf nomulus-internal
 # Build the builder image and pull the base images, them upload them to GCR.
 - id: Build-Builder-Base-Images-And-Push

@@ -37,7 +37,7 @@ steps:
     set -e
     shopt -s dotglob
     rm -rf .git && rm -rf nomulus-internal/.git
-    cp -rf nomulus-internal/* .
+    cp -prf nomulus-internal/* .
     rm -rf nomulus-internal
 # Create a directory to store the artifacts
 - id: Create-Nomulus-Directory
@@ -72,9 +72,9 @@ steps:
   
     # Replace the placeholders in the config file
     sed -i "s|{POWER_DNS_BASE_URL}|$${POWER_DNS_BASE_URL}|g" \
-      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+      core/src/main/java/google/registry/config/files/power-dns/env-${_ENV}.yaml
     sed -i "s|{POWER_DNS_API_KEY}|$${POWER_DNS_API_KEY}|g" \
-      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+      core/src/main/java/google/registry/config/files/power-dns/env-${_ENV}.yaml
     sed -i "s|{CLOUD_SQL_INSTANCE_CONNECTION_NAME}|$${CLOUD_SQL_INSTANCE_CONNECTION_NAME}|g" \
       core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
     sed -i "s|{OAUTH_CLIENT_ID}|$${OAUTH_CLIENT_ID}|g" \
