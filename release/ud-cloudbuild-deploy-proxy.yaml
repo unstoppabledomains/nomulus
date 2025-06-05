@@ -1,0 +1,30 @@
+# This will create a docker image named gcr.io/[PROJECT_ID]/proxy:[TAG] locally.
+# The PROJECT_ID is the current project name that gcloud uses.
+#
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-proxy.yaml --substitutions TAG_NAME=[TAG] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+steps:
+# Build the proxy docker image.
+- id: Deploy-Nomulus-Proxy
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    ./deploy-proxy-for-env.sh ${_ENV}
+  dir: 'proxy'
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA: ${COMMIT_SHA}
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"

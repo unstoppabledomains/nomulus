@@ -1,0 +1,105 @@
+# This will deploy Cloud SQL schema release with tag value ${TAG_NAME} to
+# the environment specified by ${_ENV}.
+#
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config=cloudbuild-schema-deploy.yaml \
+# --substitutions=TAG_NAME=[TAG],_ENV=[ENV] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+#
+# Note that the release process hardens the tags and variables in this file:
+# - The 'latest' tag on docker images will be replaced by their image digests.
+# - The ${TAG_NAME} pattern will be replaced by the actual release tag.
+# - The ${_ENV} pattern will be replaced by the actual environment name.
+# Please refer to ./cloudbuild-release.yaml for more details.
+
+# Note 2: to work around issue in Spinnaker's 'Deployment Manifest' stage,
+# variable references must avoid the ${var} format. Valid formats include
+# $var or ${"${var}"}. This file use the former. Since TAG_NAME and _ENV are
+# expanded in the copies sent to Spinnaker, we preserve the brackets around
+# them for safe pattern matching during release.
+# See https://github.com/spinnaker/spinnaker/issues/3028 for more information.
+steps:
+# Download and decrypt the nomulus tool credential, which has the privilege to
+# start Cloud SQL proxy to all environments. This credential is also used to
+# authenticate the nomulus tool when fetching the schema deployer credential in
+# the next step.
+- id: Get-Nomulus-Tool-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud secrets versions access latest \
+      --secret nomulus-tool-cloudbuild-credential \
+      > /secrets/cloud_sql_credential.json
+# Fetch the Cloud SQL credential for schema_deployer
+- id: Get-Schema-Deployer-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - -e
+  - ${_ENV}
+  - --credential
+  - /secrets/cloud_sql_credential.json
+  - get_sql_credential
+  - --user
+  - schema_deployer
+  - --output
+  - /secrets/schema_deployer_credential.dec
+# Download the schema jar to be deployed.
+- id: Download-Schema-Jar
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  volumes:
+  - name: 'flyway'
+    path: '/flyway/jars'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/schema.jar \
+      /flyway/jars
+# Deploy SQL schema
+- id: Deploy-SQL-Schema
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  - name: 'flyway'
+    path: '/flyway/jars'
+  args: ['migrate']
+# Save the deployed tag for the current environment on GCS to a well-known.
+# location. Do not use the 'artifacts' section for this since it will
+# upload an extra metadata file every time and pollute the folder.
+# TODO(weiminyu): modify this step so that TAG_NAME may be 'live'.
+- id: Save-Deployed-Tag
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo ${commit_sha} | \
+      gcloud storage cp - gs://$PROJECT_ID-deployed-tags/sql.${_ENV}.tag\
+timeout: 7200s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA:
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"

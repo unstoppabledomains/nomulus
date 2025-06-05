@@ -1,0 +1,138 @@
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config=cloudbuild-deploy.yaml \
+# --substitutions=TAG_NAME=[TAG],_ENV=[ENV] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+#
+# Note: to work around issue in Spinnaker's 'Deployment Manifest' stage,
+# variable references must avoid the ${var} format. Valid formats include
+# $var or ${"${var}"}. This file uses the former. Since TAG_NAME and _ENV are
+# expanded in the copies sent to Spinnaker, we preserve the brackets around
+# them for safe pattern matching during release.
+# See https://github.com/spinnaker/spinnaker/issues/3028 for more information.
+steps:
+# Pull the credential for nomulus tool.
+# - name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     gcloud secrets versions access latest \
+#       --secret nomulus-tool-cloudbuild-credential > tool-credential.json
+# Create/Update cloud scheduler and cloud tasks based on a cloud-scheduler-tasks.xml
+- id: Create-Cloud-Scheduler-Tasks
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo Using commit sha: $commit_sha
+    echo "Copying files from GCS"
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/nomulus-config-${_ENV}.yaml .
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/cloud-scheduler-tasks-${_ENV}.xml .
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/cloud-tasks-queue.xml .
+    echo "Deploying Cloud Scheduler and Cloud Tasks"
+    deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-scheduler-tasks-${_ENV}.xml $project_id
+    deployCloudSchedulerAndQueue nomulus-config-${_ENV}.yaml cloud-tasks-queue.xml $project_id
+# Deploy the GAE app services.
+- id: Deploy-GAE-App-Services
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo Using commit sha: $commit_sha
+    gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/${_ENV}.tar .
+    tar -xvf ${_ENV}.tar
+    unzip default/WEB-INF/lib/core.jar
+    for _service in backend default bsa pubapi tools console
+    do
+      gcloud -q --project $project_id app deploy ${_service}/app.yaml
+    done 
+- id: Deploy-GAE-Config
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    while [[ $(gcloud app operations list --filter="status=PENDING" --format="value(name)") ]]; do
+      echo "Waiting for pending App Engine operations to finish..."
+      sleep 10
+    done
+    gcloud -q --project $project_id app deploy console/dispatch.yaml
+    gcloud -q --project $project_id app deploy default/WEB-INF/appengine-generated/dispatch.yaml
+# Save the deployed tag for the current environment on GCS, and update the
+# mappings from Nomulus releases to Appengine versions.
+- id: Save-Deployed-Tag
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo ${commit_sha} | \
+      gcloud storage cp - gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tag
+    # Update the release to AppEngine version mapping.
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    local_map="nomulus.${_ENV}.tmp"
+    gcloud app versions list \
+      --project $project_id --hide-no-traffic \
+      --format="csv[no-heading](SERVICE,VERSION.ID)" | \
+      grep -e "^backend\|^default\|^bsa\|^pubapi\|^tools" |\
+      while read line; do echo "${commit_sha},$line"; done | tee "$local_map"
+    num_versions=$(cat "$local_map" | wc -l)
+    if [ "$num_versions" -ne 5 ]; then
+      echo "Expecting exactly five active services. Found $num_versions"
+      exit 1
+    fi
+    gcloud storage cp "$local_map" gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tmp
+    # Atomically append uploaded tmp file to nomulus.${_ENV}.versions
+    # Check if versions file exists, if not create it
+    if ! gcloud storage ls gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions &>/dev/null; then
+      echo "Creating initial versions file..."
+      echo "# Initial deployment $(date)" | \
+        gcloud storage cp - gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions
+    fi
+    gcloud storage objects compose \
+      gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions \
+      gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tmp \
+      gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.versions
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA: ${COMMIT_SHA}
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
