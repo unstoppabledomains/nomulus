@@ -22,7 +22,6 @@ import google.registry.bigquery.BigqueryModule;
 import google.registry.config.CloudTasksUtilsModule;
 import google.registry.config.CredentialModule;
 import google.registry.config.RegistryConfig.ConfigModule;
-import google.registry.dns.writer.VoidDnsWriterModule;
 import google.registry.dns.writer.powerdns.PowerDnsConfig.PowerDnsConfigModule;
 import google.registry.export.DriveModule;
 import google.registry.export.sheet.SheetsServiceModule;
@@ -75,7 +74,6 @@ import jakarta.inject.Singleton;
       SheetsServiceModule.class,
       StackdriverModule.class,
       UrlConnectionServiceModule.class,
-      VoidDnsWriterModule.class,
       UtilsModule.class
     })
 interface BackendComponent {
