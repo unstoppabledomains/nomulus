@@ -14,9 +14,8 @@
 # Initializes roles in the database and assigns them to the nomulus and tool user.
 # Updates the flyway user permissions too
 ARG PROJECT_ID
-ARG TAG_NAME
 ARG GCR_HOSTNAME
-FROM ${GCR_HOSTNAME}/${PROJECT_ID}/builder:${TAG_NAME}
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
 
 COPY db/src/main/resources/sql/user/initialize_roles.sql /
 COPY db/src/main/resources/sql/user/set_fly_privileges.sql /

@@ -8,7 +8,7 @@ steps:
   - -c
   - |
     set -e
-    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA} \
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:latest
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA}
@@ -22,3 +22,4 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA}']
