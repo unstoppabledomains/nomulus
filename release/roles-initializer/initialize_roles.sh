@@ -54,20 +54,33 @@ if ! pgrep cloud_sql_proxy; then
 fi
 
 # Run initialize_roles.sql against the database
-PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus -f /initialize_roles.sql
-if [ $? -ne 0 ]; then
-  echo "Failed to initialize roles."
+if [ ! -f /initialize_roles.sql ]; then
+  echo "Missing /initialize_roles.sql"
   exit 1
 fi
-echo "$(date): Successfully initialized roles in ${cloud_sql_instance}."
+
+## dont do anything yet, let's make sure we can connect first
+# PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus -f /initialize_roles.sql
+# if [ $? -ne 0 ]; then
+#   echo "Failed to initialize roles."
+#   exit 1
+# fi
+# echo "$(date): Successfully initialized roles in ${cloud_sql_instance}."
+
+if [ ! -f /set_flyway_privileges.sql ]; then
+  echo "Missing /set_flyway_privileges.sql"
+  exit 1
+fi
+
+PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus
 
 # Run set_flyway_priveleges.sql against the database
-PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus -f /set_flyway_privileges.sql
-if [ $? -ne 0 ]; then
-  echo "Failed to set Flyway privileges."
-  exit 1
-fi
-echo "$(date): Successfully set Flyway privileges in ${cloud_sql_instance}."
+#PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus -f /set_flyway_privileges.sql
+# if [ $? -ne 0 ]; then
+#   echo "Failed to set Flyway privileges."
+#   exit 1
+# fi
+# echo "$(date): Successfully set Flyway privileges in ${cloud_sql_instance}."
 
 # Clean up the background process
 pkill cloud_sql_proxy
