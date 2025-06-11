@@ -25,6 +25,7 @@ RUN apt-get update && \
 COPY initialize_roles.sql /
 COPY set_flyway_privileges.sql /
 
-COPY initialize_roles.sh /usr/local/bin/
+COPY initialize_roles.sh /usr/local/bin
+RUN chmod +x /usr/local/bin/initialize_roles.sh
 
-ENTRYPOINT [ "initialize_roles.sh" ]
+ENTRYPOINT [ "/usr/local/bin/initialize_roles.sh" ]
