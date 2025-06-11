@@ -15,7 +15,8 @@
 # Updates the flyway user permissions too
 ARG PROJECT_ID
 ARG TAG_NAME
-FROM gcr.io/${PROJECT_ID}/builder:${TAG_NAME}
+ARG GCR_HOSTNAME
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/builder:${TAG_NAME}
 
 COPY db/src/main/resources/sql/user/initialize_roles.sql /
 COPY db/src/main/resources/sql/user/set_fly_privileges.sql /

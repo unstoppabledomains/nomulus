@@ -1,5 +1,6 @@
 # Builds the image to run SQL after the initial database migration has been run.
 # Build and upload the roles_initializer image.
+steps:
 - id: Build-Image-And-Push
   name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
@@ -13,11 +14,11 @@
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles_initializer:latest
   dir: 'release/roles-initializer/'
-  timeout: 3600s
-  options:
-    pool: 
-      name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
-  substitutions:
-    _GCR_HOSTNAME: us-central1-docker.pkg.dev
-    _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+substitutions:
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
