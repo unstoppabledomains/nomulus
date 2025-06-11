@@ -2,7 +2,7 @@
 # Build and upload the roles_initializer image.
 steps:
 - id: Copy-Sql-Files-To-Working-Dir
-  name: 'gcr.io/cloud-builders/bash'
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
