@@ -1,6 +1,16 @@
 # Builds the image to run SQL after the initial database migration has been run.
 # Build and upload the roles_initializer image.
 steps:
+- id: Copy-Sql-Files-To-Working-Dir
+  name: 'gcr.io/cloud-builders/bash'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    # Copy the SQL files to the working directory.
+    cp db/src/main/resources/sql/user/initialize_roles.sql release/roles-initializer
+    cp db/src/main/resources/sql/user/set_flyway_privileges.sql release/roles-initializer
 - id: Build-Image-And-Push
   name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
