@@ -12,15 +12,6 @@
 # them for safe pattern matching during release.
 # See https://github.com/spinnaker/spinnaker/issues/3028 for more information.
 steps:
-# Pull the credential for nomulus tool.
-# - name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     gcloud secrets versions access latest \
-#       --secret nomulus-tool-cloudbuild-credential > tool-credential.json
 # Create/Update cloud scheduler and cloud tasks based on a cloud-scheduler-tasks.xml
 - id: Create-Cloud-Scheduler-Tasks
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
