@@ -40,11 +40,53 @@ steps:
   - schema_deployer
   - --output
   - /secrets/schema_deployer_credential.dec
-- id: Run-Roles-Initialization-Scripts
+- id: Run-Roles-Initialization-Sql
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest'
   volumes:
   - name: 'secrets'
     path: '/secrets'
+- id: Enable-GAE-IAP
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
+- id: Add-GAE-Nomulus-User
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - -e
+  - ${_ENV}
+  - --credential
+  - /secrets/cloud_sql_credential.json
+  - create_user
+  - --email
+  - ${PROJECT_ID}@appspot.gserviceaccount.com
+  - --global_role
+  - FTE
+  - --admin
+  - 'true'
+- id: Add-Cloud-Scheduler-Nomulus-User
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - -e
+  - ${_ENV}
+  - --credential
+  - /secrets/cloud_sql_credential.json
+  - create_user
+  - --email
+  - cloud-scheduler@${PROJECT_ID}.iam.gserviceaccount.com
+  - --global_role
+  - FTE
+  - --admin
+  - 'true'
 timeout: 3600s
 options:
   pool: 
