@@ -15,7 +15,7 @@
 # Updates the flyway user permissions too
 ARG PROJECT_ID
 ARG GCR_HOSTNAME
-FROM ${GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:latest
 
 COPY db/src/main/resources/sql/user/initialize_roles.sql /
 COPY db/src/main/resources/sql/user/set_fly_privileges.sql /
