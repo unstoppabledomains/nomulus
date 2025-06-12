@@ -40,7 +40,7 @@ steps:
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest
-  dir: 'release/create-users/'
+  dir: 'release/user-creator/'
 timeout: 3600s
 options:
   pool: 
