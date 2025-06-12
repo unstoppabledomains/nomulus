@@ -27,7 +27,7 @@ steps:
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
   dir: 'release/roles-initializer/'
 - id: Build-Create-Users-Image-And-Push
-  name: 'gcr.io/cloud-builders/docker'
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
