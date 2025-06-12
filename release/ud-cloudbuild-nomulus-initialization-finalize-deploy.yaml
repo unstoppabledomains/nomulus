@@ -21,6 +21,8 @@ steps:
   - -c
   - |
     set -e
+    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    echo $commit_sha
     gcloud secrets versions access latest \
       --secret nomulus-tool-cloudbuild-credential \
       > /secrets/cloud_sql_credential.json
@@ -54,7 +56,7 @@ steps:
 #     set -e
 #     gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
 - id: Add-Nomulus-Users
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest'
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest'
   volumes:
   - name: 'secrets'
     path: '/secrets'
