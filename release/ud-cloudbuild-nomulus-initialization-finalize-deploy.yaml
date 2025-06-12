@@ -21,7 +21,7 @@ steps:
   - -c
   - |
     set -e
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    commit_sha="${$_COMMIT_SHA:-${COMMIT_SHA}}"
     echo $commit_sha
     gcloud secrets versions access latest \
       --secret nomulus-tool-cloudbuild-credential \
