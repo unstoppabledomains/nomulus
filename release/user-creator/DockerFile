@@ -1,0 +1,13 @@
+ARG PROJECT_ID
+ARG GCR_HOSTNAME
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:latest
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      jq && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY nomulus.jar /
+COPY create_users.sh /usr/local/bin
+
+ENTRYPOINT [ "/usr/local/bin/create_users.sh" ]

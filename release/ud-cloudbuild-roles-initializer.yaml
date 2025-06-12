@@ -18,12 +18,29 @@ steps:
   - -c
   - |
     set -e
+    echo "Current working directory:"
+    pwd
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} \
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
   dir: 'release/roles-initializer/'
+- id: Build-Create-Users-Image-And-Push
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud storage cp \
+      gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus.jar .
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest
+  dir: 'release/create-users/'
 timeout: 3600s
 options:
   pool: 
@@ -31,5 +48,7 @@ options:
 substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _COMMIT_SHA: ${COMMIT_SHA}
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
-images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}']
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}', 
+         '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:${COMMIT_SHA}']

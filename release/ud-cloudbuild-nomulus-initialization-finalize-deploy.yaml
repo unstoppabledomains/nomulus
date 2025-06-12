@@ -11,19 +11,19 @@
 # 2. Updates the GAE to enable IAP
 # 3. Adds nomulus users using the nomulus tool
 steps:
-# - id: Get-Nomulus-Tool-Credential
-#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-#   volumes:
-#   - name: 'secrets'
-#     path: '/secrets'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     gcloud secrets versions access latest \
-#       --secret nomulus-tool-cloudbuild-credential \
-#       > /secrets/cloud_sql_credential.json
+- id: Get-Nomulus-Tool-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud secrets versions access latest \
+      --secret nomulus-tool-cloudbuild-credential \
+      > /secrets/cloud_sql_credential.json
 # # Fetch the Cloud SQL credential for schema_deployer
 # - id: Get-Schema-Deployer-Credential
 #   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
@@ -53,30 +53,15 @@ steps:
 #   - |
 #     set -e
 #     gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
-- id: Add-GAE-Nomulus-User
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+- id: Add-Nomulus-Users
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/create-users:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
   args:
-  - -e
   - ${_ENV}
-  - create_user
-  - --email
-  - ${PROJECT_ID}@appspot.gserviceaccount.com
-  - --global_role
-  - FTE
-  - --admin
-  - 'true'
-- id: Add-Cloud-Scheduler-Nomulus-User
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
-  args:
-  - -e
-  - ${_ENV}
-  - create_user
-  - --email
-  - cloud-scheduler@${PROJECT_ID}.iam.gserviceaccount.com
-  - --global_role
-  - FTE
-  - --admin
-  - 'true'
+  - /secrets/cloud_sql_credential.json
+  - ${_NOMULUS_USERS}
 timeout: 3600s
 options:
   pool: 
@@ -87,6 +72,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _COMMIT_SHA: ${COMMIT_SHA}
+  _NOMULUS_USERS: '[]'
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
   
