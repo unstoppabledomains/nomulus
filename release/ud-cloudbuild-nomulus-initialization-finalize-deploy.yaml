@@ -21,7 +21,11 @@ steps:
   - -c
   - |
     set -e
-    commit_sha="${$_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     echo $commit_sha
     gcloud secrets versions access latest \
       --secret nomulus-tool-cloudbuild-credential \

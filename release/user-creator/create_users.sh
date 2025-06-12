@@ -29,5 +29,5 @@ echo "$users" | jq -c '.[]' | while read obj; do
   
   java -jar /nomulus.jar -e ${env} \
     --credential "${tools_credential}" \
-    create_user --email "${email}" --global_role "${role}" --admin "${admin}"
+    create_user --email "${email}" --global_role "${role}" --admin "${admin}" --force
 done
