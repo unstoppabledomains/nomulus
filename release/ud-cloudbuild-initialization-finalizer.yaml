@@ -23,9 +23,14 @@ steps:
   - -c
   - |
     set -e
+    if [ -n "$_NOMULUS_BUILD_COMMIT_SHA" ]; then
+      commit_sha="$_NOMULUS_BUILD_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
+    echo $commit_sha
     gcloud storage cp \
-      gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus.jar .
-    ls
+      gs://$PROJECT_ID-deploy/$commit_sha/nomulus.jar .
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} \
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest
@@ -39,7 +44,7 @@ options:
 substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _COMMIT_SHA: ${COMMIT_SHA}
+  _NOMULUS_BUILD_COMMIT_SHA: ${COMMIT_SHA}
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}', 
          '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA}']

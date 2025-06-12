@@ -21,44 +21,38 @@ steps:
   - -c
   - |
     set -e
-    if [ -n "$_COMMIT_SHA" ]; then
-      commit_sha="$_COMMIT_SHA"
-    else
-      commit_sha="$COMMIT_SHA"
-    fi
-    echo $commit_sha
     gcloud secrets versions access latest \
       --secret nomulus-tool-cloudbuild-credential \
       > /secrets/cloud_sql_credential.json
-# # Fetch the Cloud SQL credential for schema_deployer
-# - id: Get-Schema-Deployer-Credential
-#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
-#   volumes:
-#   - name: 'secrets'
-#     path: '/secrets'
-#   args:
-#   - -e
-#   - ${_ENV}
-#   - --credential
-#   - /secrets/cloud_sql_credential.json
-#   - get_sql_credential
-#   - --user
-#   - schema_deployer
-#   - --output
-#   - /secrets/schema_deployer_credential.dec
-# - id: Run-Roles-Initialization-Sql
-#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest'
-#   volumes:
-#   - name: 'secrets'
-#     path: '/secrets'
-# - id: Enable-GAE-IAP
-#   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-#   entrypoint: /bin/bash
-#   args:
-#   - -c
-#   - |
-#     set -e
-#     gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
+# Fetch the Cloud SQL credential for schema_deployer
+- id: Get-Schema-Deployer-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - -e
+  - ${_ENV}
+  - --credential
+  - /secrets/cloud_sql_credential.json
+  - get_sql_credential
+  - --user
+  - schema_deployer
+  - --output
+  - /secrets/schema_deployer_credential.dec
+- id: Run-Roles-Initialization-Sql
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+- id: Enable-GAE-IAP
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
 - id: Add-Nomulus-Users
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest'
   volumes:
@@ -77,7 +71,6 @@ substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _COMMIT_SHA: ${COMMIT_SHA}
   _NOMULUS_USERS: '[]'
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
