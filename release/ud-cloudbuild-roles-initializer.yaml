@@ -20,6 +20,7 @@ steps:
     set -e
     echo "Current working directory:"
     pwd
+    less ../../db/src/main/resources/sql/user/initialize_roles.sql
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} \
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
