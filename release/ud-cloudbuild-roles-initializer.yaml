@@ -32,6 +32,7 @@ steps:
   - -c
   - |
     set -e
+    cp ../nomulus.jar .
     ls
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} \
