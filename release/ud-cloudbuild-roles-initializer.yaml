@@ -1,16 +1,7 @@
 # Builds the image to run SQL after the initial database migration has been run.
 # Build and upload the roles-initializer image.
 steps:
-- id: Stage-Files
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    gcloud storage cp \
-      gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus.jar .
-- id: Build-Image-And-Push
+- id: Build-Roles-Initializer-Image-And-Push
   name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
@@ -25,14 +16,15 @@ steps:
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
   dir: 'release/roles-initializer/'
-- id: Build-Create-Users-Image-And-Push
-  name: 'gcr.io/cloud-builders/docker'
+- id: Build-User-Creator-Image-And-Push
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    cp ../nomulus.jar .
+    gcloud storage cp \
+      gs://$PROJECT_ID-deploy/${COMMIT_SHA}/nomulus.jar .
     ls
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} \
