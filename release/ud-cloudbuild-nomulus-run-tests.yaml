@@ -40,10 +40,15 @@ steps:
   - -c
   - |
     set -e
-    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA} .
-    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA}
-    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest
+    if [ "$_FORCE_BUILD" == "true" ] || ! docker pull $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest; then
+      echo "Building and pushing builder-test image..."
+      docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA} .
+      docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest
+      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA}
+      docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest
+    else
+      echo "Using existing builder-test image."
+    fi
   dir: 'release/builder/'
 # Run tests
 - id: Run-Tests
@@ -64,6 +69,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _FORCE_BUILD: "false"
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 
 availableSecrets:
