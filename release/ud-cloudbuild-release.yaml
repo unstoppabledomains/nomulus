@@ -1,0 +1,116 @@
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-release.yaml --substitutions \
+#   TAG_NAME=[TAG],_INTERNAL_REPO_URL=[URL] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+#
+# This pipeline prepares a release. The pipeline should be run against the Nomulus public repo on
+# GitHub. It builds the builder and base images, and hard codes the sha256 hashes of the resulting
+# images in the merged code base (internal + public), which is tagged and pushed into the release
+# repo. Actual release artifacts are built from the release repo, ensuring reproducibility.
+steps:
+# Check the out internal repo. 
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
+# Merge the repos. 
+- id: Merge-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    shopt -s dotglob
+    rm -rf .git && rm -rf nomulus-internal/.git
+    cp -rf nomulus-internal/* .
+    rm -rf nomulus-internal
+# Build the builder image and pull the base images, them upload them to GCR.
+- id: Build-Builder-Base-Images-And-Push
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest
+    docker pull jetty:12-jdk21
+    docker tag jetty:12-jdk21 $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/jetty:${COMMIT_SHA}
+    docker tag jetty:12-jdk21 $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/jetty:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/jetty:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/jetty:latest
+    docker pull eclipse-temurin:21
+    docker tag eclipse-temurin:21 $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
+    docker tag eclipse-temurin:21 $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/temurin:latest
+  dir: 'release/builder/'
+# Build and upload the schema_deployer image.
+- id: Build-Schema-Deployer-Image-And-Push
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/schema_deployer:latest
+  dir: 'release/schema-deployer/'
+# Upload the Gradle binary to GCS if it does not exist and point URL in Gradle wrapper to it.
+- id: Upload-Gradle-Binary-To-GCS
+  name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gradle_url=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties \
+      | awk -F = '{print $2}' | sed 's/\\//g')
+    gradle_bin=$(basename $gradle_url)
+    gcs_loc="${PROJECT_ID}-maven-repository/gradle"
+    curl -O -L ${gradle_url}
+    if gcloud storage objects describe gs://${gcs_loc}/${gradle_bin}
+    then
+      local_md5=$(md5sum ${gradle_bin} | awk '{print $1}')
+      remote_md5=$(gcloud storage hash -h gs://${gcs_loc}/${gradle_bin} | grep md5 | awk '{print $3}')
+      if [[ ${local_md5} != ${remote_md5} ]]
+      then
+        echo "${gradle_bin} HAS CHANGED ON GRADLE WEBSITE, USING THE BINARY ON GCS."
+      fi
+    else
+      gcloud storage cp $gradle_bin gs://${gcs_loc}/
+      gcloud storage objects update --predefined-acl=publicRead gs://${gcs_loc}/${gradle_bin}
+    fi
+    rm ${gradle_bin}
+    sed -i s%services.gradle.org/distributions%storage.googleapis.com/${gcs_loc}% \
+      gradle/wrapper/gradle-wrapper.properties
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+substitutions:
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+    env: GITHUB_OAUTH_TOKEN

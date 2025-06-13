@@ -1,0 +1,50 @@
+# Builds the image to run SQL after the initial database migration has been run.
+# Build and upload the roles-initializer image.
+steps:
+- id: Build-Roles-Initializer-Image-And-Push
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    cp ../../db/src/main/resources/sql/user/initialize_roles.sql .
+    cp ../../db/src/main/resources/sql/user/set_flyway_privileges.sql .
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest
+  dir: 'release/roles-initializer/'
+- id: Build-User-Creator-Image-And-Push
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ -n "$_NOMULUS_BUILD_COMMIT_SHA" ]; then
+      commit_sha="$_NOMULUS_BUILD_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
+    echo $commit_sha
+    gcloud storage cp \
+      gs://$PROJECT_ID-deploy/$commit_sha/nomulus.jar .
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest
+  dir: 'release/user-creator/'
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+substitutions:
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _NOMULUS_BUILD_COMMIT_SHA: ${COMMIT_SHA}
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}', 
+         '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA}']

@@ -21,8 +21,17 @@ REVOKE ALL PRIVILEGES ON SCHEMA public from public;
 
 -- Create the schema_deployer user, which will be used by the automated schema
 -- deployment process. This creation must come before the grants below.
--- Comment out line below if user already exists:
-CREATE USER schema_deployer ENCRYPTED PASSWORD :'password';
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles 
+      WHERE rolname = 'schema_deployer'
+   ) THEN
+      CREATE USER schema_deployer ENCRYPTED PASSWORD :'password';
+   END IF;
+END
+$do$;
 -- Comment out line above and uncomment line below if user has been created
 -- from Cloud Dashboard:
 -- ALTER USER schema_deployer NOCREATEDB NOCREATEROLE;
