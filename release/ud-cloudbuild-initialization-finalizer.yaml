@@ -45,6 +45,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _NOMULUS_BUILD_COMMIT_SHA: ${COMMIT_SHA}
+  _COMMIT_SHA: ${COMMIT_SHA}
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:${COMMIT_SHA}', 
          '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:${COMMIT_SHA}']
