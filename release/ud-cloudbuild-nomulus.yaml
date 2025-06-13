@@ -177,7 +177,8 @@ artifacts:
     - 'jetty/kubernetes/gateway/*.yaml'
 timeout: 7200s
 options:
-  machineType: 'E2_HIGHCPU_32'
+  pool:
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
 
 substitutions:
   _ENV: crash

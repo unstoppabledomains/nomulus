@@ -8,8 +8,7 @@
 # This should only really be run once. After the initial database schema has been run and Nomulus has been deployed to GAE,
 # this runs some final steps needed to finalize the setup
 # 1. Runs initialize_roles.sql and set_fly_privledges.sql in that order
-# 2. Updates the GAE to enable IAP
-# 3. Adds nomulus users using the nomulus tool
+# 2. Adds nomulus users using the nomulus tool
 steps:
 - id: Get-Nomulus-Tool-Credential
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
@@ -45,14 +44,6 @@ steps:
   volumes:
   - name: 'secrets'
     path: '/secrets'
-- id: Enable-GAE-IAP
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    gcloud iap web enable --resource-type=app-engine --project ${PROJECT_ID}
 - id: Add-Nomulus-Users
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest'
   volumes:
@@ -65,7 +56,7 @@ steps:
 timeout: 3600s
 options:
   pool: 
-    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
 
 substitutions:
   _ENV: crash
@@ -74,4 +65,3 @@ substitutions:
   _NOMULUS_USERS: '[]'
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
-  

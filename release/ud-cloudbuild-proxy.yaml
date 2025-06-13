@@ -68,7 +68,7 @@ artifacts:
 timeout: 3600s
 options:
   pool: 
-    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-pool-test-2'
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
 
 substitutions:
   _ENV: crash
