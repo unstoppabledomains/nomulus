@@ -65,7 +65,11 @@ steps:
   - -c
   - |
     set -e
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/schema.jar \
       /flyway/jars
 # Deploy SQL schema
@@ -88,7 +92,11 @@ steps:
   - -c
   - |
     set -e
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     echo ${commit_sha} | \
       gcloud storage cp - gs://$PROJECT_ID-deployed-tags/sql.${_ENV}.tag\
 timeout: 7200s
@@ -100,6 +108,6 @@ substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _COMMIT_SHA:
+  _COMMIT_SHA: ${COMMIT_SHA}
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"

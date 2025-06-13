@@ -74,7 +74,6 @@ substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _COMMIT_SHA: ${COMMIT_SHA}
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"

@@ -25,7 +25,11 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     echo Using commit sha: $commit_sha
     echo "Copying files from GCS"
     gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/nomulus-config-${_ENV}.yaml .
@@ -47,7 +51,11 @@ steps:
     else
       project_id="ud-registry-${_ENV}"
     fi
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     echo Using commit sha: $commit_sha
     gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/${_ENV}.tar .
     tar -xvf ${_ENV}.tar
@@ -83,7 +91,11 @@ steps:
   - -c
   - |
     set -e
-    commit_sha="${_COMMIT_SHA:-${COMMIT_SHA}}"
+    if [ -n "$_COMMIT_SHA" ]; then
+      commit_sha="$_COMMIT_SHA"
+    else
+      commit_sha="$COMMIT_SHA"
+    fi
     echo ${commit_sha} | \
       gcloud storage cp - gs://$PROJECT_ID-deployed-tags/nomulus.${_ENV}.tag
     # Update the release to AppEngine version mapping.
