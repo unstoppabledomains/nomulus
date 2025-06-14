@@ -75,7 +75,14 @@ public class ContactAction extends ConsoleApiAction {
   protected void getHandler(User user) {
     checkPermission(user, registrarId, ConsolePermission.VIEW_REGISTRAR_DETAILS);
     ImmutableList<RegistrarPoc> contacts =
-        tm().transact(() -> RegistrarPoc.loadForRegistrar(registrarId));
+        tm().transact(
+                () ->
+                    tm()
+                        .createQueryComposer(RegistrarPoc.class)
+                        .where("registrarId", Comparator.EQ, registrarId)
+                        .stream()
+                        .collect(toImmutableList()));
+
     consoleApiParams.response().setStatus(SC_OK);
     consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(contacts));
   }

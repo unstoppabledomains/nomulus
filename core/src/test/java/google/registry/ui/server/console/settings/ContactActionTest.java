@@ -20,6 +20,7 @@ import static google.registry.model.registrar.RegistrarPoc.Type.ABUSE;
 import static google.registry.model.registrar.RegistrarPoc.Type.ADMIN;
 import static google.registry.model.registrar.RegistrarPoc.Type.MARKETING;
 import static google.registry.model.registrar.RegistrarPoc.Type.TECH;
+import static google.registry.testing.DatabaseHelper.deleteResource;
 import static google.registry.testing.DatabaseHelper.insertInDb;
 import static google.registry.testing.DatabaseHelper.loadAllOf;
 import static google.registry.testing.DatabaseHelper.persistResource;
@@ -111,37 +112,26 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
 
   @Test
   void testSuccess_getContactInfo() throws IOException {
-    insertInDb(adminPoc);
-    ContactAction action = createAction(Action.Method.GET, fteUser, testRegistrar.getRegistrarId());
+    ContactAction action =
+        createAction(Action.Method.GET, fteUser, testRegistrar.getRegistrarId(), null);
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
-    assertThat(response.getPayload()).isEqualTo("[" + jsonRegistrar1 + "]");
+    assertThat(response.getPayload()).contains(String.format(jsonRegistrar1, adminPoc.getId()));
   }
 
   @Test
   void testSuccess_noOp() throws IOException {
     ContactAction action =
-        createAction(Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), adminPoc);
+        createAction(Action.Method.PUT, fteUser, testRegistrar.getRegistrarId(), adminPoc);
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     verify(consoleApiParams.sendEmailUtils().gmailClient, never()).sendEmail(any());
   }
 
   @Test
-  void testSuccess_onlyContactsWithNonEmptyType() throws IOException {
-    adminPoc = adminPoc.asBuilder().setTypes(ImmutableSet.of()).build();
-    insertInDb(adminPoc);
-    ContactAction action = createAction(Action.Method.GET, fteUser, testRegistrar.getRegistrarId());
-    action.run();
-    assertThat(response.getStatus()).isEqualTo(SC_OK);
-    assertThat(response.getPayload()).isEqualTo("[]");
-  }
-
-  @Test
   void testSuccess_postCreateContactInfo() throws IOException {
     ContactAction action =
-        createAction(
-            Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), adminPoc, techPoc);
+        createAction(Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), techPoc);
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     assertThat(
@@ -158,7 +148,10 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
         persistResource(techPoc.asBuilder().setEmailAddress("incorrect@email.com").build());
     ContactAction action =
         createAction(
-            Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), adminPoc, techPoc);
+            Action.Method.PUT,
+            fteUser,
+            testRegistrar.getRegistrarId(),
+            techPocIncorrect.asBuilder().setEmailAddress(techPoc.getEmailAddress()).build());
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     HashMap<String, String> testResult = new HashMap<>();
@@ -199,7 +192,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   void testFailure_postUpdateContactInfo_requiredContactRemoved() throws IOException {
     ContactAction action =
         createAction(
-            Action.Method.POST,
+            Action.Method.PUT,
             fteUser,
             testRegistrar.getRegistrarId(),
             adminPoc.asBuilder().setTypes(ImmutableSet.of(ABUSE)).build());
@@ -218,7 +211,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
     adminPoc = persistResource(adminPoc.asBuilder().setTypes(ImmutableSet.of(ADMIN, TECH)).build());
     ContactAction action =
         createAction(
-            Action.Method.POST,
+            Action.Method.PUT,
             fteUser,
             testRegistrar.getRegistrarId(),
             adminPoc
@@ -256,7 +249,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
     adminPoc = persistResource(adminPoc.asBuilder().setVisibleInDomainWhoisAsAbuse(true).build());
     ContactAction action =
         createAction(
-            Action.Method.POST,
+            Action.Method.PUT,
             fteUser,
             testRegistrar.getRegistrarId(),
             adminPoc.asBuilder().setVisibleInDomainWhoisAsAbuse(false).build());
@@ -272,89 +265,16 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   }
 
   @Test
-  void testFailure_postUpdateContactInfo_newContactCannotSetRegistryLockPassword()
-      throws IOException {
-    ContactAction action =
-        createAction(
-            Action.Method.POST,
-            fteUser,
-            testRegistrar.getRegistrarId(),
-            adminPoc
-                .asBuilder()
-                .setAllowedToSetRegistryLockPassword(true)
-                .setRegistryLockEmailAddress("lock@example.com")
-                .build());
-    action.run();
-    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat(response.getPayload())
-        .isEqualTo("Cannot set registry lock password directly on new contact");
-    assertThat(
-            loadAllOf(RegistrarPoc.class).stream()
-                .filter(r -> r.registrarId.equals(testRegistrar.getRegistrarId()))
-                .collect(toImmutableList()))
-        .isEmpty();
-  }
-
-  @Test
-  void testFailure_postUpdateContactInfo_cannotModifyRegistryLockEmail() throws IOException {
-    adminPoc =
-        adminPoc
-            .asBuilder()
-            .setRegistryLockEmailAddress("lock@example.com")
-            .setAllowedToSetRegistryLockPassword(true)
-            .build();
-    insertInDb(adminPoc);
-    ContactAction action =
-        createAction(
-            Action.Method.POST,
-            fteUser,
-            testRegistrar.getRegistrarId(),
-            adminPoc.asBuilder().setRegistryLockEmailAddress("unlock@example.com").build());
-    action.run();
-    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat(response.getPayload())
-        .isEqualTo("Cannot modify registryLockEmailAddress through the UI");
-    assertThat(
-            loadAllOf(RegistrarPoc.class).stream()
-                .filter(r -> r.registrarId.equals(testRegistrar.getRegistrarId()))
-                .collect(toImmutableList()))
-        .containsExactly(adminPoc);
-  }
-
-  @Test
-  void testFailure_postUpdateContactInfo_cannotSetIsAllowedToSetRegistryLockPassword()
-      throws IOException {
-    adminPoc =
-        adminPoc
-            .asBuilder()
-            .setRegistryLockEmailAddress("lock@example.com")
-            .setAllowedToSetRegistryLockPassword(false)
-            .build();
-    insertInDb(adminPoc);
-    ContactAction action =
-        createAction(
-            Action.Method.POST,
-            fteUser,
-            testRegistrar.getRegistrarId(),
-            adminPoc.asBuilder().setAllowedToSetRegistryLockPassword(true).build());
-    action.run();
-    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat(response.getPayload())
-        .isEqualTo("Cannot modify isAllowedToSetRegistryLockPassword through the UI");
-    assertThat(
-            loadAllOf(RegistrarPoc.class).stream()
-                .filter(r -> r.registrarId.equals(testRegistrar.getRegistrarId()))
-                .collect(toImmutableList()))
-        .containsExactly(adminPoc);
-  }
-
-  @Test
   void testSuccess_sendsEmail() throws IOException, AddressException {
     deleteResource(adminPoc);
     techPoc = persistResource(techPoc);
     Long id = techPoc.getId();
     ContactAction action =
-        createAction(Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), techPoc);
+        createAction(
+            Action.Method.PUT,
+            fteUser,
+            testRegistrar.getRegistrarId(),
+            techPoc.asBuilder().setEmailAddress("incorrect@example.com").build());
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     verify(consoleApiParams.sendEmailUtils().gmailClient, times(1))
@@ -405,8 +325,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   void testSuccess_postDeleteContactInfo() throws IOException {
     insertInDb(techPoc, marketingPoc);
     ContactAction action =
-        createAction(
-            Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), adminPoc, techPoc);
+        createAction(Action.Method.DELETE, fteUser, testRegistrar.getRegistrarId(), marketingPoc);
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     assertThat(
@@ -421,7 +340,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   void testFailure_postDeleteContactInfo_missingPermission() throws IOException {
     ContactAction action =
         createAction(
-            Action.Method.POST,
+            Action.Method.DELETE,
             new User.Builder()
                 .setEmailAddress("email@email.com")
                 .setUserRoles(
@@ -440,7 +359,11 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   @Test
   void testFailure_changesAdminEmail() throws Exception {
     ContactAction action =
-        createAction(Action.Method.POST, fteUser, testRegistrar.getRegistrarId(), adminPoc);
+        createAction(
+            Action.Method.PUT,
+            fteUser,
+            testRegistrar.getRegistrarId(),
+            adminPoc.asBuilder().setEmailAddress("testemail@example.com").build());
     action.run();
     FakeResponse fakeResponse = response;
     assertThat(fakeResponse.getStatus()).isEqualTo(400);
@@ -449,7 +372,7 @@ class ContactActionTest extends ConsoleActionBaseTestCase {
   }
 
   private ContactAction createAction(
-      Action.Method method, User user, String registrarId, RegistrarPoc... contacts)
+      Action.Method method, User user, String registrarId, RegistrarPoc contact)
       throws IOException {
     consoleApiParams = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(consoleApiParams.request().getMethod()).thenReturn(method.toString());
