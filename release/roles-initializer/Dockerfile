@@ -24,6 +24,7 @@ RUN apt-get update && \
 
 COPY initialize_roles.sql /
 COPY set_flyway_privileges.sql /
+COPY set_nomulus_tool_user_privileges.sql /
 
 COPY initialize_roles.sh /usr/local/bin
 RUN chmod +x /usr/local/bin/initialize_roles.sh

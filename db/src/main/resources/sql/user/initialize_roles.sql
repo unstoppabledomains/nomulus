@@ -25,23 +25,37 @@ DO
 $do$
 BEGIN
    IF NOT EXISTS (
-      SELECT FROM pg_catalog.pg_roles 
-      WHERE rolname = 'schema_deployer'
+      SELECT FROM pg_catalog.pg_user 
+      WHERE usename = 'schema_deployer'
    ) THEN
       CREATE USER schema_deployer ENCRYPTED PASSWORD :'password';
+   ELSE
+      ALTER USER schema_deployer NOCREATEDB NOCREATEROLE;
    END IF;
 END
 $do$;
--- Comment out line above and uncomment line below if user has been created
--- from Cloud Dashboard:
--- ALTER USER schema_deployer NOCREATEDB NOCREATEROLE;
+
+-- Ensure schema_deployer has the correct privileges
 GRANT CONNECT ON DATABASE postgres TO schema_deployer;
 GRANT CREATE, USAGE ON SCHEMA public TO schema_deployer;
 -- The 'postgres' user in Cloud SQL/postgres is not a true super user, and
 -- cannot grant access to schema_deployer's objects without taking on its role.
 GRANT schema_deployer to postgres;
 
-CREATE ROLE readonly;
+-- Create the readonly role if it doesn't exist
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles 
+      WHERE rolname = 'readonly'
+   ) THEN
+      CREATE ROLE readonly;
+   END IF;
+END
+$do$;
+
+-- Ensure readonly has the correct privileges
 GRANT CONNECT ON DATABASE postgres TO readonly;
 GRANT USAGE ON SCHEMA public TO readonly;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO readonly;
@@ -55,7 +69,20 @@ ALTER DEFAULT PRIVILEGES
   FOR USER schema_deployer
   GRANT SELECT ON TABLES TO readonly;
 
-CREATE ROLE readwrite;
+-- Create the readwrite role if it doesn't exist
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles 
+      WHERE rolname = 'readwrite'
+   ) THEN
+      CREATE ROLE readwrite;
+   END IF;
+END
+$do$;
+
+-- Ensure readwrite has the correct privileges
 GRANT CONNECT ON DATABASE postgres TO readwrite;
 GRANT USAGE ON SCHEMA public TO readwrite;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO readwrite;

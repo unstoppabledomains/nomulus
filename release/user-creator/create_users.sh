@@ -44,3 +44,7 @@ echo "$users" | jq -c '.[]' | while read obj; do
     --credential "${tools_credential}" \
     create_user --email "${email}" --global_role "${role}" --admin "${admin}" --force
 done
+
+# Configure the feature flag for minimum dataset contacts optional
+java -jar /nomulus.jar -e ${env} configure_feature_flag --status_map 0=ACTIVE  MINIMUM_DATASET_CONTACTS_OPTIONAL
+echo "$(date): All users processed successfully."

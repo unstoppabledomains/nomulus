@@ -65,6 +65,18 @@ if [ $? -ne 0 ]; then
 fi
 echo "$(date): Successfully initialized roles in ${cloud_sql_instance}."
 
+# Grant readwrite to nomulus and tool users
+if [ ! -f /set_nomulus_tool_user_privileges.sql ]; then
+  echo "Missing /set_nomulus_tool_user_privileges.sql"
+  exit 1
+fi
+PGPASSWORD=$db_password psql -h localhost -p 5432 -U $db_user -d nomulus -f /set_nomulus_tool_user_privileges.sql
+if [ $? -ne 0 ]; then
+  echo "Failed to grant readwrite role to nomulus and tool users."
+  exit 1
+fi
+echo "$(date): Successfully granted roles in ${cloud_sql_instance}."
+
 # Run set_flyway_privileges.sql against the database
 if [ ! -f /set_flyway_privileges.sql ]; then
   echo "Missing /set_flyway_privileges.sql"
