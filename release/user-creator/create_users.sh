@@ -48,7 +48,10 @@ echo "$users" | jq -c '.[]' | while read obj; do
 done
 
 # Configure the feature flag for minimum dataset contacts optional
-java -jar /nomulus.jar -e ${env} configure_feature_flag --status_map 0=ACTIVE  MINIMUM_DATASET_CONTACTS_OPTIONAL || {
+java -jar /nomulus.jar -e ${env} \
+  --credential "${tools_credential}" \
+  configure_feature_flag --status_map 0=ACTIVE  MINIMUM_DATASET_CONTACTS_OPTIONAL \
+  --force || {
   echo "$(date): Failed to configure feature flag for minimum dataset contacts optional. Exiting."
   exit 1
 }
