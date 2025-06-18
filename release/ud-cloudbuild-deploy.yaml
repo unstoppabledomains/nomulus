@@ -60,7 +60,7 @@ steps:
     gcloud storage cp gs://$PROJECT_ID-deploy/${commit_sha}/${_ENV}.tar .
     tar -xvf ${_ENV}.tar
     unzip default/WEB-INF/lib/core.jar
-    for _service in backend default bsa pubapi tools console
+    for _service in default backend bsa pubapi tools console
     do
       gcloud -q --project $project_id app deploy ${_service}/app.yaml
     done 
