@@ -76,4 +76,4 @@ availableSecrets:
   secretManager:
   - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
     env: GITHUB_OAUTH_TOKEN
-images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:${COMMIT_SHA}']
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder-test:latest']
