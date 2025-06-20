@@ -615,8 +615,8 @@ public class Registrar extends UpdateAutoTimestampEntity implements Buildable, J
     return getContacts().stream().filter(RegistrarPoc::getVisibleInDomainWhoisAsAbuse).findFirst();
   }
 
-  private ImmutableList<RegistrarPoc> getContactPocs() {
-    return tm().transact(() -> RegistrarPoc.loadForRegistrar(registrarId));
+  private ImmutableList<RegistrarPoc> getContactPocs(TransactionManager txnManager) {
+    return txnManager.transact(() -> RegistrarPoc.loadForRegistrar(registrarId));
   }
 
   @Override
