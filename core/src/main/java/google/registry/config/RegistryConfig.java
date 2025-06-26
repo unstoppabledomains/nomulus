@@ -99,6 +99,12 @@ public final class RegistryConfig {
     return YamlUtils.getConfigSettings(defaultYaml, customYaml, clazz);
   }
 
+  /** Shorthand method to retrieve the main registry config settings for the current environment. */
+  static RegistryConfigSettings getConfigSettings() {
+    return RegistryConfig.getEnvironmentConfigSettings(
+        YAML_CONFIG_DEFAULT, YAML_CONFIG_ENV_TEMPLATE, RegistryConfigSettings.class);
+  }
+
   /** Dagger module for providing configuration settings. */
   @Module
   public static final class ConfigModule {
@@ -1722,10 +1728,7 @@ public final class RegistryConfig {
    */
   @VisibleForTesting
   public static final Supplier<RegistryConfigSettings> CONFIG_SETTINGS =
-      memoize(
-          () ->
-              RegistryConfig.getEnvironmentConfigSettings(
-                  YAML_CONFIG_DEFAULT, YAML_CONFIG_ENV_TEMPLATE, RegistryConfigSettings.class));
+      memoize(RegistryConfig::getConfigSettings);
 
   private static InternetAddress parseEmailAddress(String email) {
     try {
