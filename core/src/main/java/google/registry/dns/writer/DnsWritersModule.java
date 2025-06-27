@@ -17,6 +17,7 @@ package google.registry.dns.writer;
 import dagger.Module;
 import google.registry.dns.writer.clouddns.CloudDnsWriterModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
+import google.registry.dns.writer.powerdns.PowerDnsWriterModule;
 
 /**
  * Groups all {@link DnsWriter} implementations to be installed.
@@ -25,5 +26,10 @@ import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
  * the release process.
  */
 @Module(
-    includes = {CloudDnsWriterModule.class, DnsUpdateWriterModule.class, VoidDnsWriterModule.class})
+    includes = {
+      CloudDnsWriterModule.class,
+      DnsUpdateWriterModule.class,
+      VoidDnsWriterModule.class,
+      PowerDnsWriterModule.class
+    })
 public class DnsWritersModule {}
