@@ -1,0 +1,67 @@
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config ud-cloudbuild-finalize-setup.yaml --substitutions \
+#   _GCR_HOSTNAME=[GCR_HOSTNAME], ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+#
+# This should only really be run once. After the initial database schema has been run and Nomulus has been deployed to GAE,
+# this runs some final steps needed to finalize the setup
+# 1. Runs initialize_roles.sql and set_fly_privledges.sql in that order
+# 2. Adds nomulus users using the nomulus tool
+steps:
+- id: Get-Nomulus-Tool-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gcloud secrets versions access latest \
+      --secret nomulus-tool-cloudbuild-credential \
+      > /secrets/cloud_sql_credential.json
+# Fetch the Cloud SQL credential for schema_deployer
+- id: Get-Schema-Deployer-Credential
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - -e
+  - ${_ENV}
+  - --credential
+  - /secrets/cloud_sql_credential.json
+  - get_sql_credential
+  - --user
+  - schema_deployer
+  - --output
+  - /secrets/schema_deployer_credential.dec
+- id: Run-Roles-Initialization-Sql
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/roles-initializer:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+- id: Add-Nomulus-Users
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/user-creator:latest'
+  volumes:
+  - name: 'secrets'
+    path: '/secrets'
+  args:
+  - ${_ENV}
+  - /secrets/cloud_sql_credential.json
+  - ${_NOMULUS_USERS}
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _NOMULUS_USERS: '[]'
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
