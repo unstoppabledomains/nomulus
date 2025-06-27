@@ -1,0 +1,84 @@
+# This will create a docker image named gcr.io/[PROJECT_ID]/proxy:[TAG] locally.
+# The PROJECT_ID is the current project name that gcloud uses.
+#
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-proxy.yaml --substitutions TAG_NAME=[TAG] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+steps:
+# Check the out internal repo. 
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
+# Merge the repos. 
+- id: Merge-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    shopt -s dotglob
+    rm -rf .git && rm -rf nomulus-internal/.git
+    cp -rf nomulus-internal/* .
+    rm -rf nomulus-internal
+# Build the proxy docker image.
+- id: Build-Proxy-Image
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  args:
+  - ./gradlew
+  - :proxy:test
+  - :proxy:buildProxyImage
+  - -PmavenUrl=https://repo.maven.apache.org/maven2
+  - -PpluginsUrl=https://plugins.gradle.org/m2
+# Tag and push the image. We can't let Cloud Build's default processing do that for us
+# because we need to push the image before we can sign it in the following step.
+- id: Tag-And-Push-Proxy-Image
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+  dir: 'proxy'
+# Images to upload to GCR. Even though the image has already been uploaded, we still include it
+# here so that the GCB pubsub message contains it (for Spinnaker to consume).
+images: ['$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}']
+# Config files to upload to GCS.
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}-deploy/${COMMIT_SHA}'
+    # This cannot be regexs because of how Spinnaker constructs artifact paths.
+    paths:
+    - 'proxy/kubernetes/proxy-*.yaml'
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+    env: GITHUB_OAUTH_TOKEN
