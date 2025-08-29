@@ -122,14 +122,16 @@ class SchemaTest {
 
     // Clean both contents
     String cleanedActual = actualContent.lines()
-        .filter(line -> !line.startsWith("--") 
+        .filter(line -> !line.trim().isEmpty()
+                    && !line.startsWith("--") 
                     && !line.startsWith("**") 
                     && !line.startsWith("\\restrict") 
                     && !line.startsWith("\\unrestrict"))
         .collect(Collectors.joining("\n"));
 
     String cleanedExpected = expectedContent.lines()
-        .filter(line -> !line.startsWith("--") 
+        .filter(line -> !line.trim().isEmpty()
+                    && !line.startsWith("--")
                     && !line.startsWith("**"))
         .collect(Collectors.joining("\n"));
 
