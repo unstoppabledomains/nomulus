@@ -114,6 +114,7 @@ class SchemaTest {
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
 
+    logger.atInfo().log("Dumped schema: %s", dumpedSchema);
     assertThat(dumpedSchema)
         .ignoringLinesStartingWith("--")
         .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
