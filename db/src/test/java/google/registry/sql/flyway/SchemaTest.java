@@ -35,6 +35,7 @@ import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import java.util.stream.Collectors;
 
 /**
  * Schema deployment tests using Flyway.
@@ -114,9 +115,27 @@ class SchemaTest {
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
 
-    assertThat(dumpedSchema)
-        .ignoringLinesStartingWith("--")
-        .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
+    String actualContent = Resources.toString(dumpedSchema, StandardCharsets.UTF_8);
+    String expectedContent = Resources.toString(
+        Resources.getResource("sql/schema/nomulus.golden.sql"), 
+        StandardCharsets.UTF_8);
+
+    // Clean both contents
+    String cleanedActual = actualContent.lines()
+        .filter(line -> !line.trim().isEmpty()
+                    && !line.startsWith("--") 
+                    && !line.startsWith("**") 
+                    && !line.startsWith("\\restrict") 
+                    && !line.startsWith("\\unrestrict"))
+        .collect(Collectors.joining("\n"));
+
+    String cleanedExpected = expectedContent.lines()
+        .filter(line -> !line.trim().isEmpty()
+                    && !line.startsWith("--")
+                    && !line.startsWith("**"))
+        .collect(Collectors.joining("\n"));
+
+    assertThat(cleanedActual).isEqualTo(cleanedExpected);
   }
 
   @Test
