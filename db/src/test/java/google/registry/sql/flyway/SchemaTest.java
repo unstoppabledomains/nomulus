@@ -125,6 +125,8 @@ class SchemaTest {
 
     assertThat(dumpedSchema)
         .ignoringLinesStartingWith("--")
+        .ignoringLinesStartingWith("\\restrict")
+        .ignoringLinesStartingWith("\\unrestrict")
         .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
   }
 
