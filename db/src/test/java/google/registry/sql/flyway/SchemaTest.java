@@ -113,14 +113,26 @@ class SchemaTest {
     URL dumpedSchema =
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
+            
+    String actualContent = Resources.toString(dumpedSchema, StandardCharsets.UTF_8);
+    String expectedContent = Resources.toString(
+        Resources.getResource("sql/schema/nomulus.golden.sql"), 
+        StandardCharsets.UTF_8);
 
+    // Clean both contents
+    String cleanedActual = actualContent.lines()
+        .filter(line -> !line.startsWith("--") 
+                    && !line.startsWith("**") 
+                    && !line.startsWith("\\restrict") 
+                    && !line.startsWith("\\unrestrict"))
+        .collect(Collectors.joining("\n"));
 
-    assertThat(dumpedSchema)
-        .ignoringLinesStartingWith("--")
-        .ignoringLinesStartingWith("**")
-        .ignoringLinesStartingWith("\\restrict")
-        .ignoringLinesStartingWith("\\unrestrict")
-        .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
+    String cleanedExpected = expectedContent.lines()
+        .filter(line -> !line.startsWith("--") 
+                    && !line.startsWith("**"))
+        .collect(Collectors.joining("\n"));
+
+    assertThat(cleanedActual).isEqualTo(cleanedExpected);
   }
 
   @Test
