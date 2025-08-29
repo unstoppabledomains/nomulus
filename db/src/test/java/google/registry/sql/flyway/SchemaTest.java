@@ -35,7 +35,7 @@ import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import java.util.stream.Collectors
+import java.util.stream.Collectors;
 
 /**
  * Schema deployment tests using Flyway.
