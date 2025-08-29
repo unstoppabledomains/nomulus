@@ -2,8 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9dhB1ThIWb0ob0KeAf7iTzMynR34ByiaqvedH910kUs5QTrCZiYkAfMwdhTI4Ah
-
 -- Dumped from database version 15.13
 -- Dumped by pg_dump version 15.14 (Ubuntu 15.14-1.pgdg22.04+1)
 
@@ -3139,6 +3137,3 @@ ALTER TABLE ONLY public."DelegationSignerData"
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict 9dhB1ThIWb0ob0KeAf7iTzMynR34ByiaqvedH910kUs5QTrCZiYkAfMwdhTI4Ah
-
