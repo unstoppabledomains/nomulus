@@ -114,7 +114,15 @@ class SchemaTest {
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
 
-    logger.atInfo().log("Dumped schema: %s", dumpedSchema);
+    // Read and log the dumped schema content
+    String dumpedContent = Resources.toString(dumpedSchema, StandardCharsets.UTF_8);
+    logger.atInfo().log("Dumped schema content:\n%s", dumpedContent);
+
+    // Read and log the golden schema for comparison
+    String goldenContent = Resources.toString(
+        Resources.getResource("sql/schema/nomulus.golden.sql"), StandardCharsets.UTF_8);
+    logger.atInfo().log("Golden schema content:\n%s", goldenContent);
+
     assertThat(dumpedSchema)
         .ignoringLinesStartingWith("--")
         .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
