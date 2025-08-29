@@ -57,6 +57,8 @@ steps:
   env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
   args: ['./gradlew',
          'test',
+         '--console=plain',
+         '--info',
          '-PskipDockerIncompatibleTests=true',
          '-PmavenUrl=https://repo.maven.apache.org/maven2',
          '-PpluginsUrl=https://plugins.gradle.org/m2'
