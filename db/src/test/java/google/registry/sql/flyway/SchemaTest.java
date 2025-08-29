@@ -114,9 +114,12 @@ class SchemaTest {
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
 
+
     assertThat(dumpedSchema)
         .ignoringLinesStartingWith("--")
         .ignoringLinesStartingWith("**")
+        .ignoringLinesStartingWith("\restrict")
+        .ignoringLinesStartingWith("\unrestrict")
         .hasSameContentAs(Resources.getResource("sql/schema/nomulus.golden.sql"));
   }
 
