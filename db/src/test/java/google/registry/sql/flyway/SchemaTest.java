@@ -35,6 +35,7 @@ import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import java.util.stream.Collectors
 
 /**
  * Schema deployment tests using Flyway.
@@ -113,7 +114,7 @@ class SchemaTest {
     URL dumpedSchema =
         Resources.getResource(
             Joiner.on(File.separatorChar).join(MOUNTED_RESOURCE_PATH, DUMP_OUTPUT_FILE));
-            
+
     String actualContent = Resources.toString(dumpedSchema, StandardCharsets.UTF_8);
     String expectedContent = Resources.toString(
         Resources.getResource("sql/schema/nomulus.golden.sql"), 
