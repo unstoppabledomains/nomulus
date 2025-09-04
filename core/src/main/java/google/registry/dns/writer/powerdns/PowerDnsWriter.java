@@ -18,6 +18,11 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.FluentLogger;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.dns.writer.DnsWriterZone;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriter;
@@ -31,6 +36,7 @@ import google.registry.dns.writer.powerdns.client.model.TSIGKey;
 import google.registry.dns.writer.powerdns.client.model.Zone;
 import google.registry.util.Clock;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,6 +67,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private final Boolean dnssecEnabled;
   private final Boolean tsigEnabled;
   private final PowerDNSClient powerDnsClient;
+  private final ListeningExecutorService rectificationExecutor;
 
   // Supported record types to synchronize with PowerDNS
   private static final ArrayList<String> supportedRecordTypes =
@@ -70,6 +77,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private static final ConcurrentHashMap<String, String> zoneIdCache = new ConcurrentHashMap<>();
   private static long zoneIdCacheExpiration = 0;
   private static int defaultZoneTtl = 3600; // 1 hour in seconds
+
+  // Zone rectification state
+  private static final ConcurrentHashMap<String, ZoneRectificationState> rectifyZoneStateMap =
+      new ConcurrentHashMap<>();
 
   // DNSSEC configuration
   private static final String DNSSEC_ALGORITHM = "rsasha256";
@@ -109,7 +120,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       @Config("powerDnsSoaName") String powerDnsSoaName,
       @Config("powerDnsDnssecEnabled") Boolean powerDnsDnssecEnabled,
       @Config("powerDnsTsigEnabled") Boolean powerDnsTsigEnabled,
-      Clock clock) {
+      Clock clock,
+      @Named("powerDnsRectifyExecutor") ListeningExecutorService rectificationExecutor) {
 
     // call the DnsUpdateWriter constructor, omitting the transport parameter
     // since we don't need it for PowerDNS
@@ -122,6 +134,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     this.dnssecEnabled = powerDnsDnssecEnabled;
     this.tsigEnabled = powerDnsTsigEnabled;
     this.powerDnsClient = new PowerDNSClient(powerDnsBaseUrl, powerDnsApiKey);
+    this.rectificationExecutor = rectificationExecutor;
   }
 
   /**
@@ -161,10 +174,93 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
       // call the PowerDNS API to commit the changes
       powerDnsClient.patchZone(zone);
+
+      // call rectify zone in a new thread and do not wait for complete
+      this.rectifyZoneAsync(zone);
     } catch (Exception e) {
       logger.atSevere().withCause(e).log("Commit to PowerDNS failed for TLD: %s", tldZoneName);
       throw new RuntimeException("publishDomain failed for TLD: " + tldZoneName, e);
     }
+  }
+
+  /**
+   * Schedule zone rectification to run in the background and return immediately.
+   *
+   * @param zone the zone to rectify
+   */
+  private void rectifyZoneAsync(Zone zone) {
+    ListenableFuture<?> future = rectificationExecutor.submit(() -> this.rectifyZone(zone));
+    Futures.addCallback(
+        future,
+        new FutureCallback<Object>() {
+          @Override
+          public void onSuccess(Object result) {
+            logger.atInfo().log("Rectify zone task completed for TLD: %s", tldZoneName);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            logger.atSevere().withCause(t).log("Rectify zone task failed for TLD: %s", tldZoneName);
+          }
+        },
+        MoreExecutors.directExecutor());
+  }
+
+  /**
+   * Rectify the zone. This method is optimized to skip rectification and return immediately if
+   * another thread is already rectifying the zone. The exiting thread will set a flag to indicate
+   * another rectification is required, and the currently executing thread will handle the request.
+   *
+   * @param zone the zone to rectify
+   */
+  private void rectifyZone(Zone zone) {
+    // retrieve a zone specific rectification lock
+    ZoneRectificationState rectifyZoneState = getRectifyZoneState(zone.getId());
+
+    // Only one thread should rectify the zone at a time, so we will attempt to acquire the lock but
+    // continue immediately if the lock is not available.
+    if (rectifyZoneState.tryLock()) {
+      try {
+        do {
+          // Clear the rectification flag before rectifying the zone. Another thread may set this
+          // flag while the current thread is rectifying the zone, resulting in another iteration
+          // once the current rectification is complete.
+          rectifyZoneState.setIsRectificationRequired(false);
+
+          // rectify the zone
+          logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
+          powerDnsClient.rectifyZone(zone.getId());
+        }
+        // continue rectifying the zone until the flag is cleared
+        while (rectifyZoneState.isRectificationRequired());
+      } catch (Exception e) {
+        // log the rectification error
+        logger.atSevere().withCause(e).log("Rectify zone failed for TLD: %s", tldZoneName);
+      } finally {
+        // release the lock
+        rectifyZoneState.unlock();
+      }
+    } else {
+      // set the flag to indicate that another rectification is required, which will be
+      // handled by the currently executing thread
+      rectifyZoneState.setIsRectificationRequired(true);
+    }
+  }
+
+  /**
+   * Get a zone specific rectification lock.
+   *
+   * @param zoneId the ID of the zone to rectify
+   * @return the rectification state
+   */
+  private synchronized ZoneRectificationState getRectifyZoneState(String zoneId) {
+    return rectifyZoneStateMap.computeIfAbsent(
+        zoneId,
+        k -> {
+          logger.atInfo().log(
+              "Initializing zone rectification state for PowerDNS TLD zone %s", zoneId);
+          return new ZoneRectificationState();
+        });
   }
 
   /**
@@ -614,7 +710,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         // update the zone account field with the expiration timestamp
         Zone updatedZone = new Zone();
         updatedZone.setId(zone.getId());
-        updatedZone.setApiRectify(true);
+        updatedZone.setApiRectify(false);
         updatedZone.setAccount(
             String.format(
                 "%s:%s",
