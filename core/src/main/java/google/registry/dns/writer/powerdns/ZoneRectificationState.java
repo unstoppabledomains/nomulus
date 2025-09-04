@@ -18,15 +18,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ZoneRectificationState {
-  ReentrantLock rectifyZoneLock;
-  AtomicBoolean isRectificationRequired;
+  private final ReentrantLock rectifyZoneLock;
+  private final AtomicBoolean isRectificationRequired;
 
   public ZoneRectificationState() {
     this.rectifyZoneLock = new ReentrantLock();
     this.isRectificationRequired = new AtomicBoolean(false);
   }
 
-  public Boolean tryLock() {
+  public boolean tryLock() {
     return rectifyZoneLock.tryLock();
   }
 
@@ -34,11 +34,11 @@ public class ZoneRectificationState {
     rectifyZoneLock.unlock();
   }
 
-  public void setIsRectificationRequired(Boolean isRectificationRequired) {
+  public void setIsRectificationRequired(boolean isRectificationRequired) {
     this.isRectificationRequired.set(isRectificationRequired);
   }
 
-  public Boolean isRectificationRequired() {
+  public boolean isRectificationRequired() {
     return isRectificationRequired.get();
   }
 }
