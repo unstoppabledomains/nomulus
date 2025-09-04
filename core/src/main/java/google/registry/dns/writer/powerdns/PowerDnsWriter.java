@@ -18,11 +18,8 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.FluentLogger;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.dns.writer.DnsWriterZone;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriter;
@@ -190,20 +187,9 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    */
   private void rectifyZoneAsync(Zone zone) {
     ListenableFuture<?> future = rectificationExecutor.submit(() -> rectifyZone(zone));
-    Futures.addCallback(
-        future,
-        new FutureCallback<Object>() {
-          @Override
-          public void onSuccess(Object result) {
-            logger.atInfo().log("Rectify zone task completed for TLD: %s", tldZoneName);
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            logger.atSevere().withCause(t).log("Rectify zone task failed for TLD: %s", tldZoneName);
-          }
-        },
-        MoreExecutors.directExecutor());
+    logger.atInfo().log(
+        "Submitted async PowerDNS TLD zone rectification task for TLD: %s, Task completed: %s",
+        tldZoneName, future.isDone());
   }
 
   /**
