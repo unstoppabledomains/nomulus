@@ -176,7 +176,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       powerDnsClient.patchZone(zone);
 
       // call rectify zone in a new thread and do not wait for complete
-      this.rectifyZoneAsync(zone);
+      rectifyZoneAsync(zone);
     } catch (Exception e) {
       logger.atSevere().withCause(e).log("Commit to PowerDNS failed for TLD: %s", tldZoneName);
       throw new RuntimeException("publishDomain failed for TLD: " + tldZoneName, e);
@@ -189,7 +189,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param zone the zone to rectify
    */
   private void rectifyZoneAsync(Zone zone) {
-    ListenableFuture<?> future = rectificationExecutor.submit(() -> this.rectifyZone(zone));
+    ListenableFuture<?> future = rectificationExecutor.submit(() -> rectifyZone(zone));
     Futures.addCallback(
         future,
         new FutureCallback<Object>() {
@@ -248,7 +248,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
-   * Get a zone specific rectification lock.
+   * Get a zone specific rectification lock. This method is synchronized to ensure that the
+   * rectification state is initialized before it is used and always returns the same instance for
+   * the same zone ID. Performance due to lock contention is not a concern here since this is not a
+   * long-running operation.
    *
    * @param zoneId the ID of the zone to rectify
    * @return the rectification state
