@@ -14,6 +14,9 @@
 
 package google.registry.dns.writer.powerdns;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
@@ -22,6 +25,8 @@ import dagger.multibindings.IntoSet;
 import dagger.multibindings.StringKey;
 import google.registry.dns.writer.DnsWriter;
 import jakarta.inject.Named;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Dagger module that provides a PowerDnsWriter. */
 @Module
@@ -37,5 +42,15 @@ public abstract class PowerDnsWriterModule {
   @Named("dnsWriterNames")
   static String provideWriterName() {
     return PowerDnsWriter.NAME;
+  }
+
+  @Provides
+  @Named("powerDnsRectifyExecutor")
+  static ListeningExecutorService provideRectificationExecutor() {
+    ExecutorService delegate =
+        Executors.newFixedThreadPool(
+            Math.max(2, Runtime.getRuntime().availableProcessors() / 2),
+            new ThreadFactoryBuilder().setNameFormat("pdns-rectify-%d").setDaemon(true).build());
+    return MoreExecutors.listeningDecorator(delegate);
   }
 }
