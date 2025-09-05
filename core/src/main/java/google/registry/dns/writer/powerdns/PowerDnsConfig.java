@@ -78,6 +78,21 @@ public final class PowerDnsConfig {
       return config.powerDns.tsigEnabled;
     }
 
+    /** Whether auto rectification is enabled for the PowerDNS server. */
+    @Provides
+    @Config("powerDnsIsAutoRectifyEnabled")
+    public static Boolean providePowerDnsIsAutoRectifyEnabled(PowerDnsConfigSettings config) {
+      return config.powerDns.isAutoRectifyEnabled;
+    }
+
+    /** Threshold for auto rectification in minutes. */
+    @Provides
+    @Config("powerDnsAutoRectifyThresholdMinutes")
+    public static Integer providePowerDnsAutoRectifyThresholdMinutes(
+        PowerDnsConfigSettings config) {
+      return config.powerDns.autoRectifyThresholdMinutes;
+    }
+
     /** Default SOA MNAME for the TLD zone. */
     @Provides
     @Config("powerDnsRootNameServers")

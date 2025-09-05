@@ -30,14 +30,13 @@ public class ZoneRectificationState {
   private final ReentrantLock rectifyZoneLock;
   private final AtomicBoolean isRectificationRequested;
   private final String zoneId;
+  private final Integer autoRectifyThresholdMinutes;
 
-  // do not rectify more than more often than the threshold
-  private static final int RECTIFICATION_TIME_THRESHOLD_MINUTES = 5;
-
-  public ZoneRectificationState(String zoneId) {
+  public ZoneRectificationState(String zoneId, Integer autoRectifyThresholdMinutes) {
     this.rectifyZoneLock = new ReentrantLock();
     this.isRectificationRequested = new AtomicBoolean(false);
     this.zoneId = zoneId;
+    this.autoRectifyThresholdMinutes = autoRectifyThresholdMinutes;
   }
 
   public boolean tryLock() {
@@ -70,7 +69,7 @@ public class ZoneRectificationState {
   private boolean isRectificationTimeExpired() {
     return lastRectificationTime == null
         || lastRectificationTime
-            .plus(Duration.standardMinutes(RECTIFICATION_TIME_THRESHOLD_MINUTES))
+            .plus(Duration.standardMinutes(autoRectifyThresholdMinutes))
             .isBeforeNow();
   }
 }

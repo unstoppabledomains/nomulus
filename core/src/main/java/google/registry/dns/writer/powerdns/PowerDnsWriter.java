@@ -63,6 +63,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private final String soaName;
   private final Boolean dnssecEnabled;
   private final Boolean tsigEnabled;
+  private final Boolean isAutoRectifyEnabled;
+  private final Integer autoRectifyThresholdMinutes;
   private final PowerDNSClient powerDnsClient;
   private final ListeningExecutorService rectificationExecutor;
 
@@ -117,6 +119,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       @Config("powerDnsSoaName") String powerDnsSoaName,
       @Config("powerDnsDnssecEnabled") Boolean powerDnsDnssecEnabled,
       @Config("powerDnsTsigEnabled") Boolean powerDnsTsigEnabled,
+      @Config("powerDnsIsAutoRectifyEnabled") Boolean powerDnsIsAutoRectifyEnabled,
+      @Config("powerDnsAutoRectifyThresholdMinutes") Integer powerDnsAutoRectifyThresholdMinutes,
       Clock clock,
       @Named("powerDnsRectifyExecutor") ListeningExecutorService rectificationExecutor) {
 
@@ -130,6 +134,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     this.soaName = powerDnsSoaName;
     this.dnssecEnabled = powerDnsDnssecEnabled;
     this.tsigEnabled = powerDnsTsigEnabled;
+    this.isAutoRectifyEnabled = powerDnsIsAutoRectifyEnabled;
+    this.autoRectifyThresholdMinutes = powerDnsAutoRectifyThresholdMinutes;
     this.powerDnsClient = new PowerDNSClient(powerDnsBaseUrl, powerDnsApiKey);
     this.rectificationExecutor = rectificationExecutor;
   }
@@ -200,6 +206,13 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param zone the zone to rectify
    */
   private void rectifyZone(Zone zone) {
+    // check if auto rectification is enabled
+    if (!isAutoRectifyEnabled) {
+      logger.atInfo().log(
+          "Auto rectification is not enabled for PowerDNS TLD zone %s", zone.getName());
+      return;
+    }
+
     // retrieve a zone specific rectification lock
     ZoneRectificationState rectifyZoneState = getRectifyZoneState(zone.getId());
 
@@ -218,11 +231,14 @@ public class PowerDnsWriter extends DnsUpdateWriter {
               "Clearing rectification flag for PowerDNS TLD zone %s", zone.getName());
           rectifyZoneState.setIsRectificationRequested(false);
 
+          // set timestamp associated with rectification start
+          rectifyZoneState.setLastRectificationTime();
+
           // rectify the zone
           logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
           powerDnsClient.rectifyZone(zone.getId());
 
-          // update the last rectification time
+          // set timestamp associated with rectification end
           rectifyZoneState.setLastRectificationTime();
         }
       } catch (Exception e) {
@@ -250,7 +266,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         k -> {
           logger.atInfo().log(
               "Initializing zone rectification state for PowerDNS TLD zone %s", zoneId);
-          return new ZoneRectificationState(zoneId);
+          return new ZoneRectificationState(zoneId, autoRectifyThresholdMinutes);
         });
   }
 

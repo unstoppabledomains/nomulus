@@ -26,6 +26,8 @@ public class PowerDnsConfigSettings {
     public String apiKey;
     public Boolean dnssecEnabled;
     public Boolean tsigEnabled;
+    public Boolean isAutoRectifyEnabled;
+    public Integer autoRectifyThresholdMinutes;
     public List<String> rootNameServers;
     public String soaName;
   }
