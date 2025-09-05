@@ -203,22 +203,23 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     // retrieve a zone specific rectification lock
     ZoneRectificationState rectifyZoneState = getRectifyZoneState(zone.getId());
 
+    // set the flag to indicate rectification is being requested
+    rectifyZoneState.setIsRectificationRequested(true);
+
     // Only one thread should rectify the zone at a time, so we will attempt to acquire the lock but
     // continue immediately if the lock is not available.
     if (rectifyZoneState.tryLock()) {
       try {
-        do {
+        while (rectifyZoneState.isRectificationRequired()) {
           // Clear the rectification flag before rectifying the zone. Another thread may set this
           // flag while the current thread is rectifying the zone, resulting in another iteration
           // once the current rectification is complete.
-          rectifyZoneState.setIsRectificationRequired(false);
+          rectifyZoneState.setIsRectificationRequested(false);
 
           // rectify the zone
           logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
           powerDnsClient.rectifyZone(zone.getId());
         }
-        // continue rectifying the zone until the flag is cleared
-        while (rectifyZoneState.isRectificationRequired());
       } catch (Exception e) {
         // log the rectification error
         logger.atSevere().withCause(e).log("Rectify zone failed for TLD: %s", tldZoneName);
@@ -226,10 +227,6 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         // release the lock
         rectifyZoneState.unlock();
       }
-    } else {
-      // set the flag to indicate that another rectification is required, which will be
-      // handled by the currently executing thread
-      rectifyZoneState.setIsRectificationRequired(true);
     }
   }
 
@@ -248,7 +245,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         k -> {
           logger.atInfo().log(
               "Initializing zone rectification state for PowerDNS TLD zone %s", zoneId);
-          return new ZoneRectificationState();
+          return new ZoneRectificationState(zoneId);
         });
   }
 
