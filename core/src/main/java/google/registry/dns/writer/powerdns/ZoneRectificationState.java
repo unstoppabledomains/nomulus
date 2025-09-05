@@ -45,10 +45,8 @@ public class ZoneRectificationState {
   }
 
   public void unlock() {
-    if (rectifyZoneLock.isLocked()) {
-      logger.atInfo().log("Updating last rectification time for PowerDNS TLD zone %s", zoneId);
-      this.lastRectificationTime = DateTime.now(DateTimeZone.UTC);
-    }
+    logger.atInfo().log("Updating last rectification time for PowerDNS TLD zone %s", zoneId);
+    this.lastRectificationTime = DateTime.now(DateTimeZone.UTC);
     rectifyZoneLock.unlock();
   }
 
