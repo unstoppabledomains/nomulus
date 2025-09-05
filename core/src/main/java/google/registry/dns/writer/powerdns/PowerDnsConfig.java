@@ -82,6 +82,9 @@ public final class PowerDnsConfig {
     @Provides
     @Config("powerDnsIsAutoRectifyEnabled")
     public static Boolean providePowerDnsIsAutoRectifyEnabled(PowerDnsConfigSettings config) {
+      if (config.powerDns.isAutoRectifyEnabled == null) {
+        return false;
+      }
       return config.powerDns.isAutoRectifyEnabled;
     }
 
@@ -90,6 +93,9 @@ public final class PowerDnsConfig {
     @Config("powerDnsAutoRectifyThresholdMinutes")
     public static Integer providePowerDnsAutoRectifyThresholdMinutes(
         PowerDnsConfigSettings config) {
+      if (config.powerDns.autoRectifyThresholdMinutes == null) {
+        return 5;
+      }
       return config.powerDns.autoRectifyThresholdMinutes;
     }
 

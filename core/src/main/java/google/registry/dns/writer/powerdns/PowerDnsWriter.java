@@ -710,9 +710,11 @@ public class PowerDnsWriter extends DnsUpdateWriter {
             zone.getId(),
             Cryptokey.createCryptokey(KeyType.zsk, DNSSEC_ZSK_BITS, true, true, DNSSEC_ALGORITHM));
 
-        // create the SOA-EDIT metadata entry for the TLD zone
+        // create the SOA-EDIT and SOA-EDIT-API metadata entries for the TLD zone
         powerDnsClient.createMetadata(
             zone.getId(), Metadata.createMetadata("SOA-EDIT", Arrays.asList(DNSSEC_SOA_EDIT)));
+        powerDnsClient.createMetadata(
+            zone.getId(), Metadata.createMetadata("SOA-EDIT-API", Arrays.asList(DNSSEC_SOA_EDIT)));
 
         // update the zone account field with the expiration timestamp
         Zone updatedZone = new Zone();
