@@ -18,6 +18,7 @@ import com.google.common.flogger.FluentLogger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 public class ZoneRectificationState {
@@ -46,7 +47,7 @@ public class ZoneRectificationState {
   public void unlock() {
     if (rectifyZoneLock.isLocked()) {
       logger.atInfo().log("Updating last rectification time for PowerDNS TLD zone %s", zoneId);
-      this.lastRectificationTime = DateTime.now();
+      this.lastRectificationTime = DateTime.now(DateTimeZone.UTC);
     }
     rectifyZoneLock.unlock();
   }
