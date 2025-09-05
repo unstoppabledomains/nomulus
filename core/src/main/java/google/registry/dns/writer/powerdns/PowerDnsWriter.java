@@ -214,11 +214,16 @@ public class PowerDnsWriter extends DnsUpdateWriter {
           // Clear the rectification flag before rectifying the zone. Another thread may set this
           // flag while the current thread is rectifying the zone, resulting in another iteration
           // once the current rectification is complete.
+          logger.atInfo().log(
+              "Clearing rectification flag for PowerDNS TLD zone %s", zone.getName());
           rectifyZoneState.setIsRectificationRequested(false);
 
           // rectify the zone
           logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
           powerDnsClient.rectifyZone(zone.getId());
+
+          // update the last rectification time
+          rectifyZoneState.setLastRectificationTime();
         }
       } catch (Exception e) {
         // log the rectification error
