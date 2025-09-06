@@ -80,12 +80,12 @@ public final class PowerDnsConfig {
 
     /** Whether auto rectification is enabled for the PowerDNS server. */
     @Provides
-    @Config("powerDnsIsAutoRectifyEnabled")
-    public static Boolean providePowerDnsIsAutoRectifyEnabled(PowerDnsConfigSettings config) {
-      if (config.powerDns.isAutoRectifyEnabled == null) {
+    @Config("powerDnsAutoRectifyEnabled")
+    public static Boolean providePowerDnsAutoRectifyEnabled(PowerDnsConfigSettings config) {
+      if (config.powerDns.autoRectifyEnabled == null) {
         return false;
       }
-      return config.powerDns.isAutoRectifyEnabled;
+      return config.powerDns.autoRectifyEnabled;
     }
 
     /** Threshold for auto rectification in minutes. */

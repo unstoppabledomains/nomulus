@@ -63,7 +63,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private final String soaName;
   private final Boolean dnssecEnabled;
   private final Boolean tsigEnabled;
-  private final Boolean isAutoRectifyEnabled;
+  private final Boolean autoRectifyEnabled;
   private final Integer autoRectifyThresholdMinutes;
   private final PowerDNSClient powerDnsClient;
   private final ListeningExecutorService rectificationExecutor;
@@ -119,7 +119,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
       @Config("powerDnsSoaName") String powerDnsSoaName,
       @Config("powerDnsDnssecEnabled") Boolean powerDnsDnssecEnabled,
       @Config("powerDnsTsigEnabled") Boolean powerDnsTsigEnabled,
-      @Config("powerDnsIsAutoRectifyEnabled") Boolean powerDnsIsAutoRectifyEnabled,
+      @Config("powerDnsAutoRectifyEnabled") Boolean powerDnsAutoRectifyEnabled,
       @Config("powerDnsAutoRectifyThresholdMinutes") Integer powerDnsAutoRectifyThresholdMinutes,
       Clock clock,
       @Named("powerDnsRectifyExecutor") ListeningExecutorService rectificationExecutor) {
@@ -134,7 +134,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     this.soaName = powerDnsSoaName;
     this.dnssecEnabled = powerDnsDnssecEnabled;
     this.tsigEnabled = powerDnsTsigEnabled;
-    this.isAutoRectifyEnabled = powerDnsIsAutoRectifyEnabled;
+    this.autoRectifyEnabled = powerDnsAutoRectifyEnabled;
     this.autoRectifyThresholdMinutes = powerDnsAutoRectifyThresholdMinutes;
     this.powerDnsClient = new PowerDNSClient(powerDnsBaseUrl, powerDnsApiKey);
     this.rectificationExecutor = rectificationExecutor;
@@ -187,11 +187,34 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
+   * Check if auto rectification is enabled for the PowerDNS TLD zone and logs a warning if not
+   * enabled, to ensure the operator is aware of the requirement for an external process.
+   *
+   * @return true if auto rectification is enabled, false otherwise
+   */
+  private boolean isAutoRectifyEnabled(Zone zone) {
+    if (!autoRectifyEnabled) {
+      logger.atInfo().log(
+          "Auto rectification is not enabled for PowerDNS TLD zone %s. Ensure an external process"
+              + " is configured to rectify the zone.",
+          zone.getName());
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Schedule zone rectification to run in the background and return immediately.
    *
    * @param zone the zone to rectify
    */
   private void rectifyZoneAsync(Zone zone) {
+    // check if auto rectification is enabled
+    if (!isAutoRectifyEnabled(zone)) {
+      return;
+    }
+
+    // submit the rectification task to the executor
     ListenableFuture<?> future = rectificationExecutor.submit(() -> rectifyZone(zone));
     logger.atInfo().log(
         "Submitted async PowerDNS TLD zone rectification task for TLD: %s, Task completed: %s",
@@ -207,9 +230,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    */
   private void rectifyZone(Zone zone) {
     // check if auto rectification is enabled
-    if (!isAutoRectifyEnabled) {
-      logger.atInfo().log(
-          "Auto rectification is not enabled for PowerDNS TLD zone %s", zone.getName());
+    if (!isAutoRectifyEnabled(zone)) {
       return;
     }
 
@@ -726,7 +747,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
                 DNSSEC_ZSK_EXPIRE_FLAG, System.currentTimeMillis() + DNSSEC_ZSK_EXPIRY_MS));
         powerDnsClient.putZone(updatedZone);
 
-        // attempt to manually rectify the TLD zone
+        // always attempt to manually rectify the TLD zone when it is first created, ensuring the
+        // DNSSEC records are properly formed before continuing
         try {
           logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
           powerDnsClient.rectifyZone(zone.getId());

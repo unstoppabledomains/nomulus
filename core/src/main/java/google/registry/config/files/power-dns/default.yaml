@@ -4,7 +4,7 @@ powerDns:
   apiKey: example-api-key
   dnssecEnabled: false
   tsigEnabled: true
-  isAutoRectifyEnabled: false
+  autoRectifyEnabled: false
   autoRectifyThresholdMinutes: 5
   rootNameServers:
   - ns1.example.com.
