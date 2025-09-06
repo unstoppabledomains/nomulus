@@ -84,6 +84,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   // DNSSEC configuration
   private static final String DNSSEC_ALGORITHM = "rsasha256";
   private static final String DNSSEC_SOA_EDIT = "INCREMENT-WEEKS";
+  private static final String DNSSEC_SOA_EDIT_API = "DEFAULT";
   private static final int DNSSEC_KSK_BITS = 2048;
   private static final int DNSSEC_ZSK_BITS = 1024;
   private static final long DNSSEC_ZSK_EXPIRY_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
@@ -731,11 +732,17 @@ public class PowerDnsWriter extends DnsUpdateWriter {
             zone.getId(),
             Cryptokey.createCryptokey(KeyType.zsk, DNSSEC_ZSK_BITS, true, true, DNSSEC_ALGORITHM));
 
-        // create the SOA-EDIT and SOA-EDIT-API metadata entries for the TLD zone
+        // create the SOA-EDIT metadata entry for the TLD zone, uses the weeks since epoch strategy
+        // for data imports and internal batch operations
         powerDnsClient.createMetadata(
             zone.getId(), Metadata.createMetadata("SOA-EDIT", Arrays.asList(DNSSEC_SOA_EDIT)));
+
+        // create the SOA-EDIT-API metadata entry for the TLD zone, uses the default (incremental)
+        // strategy for API operations which allows the SOA serial to update with any changes to
+        // the zone
         powerDnsClient.createMetadata(
-            zone.getId(), Metadata.createMetadata("SOA-EDIT-API", Arrays.asList(DNSSEC_SOA_EDIT)));
+            zone.getId(),
+            Metadata.createMetadata("SOA-EDIT-API", Arrays.asList(DNSSEC_SOA_EDIT_API)));
 
         // update the zone account field with the expiration timestamp
         Zone updatedZone = new Zone();
