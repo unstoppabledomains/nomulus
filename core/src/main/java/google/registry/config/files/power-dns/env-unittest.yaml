@@ -4,6 +4,8 @@ powerDns:
   apiKey: unittest-api-key
   dnssecEnabled: true
   tsigEnabled: true
+  autoRectifyEnabled: false
+  autoRectifyThresholdMinutes: 5
   rootNameServers:
   - ns1.unittest.com.
   - ns2.unittest.com.
