@@ -245,23 +245,36 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     // continue immediately if the lock is not available.
     if (rectifyZoneState.tryLock()) {
       try {
+        int retryCount = 0;
         while (rectifyZoneState.isRectificationRequired()) {
-          // Clear the rectification flag before rectifying the zone. Another thread may set this
-          // flag while the current thread is rectifying the zone, resulting in another iteration
-          // once the current rectification is complete.
-          logger.atInfo().log(
-              "Clearing rectification flag for PowerDNS TLD zone %s", zone.getName());
-          rectifyZoneState.setIsRectificationRequested(false);
+          try {
+            // Clear the rectification flag before rectifying the zone. Another thread may set this
+            // flag while the current thread is rectifying the zone, resulting in another iteration
+            // once the current rectification is complete.
+            logger.atInfo().log(
+                "Clearing rectification flag for PowerDNS TLD zone %s", zone.getName());
+            rectifyZoneState.setIsRectificationRequested(false);
 
-          // set timestamp associated with rectification start
-          rectifyZoneState.setLastRectificationTime();
+            // set timestamp associated with rectification start
+            rectifyZoneState.setLastRectificationTime();
 
-          // rectify the zone
-          logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
-          powerDnsClient.rectifyZone(zone.getId());
+            // rectify the zone
+            logger.atInfo().log("Rectifying PowerDNS TLD zone %s", zone.getName());
+            powerDnsClient.rectifyZone(zone.getId());
 
-          // set timestamp associated with rectification end
-          rectifyZoneState.setLastRectificationTime();
+            // set timestamp associated with rectification end
+            rectifyZoneState.setLastRectificationTime();
+          } catch (Exception e) {
+            // potentially retry the rectification
+            retryCount++;
+            if (retryCount > 3) {
+              throw e;
+            }
+            logger.atSevere().withCause(e).log(
+                "Retrying rectification for PowerDNS TLD zone %s", zone.getName());
+            rectifyZoneState.setIsRectificationRequested(true);
+            Thread.sleep(1000);
+          }
         }
       } catch (Exception e) {
         // log the rectification error
