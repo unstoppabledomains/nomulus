@@ -74,7 +74,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
   // Zone ID cache configuration
   private static final ConcurrentHashMap<String, String> zoneIdCache = new ConcurrentHashMap<>();
-  private static long zoneIdCacheExpiration = 0;
+  private static volatile long zoneIdCacheExpiration = 0;
   private static int defaultZoneTtl = 3600; // 1 hour in seconds
 
   // Zone rectification state
@@ -956,7 +956,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    */
   private Zone getTldZoneForUpdate(List<RRSet> records) throws IOException {
     Zone tldZone = new Zone();
-    tldZone.setId(getTldZoneId());
+    tldZone.setId(getTldZoneId(tldZoneName, this));
     tldZone.setName(getHostNameWithoutTrailingDot(tldZoneName));
     tldZone.setRrsets(records);
     return tldZone;
@@ -1006,12 +1006,16 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    *
    * @return the ID of the TLD zone
    */
-  private synchronized String getTldZoneId() throws IOException {
+  private static synchronized String getTldZoneId(String tldZoneName, PowerDnsWriter writer)
+      throws IOException {
     // clear the cache if it has expired
     if (zoneIdCacheExpiration < System.currentTimeMillis()) {
       logger.atInfo().log("Clearing PowerDNS TLD zone ID cache");
       zoneIdCache.clear();
       zoneIdCacheExpiration = System.currentTimeMillis() + 1000 * 60 * 60; // 1 hour
+    } else if (zoneIdCache.containsKey(tldZoneName)) {
+      // show that we are using the cached entry
+      logger.atInfo().log("Using cached PowerDNS TLD zone ID for %s", tldZoneName);
     }
 
     // retrieve the TLD zone ID from the cache or retrieve it from the PowerDNS API
@@ -1023,7 +1027,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
               try {
                 // retrieve the TLD zone by name, which may result from an existing zone or
                 // be dynamically created if the zone does not exist
-                Zone tldZone = getAndValidateTldZoneByName();
+                logger.atInfo().log("Retrieving PowerDNS TLD zone ID for %s", tldZoneName);
+                Zone tldZone = writer.getAndValidateTldZoneByName();
 
                 // return the TLD zone ID, which will be cached for the next hour
                 return tldZone.getId();
