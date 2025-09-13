@@ -287,15 +287,12 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
-   * Get a zone specific rectification lock. This method is synchronized to ensure that the
-   * rectification state is initialized before it is used and always returns the same instance for
-   * the same zone ID. Performance due to lock contention is not a concern here since this is not a
-   * long-running operation.
+   * Get a zone specific rectification lock.
    *
    * @param zoneId the ID of the zone to rectify
    * @return the rectification state
    */
-  private synchronized ZoneRectificationState getRectifyZoneState(String zoneId) {
+  private ZoneRectificationState getRectifyZoneState(String zoneId) {
     return rectifyZoneStateMap.computeIfAbsent(
         zoneId,
         k -> {
@@ -501,11 +498,11 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param zone the TLD zone to validate
    */
   private void validateZoneConfig(Zone zone) throws IOException {
-    // validate the SOA and root NS records
-    validateSoaConfig(zone);
-
-    // validate the NS records
-    validateNsConfig(zone);
+    // validate the SOA and root NS records if RRSets are present
+    if (zone.getRrsets() != null && !zone.getRrsets().isEmpty()) {
+      validateSoaConfig(zone);
+      validateNsConfig(zone);
+    }
 
     // validate the TSIG key configuration
     validateTsigConfig(zone);
@@ -956,11 +953,29 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    */
   private Zone getTldZoneForUpdate(List<RRSet> records) throws IOException {
     Zone tldZone = new Zone();
-    tldZone.setId(getTldZoneId(tldZoneName, this));
+    tldZone.setId(getTldZoneId());
     tldZone.setName(getHostNameWithoutTrailingDot(tldZoneName));
     tldZone.setRrsets(records);
     return tldZone;
   }
+
+  /*
+   *
+   * {
+    "account": "DNSSEC-ZSK-EXPIRE-DATE:1759407683890",
+    "catalog": "",
+    "dnssec": true,
+    "edited_serial": 2025115665,
+    "id": "udrsptest1.",
+    "kind": "Master",
+    "last_check": 0,
+    "masters": [],
+    "name": "udrsptest1.",
+    "notified_serial": 2025112759,
+    "serial": 2025112759,
+    "url": "/api/v1/servers/localhost/zones/udrsptest1."
+  }
+   */
 
   /**
    * Get the TLD zone by name and validate the zone's configuration before returning.
@@ -973,12 +988,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     for (Zone zone : powerDnsClient.listZones()) {
       if (getHostNameWithoutTrailingDot(zone.getName())
           .equals(getHostNameWithoutTrailingDot(tldZoneName))) {
-        // retrieve full zone details
-        Zone fullZone = powerDnsClient.getZone(zone.getId());
 
         // validate the zone's configuration
-        validateZoneConfig(fullZone);
-        return fullZone;
+        validateZoneConfig(zone);
+        return zone;
       }
     }
 
@@ -1001,13 +1014,11 @@ public class PowerDnsWriter extends DnsUpdateWriter {
 
   /**
    * Get the TLD zone ID for the given TLD zone name from the cache, or compute it if it is not
-   * present in the cache. This method is synchronized since it may result in a new TLD zone being
-   * created and DNSSEC being configured, and this should only happen once.
+   * present in the cache.
    *
    * @return the ID of the TLD zone
    */
-  private static synchronized String getTldZoneId(String tldZoneName, PowerDnsWriter writer)
-      throws IOException {
+  private String getTldZoneId() throws IOException {
     // clear the cache if it has expired
     if (zoneIdCacheExpiration < System.currentTimeMillis()) {
       logger.atInfo().log("Clearing PowerDNS TLD zone ID cache");
@@ -1028,7 +1039,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
                 // retrieve the TLD zone by name, which may result from an existing zone or
                 // be dynamically created if the zone does not exist
                 logger.atInfo().log("Retrieving PowerDNS TLD zone ID for %s", tldZoneName);
-                Zone tldZone = writer.getAndValidateTldZoneByName();
+                Zone tldZone = getAndValidateTldZoneByName();
 
                 // return the TLD zone ID, which will be cached for the next hour
                 return tldZone.getId();
