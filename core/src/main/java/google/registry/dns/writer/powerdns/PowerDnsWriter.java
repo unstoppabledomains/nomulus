@@ -285,12 +285,15 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   }
 
   /**
-   * Get a zone specific rectification lock.
+   * Get a zone specific rectification lock. This method is synchronized to ensure that the
+   * rectification state is initialized before it is used and always returns the same instance for
+   * the same zone ID. Performance due to lock contention is not a concern here since this is not a
+   * long-running operation.
    *
    * @param zoneId the ID of the zone to rectify
    * @return the rectification state
    */
-  private ZoneRectificationState getRectifyZoneState(String zoneId) {
+  private synchronized ZoneRectificationState getRectifyZoneState(String zoneId) {
     return rectifyZoneStateMap.computeIfAbsent(
         zoneId,
         k -> {
@@ -496,7 +499,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param zone the TLD zone to validate
    */
   private void validateZoneConfig(Zone zone) throws IOException {
-    // validate the SOA and root NS records if RRSets are present
+    // validate the SOA and root NS records if RRSets are present, which only happens when
+    // the zone is automatically created. Once created at runtime, only the basic zone data
+    // is retrieved for better scaling. Retrieving all zone records for a large zone is time
+    // consuming and causes locking issues when committing changes.
     if (zone.getRrsets() != null && !zone.getRrsets().isEmpty()) {
       validateSoaConfig(zone);
       validateNsConfig(zone);
@@ -683,12 +689,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
           "Creating TSIG key '%s' for PowerDNS TLD zone %s", zoneTsigKeyName, zone.getName());
       powerDnsClient.createTSIGKey(TSIGKey.createTSIGKey(zoneTsigKeyName, TSIG_KEY_ALGORITHM));
     }
-    logger.atInfo().log(
-        "Validated TSIG key '%s' (%s) is available for AXFR replication to secondary servers for"
-            + " TLD zone %s. Retrieve the key using 'pdnsutil list-tsig-keys' in a secure"
-            + " environment and apply the key to the secondary server configuration.",
-        zoneTsigKeyName, TSIG_KEY_ALGORITHM, zone.getName());
-
+    
     // ensure the TSIG-ALLOW-AXFR metadata is set to the current TSIG key name
     try {
       Metadata metadata = powerDnsClient.getMetadata(zone.getId(), "TSIG-ALLOW-AXFR");
@@ -697,8 +698,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         throw new IOException("missing expected TSIG-ALLOW-AXFR value");
       }
       logger.atInfo().log(
-          "Validated PowerDNS TLD zone %s is ready for AXFR replication using TSIG key '%s'",
-          zone.getName(), zoneTsigKeyName);
+          "Validated TSIG key '%s' (%s) is available for AXFR replication to secondary servers for"
+              + " TLD zone %s. Retrieve the key using 'pdnsutil list-tsig-keys' in a secure"
+              + " environment and apply the key to the secondary server configuration.",
+          zoneTsigKeyName, TSIG_KEY_ALGORITHM, zone.getName());
     } catch (IOException e) {
       // log the missing metadata with instructions on how to configure it
       logger.atSevere().log(
