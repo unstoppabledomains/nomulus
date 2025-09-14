@@ -72,9 +72,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private static final ArrayList<String> supportedRecordTypes =
       new ArrayList<>(Arrays.asList("A", "AAAA", "DS", "NS"));
 
-  // Zone ID cache configuration
-  private static final ConcurrentHashMap<String, String> zoneIdCache = new ConcurrentHashMap<>();
-  private static volatile long zoneIdCacheExpiration = 0;
+  // Zone TTL configuration
   private static int defaultZoneTtl = 3600; // 1 hour in seconds
 
   // Zone rectification state
@@ -393,7 +391,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     // prepare a PowerDNS zone object containing the TLD record updates using the RRSet objects
     // that have a valid change type
     Zone preparedTldZone =
-        getTldZoneForUpdate(
+        getTldZoneFromRecords(
             allRRSets.stream().filter(v -> v.getChangeType() != null).collect(Collectors.toList()));
 
     // return the prepared TLD zone
@@ -951,31 +949,19 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param records the set of RRSet records that will be sent to the PowerDNS API
    * @return the prepared TLD zone
    */
-  private Zone getTldZoneForUpdate(List<RRSet> records) throws IOException {
-    Zone tldZone = new Zone();
-    tldZone.setId(getTldZoneId());
-    tldZone.setName(getHostNameWithoutTrailingDot(tldZoneName));
-    tldZone.setRrsets(records);
-    return tldZone;
-  }
+  private Zone getTldZoneFromRecords(List<RRSet> records) throws IOException {
+    // retrieve the TLD zone by name, which may result from an existing zone or
+    // be dynamically created if the zone does not exist
+    logger.atInfo().log("Retrieving PowerDNS TLD zone ID for %s", tldZoneName);
+    Zone tldZone = getAndValidateTldZoneByName();
 
-  /*
-   *
-   * {
-    "account": "DNSSEC-ZSK-EXPIRE-DATE:1759407683890",
-    "catalog": "",
-    "dnssec": true,
-    "edited_serial": 2025115665,
-    "id": "udrsptest1.",
-    "kind": "Master",
-    "last_check": 0,
-    "masters": [],
-    "name": "udrsptest1.",
-    "notified_serial": 2025112759,
-    "serial": 2025112759,
-    "url": "/api/v1/servers/localhost/zones/udrsptest1."
+    // prepare a zone for update
+    Zone tldZoneFromRecords = new Zone();
+    tldZoneFromRecords.setId(tldZone.getId());
+    tldZoneFromRecords.setName(getHostNameWithoutTrailingDot(tldZoneName));
+    tldZoneFromRecords.setRrsets(records);
+    return tldZoneFromRecords;
   }
-   */
 
   /**
    * Get the TLD zone by name and validate the zone's configuration before returning.
@@ -1012,53 +998,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     throw new IOException("TLD zone not found: " + tldZoneName);
   }
 
-  /**
-   * Get the TLD zone ID for the given TLD zone name from the cache, or compute it if it is not
-   * present in the cache.
-   *
-   * @return the ID of the TLD zone
-   */
-  private String getTldZoneId() throws IOException {
-    // clear the cache if it has expired
-    if (zoneIdCacheExpiration < System.currentTimeMillis()) {
-      logger.atInfo().log("Clearing PowerDNS TLD zone ID cache");
-      zoneIdCache.clear();
-      zoneIdCacheExpiration = System.currentTimeMillis() + 1000 * 60 * 60; // 1 hour
-    } else if (zoneIdCache.containsKey(tldZoneName)) {
-      // show that we are using the cached entry
-      logger.atInfo().log("Using cached PowerDNS TLD zone ID for %s", tldZoneName);
-    }
-
-    // retrieve the TLD zone ID from the cache or retrieve it from the PowerDNS API
-    // if not available in the cache
-    String zoneId =
-        zoneIdCache.computeIfAbsent(
-            tldZoneName,
-            key -> {
-              try {
-                // retrieve the TLD zone by name, which may result from an existing zone or
-                // be dynamically created if the zone does not exist
-                logger.atInfo().log("Retrieving PowerDNS TLD zone ID for %s", tldZoneName);
-                Zone tldZone = getAndValidateTldZoneByName();
-
-                // return the TLD zone ID, which will be cached for the next hour
-                return tldZone.getId();
-              } catch (IOException e) {
-                // log the error and return a null value to indicate failure
-                logger.atWarning().log(
-                    "Failed to get PowerDNS TLD zone ID for %s: %s", tldZoneName, e);
-                return null;
-              }
-            });
-
-    // if the TLD zone ID is not found, throw an exception
-    if (zoneId == null) {
-      throw new IOException("TLD zone not found: " + tldZoneName);
-    }
-
-    // return the TLD zone ID
-    return zoneId;
-  }
+  
 
   /**
    * Determine if a record is a delete record.
