@@ -102,7 +102,7 @@ public class PowerDNSClient {
   private Response logAndExecuteRequest(Request request) throws IOException {
     // log the request and create timestamp for the start time
     logger.atInfo().log(
-        "Executing PowerDNS request: %s, url: %s, body: %s",
+        "Executing PowerDNS request, method: %s, url: %s, body: %s",
         request.method(),
         request.url(),
         request.body() != null ? bodyToString(request.body()) : null);
@@ -115,13 +115,16 @@ public class PowerDNSClient {
 
     // execute the request and log the response
     Response response = httpClient.newCall(request).execute();
-    logger.atInfo().log("PowerDNS response: %s", response);
 
     // log the response time and response code
     long endTime = System.currentTimeMillis();
     logger.atInfo().log(
-        "Completed PowerDNS request in %d ms, success: %s, response code: %d",
-        endTime - startTime, response.isSuccessful(), response.code());
+        "Completed PowerDNS request in %d ms, method: %s, url: %s, success: %s, response code: %d",
+        endTime - startTime,
+        request.method(),
+        request.url(),
+        response.isSuccessful(),
+        response.code());
 
     // return the response
     return response;

@@ -72,9 +72,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
   private static final ArrayList<String> supportedRecordTypes =
       new ArrayList<>(Arrays.asList("A", "AAAA", "DS", "NS"));
 
-  // Zone ID cache configuration
-  private static final ConcurrentHashMap<String, String> zoneIdCache = new ConcurrentHashMap<>();
-  private static long zoneIdCacheExpiration = 0;
+  // Zone TTL configuration
   private static int defaultZoneTtl = 3600; // 1 hour in seconds
 
   // Zone rectification state
@@ -396,7 +394,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     // prepare a PowerDNS zone object containing the TLD record updates using the RRSet objects
     // that have a valid change type
     Zone preparedTldZone =
-        getTldZoneForUpdate(
+        getTldZoneFromRecords(
             allRRSets.stream().filter(v -> v.getChangeType() != null).collect(Collectors.toList()));
 
     // return the prepared TLD zone
@@ -501,11 +499,14 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param zone the TLD zone to validate
    */
   private void validateZoneConfig(Zone zone) throws IOException {
-    // validate the SOA and root NS records
-    validateSoaConfig(zone);
-
-    // validate the NS records
-    validateNsConfig(zone);
+    // validate the SOA and root NS records if RRSets are present, which only happens when
+    // the zone is automatically created. Once created at runtime, only the basic zone data
+    // is retrieved for better scaling. Retrieving all zone records for a large zone is time
+    // consuming and causes locking issues when committing changes.
+    if (zone.getRrsets() != null && !zone.getRrsets().isEmpty()) {
+      validateSoaConfig(zone);
+      validateNsConfig(zone);
+    }
 
     // validate the TSIG key configuration
     validateTsigConfig(zone);
@@ -688,12 +689,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
           "Creating TSIG key '%s' for PowerDNS TLD zone %s", zoneTsigKeyName, zone.getName());
       powerDnsClient.createTSIGKey(TSIGKey.createTSIGKey(zoneTsigKeyName, TSIG_KEY_ALGORITHM));
     }
-    logger.atInfo().log(
-        "Validated TSIG key '%s' (%s) is available for AXFR replication to secondary servers for"
-            + " TLD zone %s. Retrieve the key using 'pdnsutil list-tsig-keys' in a secure"
-            + " environment and apply the key to the secondary server configuration.",
-        zoneTsigKeyName, TSIG_KEY_ALGORITHM, zone.getName());
-
+    
     // ensure the TSIG-ALLOW-AXFR metadata is set to the current TSIG key name
     try {
       Metadata metadata = powerDnsClient.getMetadata(zone.getId(), "TSIG-ALLOW-AXFR");
@@ -702,8 +698,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
         throw new IOException("missing expected TSIG-ALLOW-AXFR value");
       }
       logger.atInfo().log(
-          "Validated PowerDNS TLD zone %s is ready for AXFR replication using TSIG key '%s'",
-          zone.getName(), zoneTsigKeyName);
+          "Validated TSIG key '%s' (%s) is available for AXFR replication to secondary servers for"
+              + " TLD zone %s. Retrieve the key using 'pdnsutil list-tsig-keys' in a secure"
+              + " environment and apply the key to the secondary server configuration.",
+          zoneTsigKeyName, TSIG_KEY_ALGORITHM, zone.getName());
     } catch (IOException e) {
       // log the missing metadata with instructions on how to configure it
       logger.atSevere().log(
@@ -954,12 +952,18 @@ public class PowerDnsWriter extends DnsUpdateWriter {
    * @param records the set of RRSet records that will be sent to the PowerDNS API
    * @return the prepared TLD zone
    */
-  private Zone getTldZoneForUpdate(List<RRSet> records) throws IOException {
-    Zone tldZone = new Zone();
-    tldZone.setId(getTldZoneId());
-    tldZone.setName(getHostNameWithoutTrailingDot(tldZoneName));
-    tldZone.setRrsets(records);
-    return tldZone;
+  private Zone getTldZoneFromRecords(List<RRSet> records) throws IOException {
+    // retrieve the TLD zone by name, which may result from an existing zone or
+    // be dynamically created if the zone does not exist
+    logger.atInfo().log("Retrieving PowerDNS TLD zone ID for %s", tldZoneName);
+    Zone tldZone = getAndValidateTldZoneByName();
+
+    // prepare a zone for update
+    Zone tldZoneFromRecords = new Zone();
+    tldZoneFromRecords.setId(tldZone.getId());
+    tldZoneFromRecords.setName(getHostNameWithoutTrailingDot(tldZoneName));
+    tldZoneFromRecords.setRrsets(records);
+    return tldZoneFromRecords;
   }
 
   /**
@@ -973,12 +977,10 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     for (Zone zone : powerDnsClient.listZones()) {
       if (getHostNameWithoutTrailingDot(zone.getName())
           .equals(getHostNameWithoutTrailingDot(tldZoneName))) {
-        // retrieve full zone details
-        Zone fullZone = powerDnsClient.getZone(zone.getId());
 
         // validate the zone's configuration
-        validateZoneConfig(fullZone);
-        return fullZone;
+        validateZoneConfig(zone);
+        return zone;
       }
     }
 
@@ -999,50 +1001,7 @@ public class PowerDnsWriter extends DnsUpdateWriter {
     throw new IOException("TLD zone not found: " + tldZoneName);
   }
 
-  /**
-   * Get the TLD zone ID for the given TLD zone name from the cache, or compute it if it is not
-   * present in the cache. This method is synchronized since it may result in a new TLD zone being
-   * created and DNSSEC being configured, and this should only happen once.
-   *
-   * @return the ID of the TLD zone
-   */
-  private synchronized String getTldZoneId() throws IOException {
-    // clear the cache if it has expired
-    if (zoneIdCacheExpiration < System.currentTimeMillis()) {
-      logger.atInfo().log("Clearing PowerDNS TLD zone ID cache");
-      zoneIdCache.clear();
-      zoneIdCacheExpiration = System.currentTimeMillis() + 1000 * 60 * 60; // 1 hour
-    }
-
-    // retrieve the TLD zone ID from the cache or retrieve it from the PowerDNS API
-    // if not available in the cache
-    String zoneId =
-        zoneIdCache.computeIfAbsent(
-            tldZoneName,
-            key -> {
-              try {
-                // retrieve the TLD zone by name, which may result from an existing zone or
-                // be dynamically created if the zone does not exist
-                Zone tldZone = getAndValidateTldZoneByName();
-
-                // return the TLD zone ID, which will be cached for the next hour
-                return tldZone.getId();
-              } catch (IOException e) {
-                // log the error and return a null value to indicate failure
-                logger.atWarning().log(
-                    "Failed to get PowerDNS TLD zone ID for %s: %s", tldZoneName, e);
-                return null;
-              }
-            });
-
-    // if the TLD zone ID is not found, throw an exception
-    if (zoneId == null) {
-      throw new IOException("TLD zone not found: " + tldZoneName);
-    }
-
-    // return the TLD zone ID
-    return zoneId;
-  }
+  
 
   /**
    * Determine if a record is a delete record.
