@@ -16,7 +16,6 @@ package google.registry.batch;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.domain.rgp.GracePeriodStatus.ADD;
 import static google.registry.testing.DatabaseHelper.assertDomainDnsRequests;
 import static google.registry.testing.DatabaseHelper.createTld;
@@ -27,12 +26,12 @@ import static google.registry.testing.DatabaseHelper.persistActiveHost;
 import static google.registry.testing.DatabaseHelper.persistDeletedDomain;
 import static google.registry.testing.DatabaseHelper.persistDomainAsDeleted;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResource;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static org.joda.time.DateTimeZone.UTC;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableSet;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
@@ -203,7 +202,8 @@ class DeleteProberDataActionTest {
                 .build());
     action.run();
     DateTime timeAfterDeletion = DateTime.now(UTC);
-    assertThat(loadByForeignKey(Domain.class, "blah.ib-any.test", timeAfterDeletion)).isEmpty();
+    assertThat(ForeignKeyUtils.loadResource(Domain.class, "blah.ib-any.test", timeAfterDeletion))
+        .isEmpty();
     assertThat(loadByEntity(domain).getDeletionTime()).isLessThan(timeAfterDeletion);
     assertDomainDnsRequests("blah.ib-any.test");
   }
@@ -220,7 +220,8 @@ class DeleteProberDataActionTest {
     DateTime timeAfterDeletion = DateTime.now(UTC);
     resetAction();
     action.run();
-    assertThat(loadByForeignKey(Domain.class, "blah.ib-any.test", timeAfterDeletion)).isEmpty();
+    assertThat(ForeignKeyUtils.loadResource(Domain.class, "blah.ib-any.test", timeAfterDeletion))
+        .isEmpty();
     assertThat(loadByEntity(domain).getDeletionTime()).isLessThan(timeAfterDeletion);
     assertDomainDnsRequests("blah.ib-any.test");
   }
@@ -233,7 +234,8 @@ class DeleteProberDataActionTest {
             .setCreationTimeForTest(DateTime.now(UTC).minusSeconds(1))
             .build());
     action.run();
-    Optional<Domain> domain = loadByForeignKey(Domain.class, "blah.ib-any.test", DateTime.now(UTC));
+    Optional<Domain> domain =
+        ForeignKeyUtils.loadResource(Domain.class, "blah.ib-any.test", DateTime.now(UTC));
     assertThat(domain).isPresent();
     assertThat(domain.get().getDeletionTime()).isEqualTo(END_OF_TIME);
   }
@@ -287,7 +289,7 @@ class DeleteProberDataActionTest {
   private static Set<ImmutableObject> persistDomainAndDescendants(String fqdn) {
     Domain domain = persistDeletedDomain(fqdn, DELETION_TIME);
     DomainHistory historyEntry =
-        persistSimpleResource(
+        persistResource(
             new DomainHistory.Builder()
                 .setDomain(domain)
                 .setType(HistoryEntry.Type.DOMAIN_CREATE)
@@ -295,7 +297,7 @@ class DeleteProberDataActionTest {
                 .setModificationTime(DELETION_TIME.minusYears(3))
                 .build());
     BillingEvent billingEvent =
-        persistSimpleResource(
+        persistResource(
             new BillingEvent.Builder()
                 .setDomainHistory(historyEntry)
                 .setBillingTime(DELETION_TIME.plusYears(1))
@@ -307,7 +309,7 @@ class DeleteProberDataActionTest {
                 .setTargetId(fqdn)
                 .build());
     PollMessage.OneTime pollMessage =
-        persistSimpleResource(
+        persistResource(
             new PollMessage.OneTime.Builder()
                 .setHistoryEntry(historyEntry)
                 .setEventTime(DELETION_TIME)
@@ -315,7 +317,7 @@ class DeleteProberDataActionTest {
                 .setMsg("Domain registered")
                 .build());
     GracePeriod gracePeriod =
-        persistSimpleResource(
+        persistResource(
             GracePeriod.create(
                 ADD,
                 domain.getRepoId(),

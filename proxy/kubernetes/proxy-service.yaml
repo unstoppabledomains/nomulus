@@ -32,4 +32,12 @@ spec:
     kind: Deployment
     name: proxy-deployment
   maxReplicas: 50
-  minReplicas: 10
+  minReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+

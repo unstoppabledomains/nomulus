@@ -23,10 +23,10 @@ import static google.registry.testing.CertificateSamples.SAMPLE_CERT2_HASH;
 import static google.registry.testing.CertificateSamples.SAMPLE_CERT_HASH;
 import static google.registry.testing.DatabaseHelper.cloneAndSetAutoTimestamps;
 import static google.registry.testing.DatabaseHelper.createTld;
+import static google.registry.testing.DatabaseHelper.createTlds;
 import static google.registry.testing.DatabaseHelper.newTld;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResources;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static org.joda.money.CurrencyUnit.JPY;
 import static org.joda.money.CurrencyUnit.USD;
@@ -44,6 +44,7 @@ import google.registry.model.registrar.Registrar.Type;
 import google.registry.model.tld.Tld;
 import google.registry.model.tld.Tld.TldType;
 import google.registry.model.tld.Tlds;
+import google.registry.testing.DatabaseHelper;
 import google.registry.util.CidrAddressBlock;
 import google.registry.util.SerializeUtils;
 import java.math.BigDecimal;
@@ -125,13 +126,13 @@ class RegistrarTest extends EntityTestCase {
             .setRegistrar(registrar)
             .setName("John Abused")
             .setEmailAddress("johnabuse@example.com")
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(false)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(false)
             .setPhoneNumber("+1.2125551213")
             .setFaxNumber("+1.2125551213")
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.ABUSE, RegistrarPoc.Type.ADMIN))
             .build();
-    persistSimpleResources(
+    persistResources(
         ImmutableList.of(
             abuseAdminContact,
             new RegistrarPoc.Builder()
@@ -300,7 +301,7 @@ class RegistrarTest extends EntityTestCase {
 
   @Test
   void testSuccess_emptyContactTypesAllowed() {
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("John Abussy")
@@ -317,34 +318,34 @@ class RegistrarTest extends EntityTestCase {
   @Test
   void testSuccess_getContactsByType() {
     RegistrarPoc newTechContact =
-        persistSimpleResource(
+        persistResource(
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
                 .setName("Jake Tech")
                 .setEmailAddress("jaketech@example.com")
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(true)
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(true)
                 .setPhoneNumber("+1.2125551213")
                 .setFaxNumber("+1.2125551213")
                 .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH))
                 .build());
     RegistrarPoc newTechAbuseContact =
-        persistSimpleResource(
+        persistResource(
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
                 .setName("Jim Tech-Abuse")
                 .setEmailAddress("jimtechAbuse@example.com")
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(true)
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(true)
                 .setPhoneNumber("+1.2125551213")
                 .setFaxNumber("+1.2125551213")
                 .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH, RegistrarPoc.Type.ABUSE))
                 .build());
-    ImmutableSortedSet<RegistrarPoc> techContacts =
-        registrar.getContactsOfType(RegistrarPoc.Type.TECH);
+    abuseAdminContact = DatabaseHelper.loadByKey(abuseAdminContact.createVKey());
+    ImmutableSortedSet<RegistrarPoc> techContacts = registrar.getPocsOfType(RegistrarPoc.Type.TECH);
     assertThat(techContacts).containsExactly(newTechContact, newTechAbuseContact).inOrder();
     ImmutableSortedSet<RegistrarPoc> abuseContacts =
-        registrar.getContactsOfType(RegistrarPoc.Type.ABUSE);
+        registrar.getPocsOfType(RegistrarPoc.Type.ABUSE);
     assertThat(abuseContacts).containsExactly(newTechAbuseContact, abuseAdminContact).inOrder();
   }
 
@@ -759,5 +760,17 @@ class RegistrarTest extends EntityTestCase {
         .setBillingAccountMap(ImmutableMap.of(USD, "abc123"))
         .setAllowedTlds(ImmutableSet.of("tld", "xn--q9jyb4c"))
         .build();
+  }
+
+  @Test
+  void testToString_sortsAllowedTlds() {
+    createTlds("foo", "bar", "baz", "gon", "tri");
+    persistResource(
+        registrar
+            .asBuilder()
+            .setAllowedTlds(ImmutableSet.of("gon", "bar", "foo", "tri", "baz"))
+            .build());
+    assertThat(Registrar.loadByRegistrarId("registrar").toString())
+        .contains("allowedTlds=[bar, baz, foo, gon, tri]");
   }
 }

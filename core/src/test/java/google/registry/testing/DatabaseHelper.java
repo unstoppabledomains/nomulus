@@ -61,7 +61,7 @@ import google.registry.dns.DnsUtils.TargetType;
 import google.registry.dns.writer.VoidDnsWriter;
 import google.registry.model.Buildable;
 import google.registry.model.EppResource;
-import google.registry.model.EppResourceUtils;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase;
 import google.registry.model.billing.BillingBase.Flag;
@@ -462,7 +462,7 @@ public final class DatabaseHelper {
                   .forEach(
                       hostname ->
                           deleteResource(
-                              EppResourceUtils.loadByForeignKey(Host.class, hostname, now).get()));
+                              ForeignKeyUtils.loadResource(Host.class, hostname, now).get()));
               for (HistoryEntry hist : historyEntries) {
                 deleteResource(hist);
               }
@@ -587,7 +587,7 @@ public final class DatabaseHelper {
   public static Domain persistDomainWithDependentResources(
       String label,
       String tld,
-      Contact contact,
+      @Nullable Contact contact,
       DateTime now,
       DateTime creationTime,
       DateTime expirationTime) {
@@ -601,13 +601,16 @@ public final class DatabaseHelper {
             .setCreationRegistrarId("TheRegistrar")
             .setCreationTimeForTest(creationTime)
             .setRegistrationExpirationTime(expirationTime)
-            .setRegistrant(Optional.of(contact.createVKey()))
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, contact.createVKey()),
-                    DesignatedContact.create(Type.TECH, contact.createVKey())))
             .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("fooBAR")));
     Duration addGracePeriodLength = Tld.get(tld).getAddGracePeriodLength();
+    if (contact != null) {
+      domainBuilder
+          .setRegistrant(Optional.of(contact.createVKey()))
+          .setContacts(
+              ImmutableSet.of(
+                  DesignatedContact.create(Type.ADMIN, contact.createVKey()),
+                  DesignatedContact.create(Type.TECH, contact.createVKey())));
+    }
     if (creationTime.plus(addGracePeriodLength).isAfter(now)) {
       domainBuilder.addGracePeriod(
           GracePeriod.create(
@@ -762,7 +765,7 @@ public final class DatabaseHelper {
       String registrarName,
       Registrar.Type type,
       @Nullable Long ianaIdentifier) {
-    return persistSimpleResource(
+    return persistResource(
         new Registrar.Builder()
             .setRegistrarId(registrarId)
             .setRegistrarName(registrarName)
@@ -986,7 +989,13 @@ public final class DatabaseHelper {
   }
 
   /** Persists the specified resources to the DB. */
-  public static <R extends ImmutableObject> void persistResources(final Iterable<R> resources) {
+  public static <R extends ImmutableObject> ImmutableList<R> persistResources(R... resources) {
+    return persistResources(ImmutableList.copyOf(resources));
+  }
+
+  /** Persists the specified resources to the DB. */
+  public static <R extends ImmutableObject> ImmutableList<R> persistResources(
+      final Iterable<R> resources) {
     for (R resource : resources) {
       assertWithMessage("Attempting to persist a Builder is almost certainly an error in test code")
           .that(resource)
@@ -994,6 +1003,7 @@ public final class DatabaseHelper {
     }
     tm().transact(() -> resources.forEach(e -> tm().put(e)));
     maybeAdvanceClock();
+    return loadByEntitiesIfPresent(resources);
   }
 
   /**
@@ -1042,6 +1052,8 @@ public final class DatabaseHelper {
                                   .setGlobalRole(GlobalRole.FTE)
                                   .setIsAdmin(true)
                                   .build())
+                          .setRegistryLockEmailAddress("registrylock" + emailAddress)
+                          .setRegistryLockPassword("password")
                           .build();
                   tm().put(user);
                   return user;
@@ -1147,29 +1159,6 @@ public final class DatabaseHelper {
             .build());
   }
 
-  /** Persists a single resource, without adjusting foreign resources or keys. */
-  public static <R> R persistSimpleResource(final R resource) {
-    return persistSimpleResources(ImmutableList.of(resource)).get(0);
-  }
-
-  /**
-   * Like persistResource but for multiple entities, with no helper for saving
-   * ForeignKeyedEppResources.
-   */
-  public static <R> ImmutableList<R> persistSimpleResources(final Iterable<R> resources) {
-    insertSimpleResources(resources);
-    return tm().transact(() -> tm().loadByEntities(resources));
-  }
-
-  /**
-   * Like {@link #persistSimpleResources(Iterable)} but without reloading/returning the saved
-   * entities.
-   */
-  public static <R> void insertSimpleResources(final Iterable<R> resources) {
-    tm().transact(() -> tm().putAll(ImmutableList.copyOf(resources)));
-    maybeAdvanceClock();
-  }
-
   public static void deleteResource(final Object resource) {
     tm().transact(() -> tm().delete(resource));
   }
@@ -1230,8 +1219,8 @@ public final class DatabaseHelper {
   /**
    * Loads (i.e. reloads) the specified entity from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> T loadByEntity(T entity) {
     return tm().transact(() -> tm().loadByEntity(entity));
@@ -1240,8 +1229,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entity by its key from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> T loadByKey(VKey<T> key) {
     return tm().transact(() -> tm().loadByKey(key));
@@ -1250,8 +1239,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entity by its key from the DB or empty if it doesn't exist.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> Optional<T> loadByKeyIfPresent(VKey<T> key) {
     return tm().transact(() -> tm().loadByKeyIfPresent(key));
@@ -1260,8 +1249,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entities by their keys from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> ImmutableCollection<T> loadByKeys(Iterable<? extends VKey<? extends T>> keys) {
     return tm().transact(() -> tm().loadByKeys(keys).values());
@@ -1270,8 +1259,8 @@ public final class DatabaseHelper {
   /**
    * Loads all the entities of the specified type from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> ImmutableList<T> loadAllOf(Class<T> clazz) {
     return tm().transact(() -> tm().loadAllOf(clazz));
@@ -1280,8 +1269,8 @@ public final class DatabaseHelper {
   /**
    * Loads the set of entities by their keys from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    *
    * <p>Nonexistent keys / entities are absent from the resulting map, but no {@link
    * NoSuchElementException} will be thrown.
@@ -1294,8 +1283,8 @@ public final class DatabaseHelper {
   /**
    * Loads all given entities from the database if possible.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    *
    * <p>Nonexistent entities are absent from the resulting list, but no {@link
    * NoSuchElementException} will be thrown.
@@ -1312,36 +1301,6 @@ public final class DatabaseHelper {
   /** Returns whether or not the given entity exists in Cloud SQL. */
   public static boolean existsInDb(ImmutableObject object) {
     return tm().transact(() -> tm().exists(object));
-  }
-
-  /** Inserts the given entity/entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void insertInDb(T... entities) {
-    tm().transact(() -> tm().insertAll(entities));
-  }
-
-  /** Inserts the given entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void insertInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().insertAll(entities));
-  }
-
-  /** Puts the given entity/entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void putInDb(T... entities) {
-    tm().transact(() -> tm().putAll(entities));
-  }
-
-  /** Puts the given entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void putInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().putAll(entities));
-  }
-
-  /** Updates the given entities in Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void updateInDb(T... entities) {
-    tm().transact(() -> tm().updateAll(entities));
-  }
-
-  /** Updates the given entities in Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void updateInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().updateAll(entities));
   }
 
   /**

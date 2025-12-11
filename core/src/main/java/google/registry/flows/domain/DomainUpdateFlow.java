@@ -36,12 +36,11 @@ import static google.registry.flows.domain.DomainFlowUtils.validateFeesAckedIfPr
 import static google.registry.flows.domain.DomainFlowUtils.validateNameserversAllowedOnTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateNameserversCountForTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateNoDuplicateContacts;
-import static google.registry.flows.domain.DomainFlowUtils.validateRegistrantAllowedOnTld;
-import static google.registry.flows.domain.DomainFlowUtils.validateRequiredContactsPresentIfRequiredForDataset;
+import static google.registry.flows.domain.DomainFlowUtils.validateUpdateContactData;
 import static google.registry.flows.domain.DomainFlowUtils.verifyClientUpdateNotProhibited;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotInPendingDelete;
 import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
-import static google.registry.model.common.FeatureFlag.isActiveNow;
+import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_PROHIBITED;
 import static google.registry.model.reporting.HistoryEntry.Type.DOMAIN_UPDATE;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
@@ -64,9 +63,11 @@ import google.registry.flows.custom.DomainUpdateFlowCustomLogic.BeforeSaveParame
 import google.registry.flows.custom.EntityChanges;
 import google.registry.flows.domain.DomainFlowUtils.MissingRegistrantException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedForTldWithNameserverAllowListException;
+import google.registry.flows.domain.DomainFlowUtils.RegistrantProhibitedException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
+import google.registry.model.common.FeatureFlag;
 import google.registry.model.contact.Contact;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.Domain;
@@ -129,7 +130,7 @@ import org.joda.time.DateTime;
  * @error {@link DomainFlowUtils.NameserversNotAllowedForTldException}
  * @error {@link NameserversNotSpecifiedForTldWithNameserverAllowListException}
  * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
- * @error {@link DomainFlowUtils.RegistrantNotAllowedException}
+ * @error {@link RegistrantProhibitedException}
  * @error {@link DomainFlowUtils.SecDnsAllUsageException}
  * @error {@link DomainFlowUtils.TooManyDsRecordsException}
  * @error {@link DomainFlowUtils.TooManyNameserversException}
@@ -183,18 +184,20 @@ public final class DomainUpdateFlow implements MutatingFlow {
     Domain newDomain = performUpdate(command, existingDomain, now);
     DomainHistory domainHistory =
         historyBuilder.setType(DOMAIN_UPDATE).setDomain(newDomain).build();
-    validateNewState(newDomain);
+    validateNewState(existingDomain, newDomain);
     if (requiresDnsUpdate(existingDomain, newDomain)) {
       requestDomainDnsRefresh(targetId);
     }
-    ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
-    entitiesToSave.add(newDomain, domainHistory);
+    ImmutableSet.Builder<ImmutableObject> entitiesToInsert = new ImmutableSet.Builder<>();
+    ImmutableSet.Builder<ImmutableObject> entitiesToUpdate = new ImmutableSet.Builder<>();
+    entitiesToUpdate.add(newDomain);
+    entitiesToInsert.add(domainHistory);
     Optional<BillingEvent> statusUpdateBillingEvent =
         createBillingEventForStatusUpdates(existingDomain, newDomain, domainHistory, now);
-    statusUpdateBillingEvent.ifPresent(entitiesToSave::add);
+    statusUpdateBillingEvent.ifPresent(entitiesToInsert::add);
     Optional<PollMessage.OneTime> serverStatusUpdatePollMessage =
         createPollMessageForServerStatusUpdates(existingDomain, newDomain, domainHistory, now);
-    serverStatusUpdatePollMessage.ifPresent(entitiesToSave::add);
+    serverStatusUpdatePollMessage.ifPresent(entitiesToInsert::add);
     EntityChanges entityChanges =
         flowCustomLogic.beforeSave(
             BeforeSaveParameters.newBuilder()
@@ -202,7 +205,10 @@ public final class DomainUpdateFlow implements MutatingFlow {
                 .setNewDomain(newDomain)
                 .setExistingDomain(existingDomain)
                 .setEntityChanges(
-                    EntityChanges.newBuilder().setSaves(entitiesToSave.build()).build())
+                    EntityChanges.newBuilder()
+                        .setInserts(entitiesToInsert.build())
+                        .setUpdates(entitiesToUpdate.build())
+                        .build())
                 .build());
     persistEntityChanges(entityChanges);
     return responseBuilder.build();
@@ -240,7 +246,6 @@ public final class DomainUpdateFlow implements MutatingFlow {
         add.getNameservers());
     validateContactsHaveTypes(add.getContacts());
     validateContactsHaveTypes(remove.getContacts());
-    validateRegistrantAllowedOnTld(tldStr, command.getInnerChange().getRegistrantContactId());
     validateNameserversAllowedOnTld(tldStr, add.getNameserverHostNames());
   }
 
@@ -304,11 +309,12 @@ public final class DomainUpdateFlow implements MutatingFlow {
 
   private Optional<VKey<Contact>> determineUpdatedRegistrant(Change change, Domain domain)
       throws EppException {
-    // During phase 1 of minimum dataset transition, allow registrant to be removed
+    // During or after the minimum dataset transition, allow registrant to be removed.
     if (change.getRegistrantContactId().isPresent()
         && change.getRegistrantContactId().get().isEmpty()) {
       // TODO(b/353347632): Change this flag check to a registry config check.
-      if (isActiveNow(MINIMUM_DATASET_CONTACTS_OPTIONAL)) {
+      if (FeatureFlag.isActiveNow(MINIMUM_DATASET_CONTACTS_OPTIONAL)
+          || FeatureFlag.isActiveNow(MINIMUM_DATASET_CONTACTS_PROHIBITED)) {
         return Optional.empty();
       } else {
         throw new MissingRegistrantException();
@@ -324,9 +330,13 @@ public final class DomainUpdateFlow implements MutatingFlow {
    * compliant with the additions or amendments, otherwise existing data can become invalid and
    * cause Domain update failure.
    */
-  private static void validateNewState(Domain newDomain) throws EppException {
-    validateRequiredContactsPresentIfRequiredForDataset(
-        newDomain.getRegistrant(), newDomain.getContacts());
+  private static void validateNewState(Domain existingDomain, Domain newDomain)
+      throws EppException {
+    validateUpdateContactData(
+        existingDomain.getRegistrant(),
+        newDomain.getRegistrant(),
+        existingDomain.getContacts(),
+        newDomain.getContacts());
     validateDsData(newDomain.getDsData());
     validateNameserversCountForTld(
         newDomain.getTld(),

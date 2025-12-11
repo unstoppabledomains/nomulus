@@ -17,7 +17,6 @@ package google.registry.ui.server.console.domains;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
 import static google.registry.model.common.FeatureFlag.FeatureStatus.INACTIVE;
-import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.loadByEntity;
 import static google.registry.testing.DatabaseHelper.loadSingleton;
 import static google.registry.testing.DatabaseHelper.persistActiveContact;
@@ -33,36 +32,28 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import google.registry.flows.DaggerEppTestComponent;
 import google.registry.flows.EppController;
 import google.registry.flows.EppTestComponent;
 import google.registry.model.common.FeatureFlag;
 import google.registry.model.console.ConsoleUpdateHistory;
-import google.registry.model.console.GlobalRole;
 import google.registry.model.console.RegistrarRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.model.domain.Domain;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.ConsoleApiParamsUtils;
-import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
-import google.registry.tools.GsonUtils;
+import google.registry.ui.server.console.ConsoleActionBaseTestCase;
 import google.registry.ui.server.console.ConsoleApiParams;
 import java.util.Optional;
-import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Tests for {@link ConsoleBulkDomainAction}. */
-public class ConsoleBulkDomainActionTest {
-
-  private static final Gson GSON = GsonUtils.provideGson();
+public class ConsoleBulkDomainActionTest extends ConsoleActionBaseTestCase {
 
   private static ImmutableSet<StatusValue> serverSuspensionStatuses =
       ImmutableSet.of(
@@ -72,14 +63,7 @@ public class ConsoleBulkDomainActionTest {
           StatusValue.SERVER_DELETE_PROHIBITED,
           StatusValue.SERVER_HOLD);
 
-  private final FakeClock clock = new FakeClock(DateTime.parse("2024-05-13T00:00:00.000Z"));
-
-  @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
-
   private EppController eppController;
-  private FakeResponse fakeResponse;
   private Domain domain;
 
   @BeforeEach
@@ -96,7 +80,6 @@ public class ConsoleBulkDomainActionTest {
             .build()
             .startRequest()
             .eppController();
-    createTld("tld");
     domain =
         persistDomainWithDependentResources(
             "example",
@@ -115,12 +98,13 @@ public class ConsoleBulkDomainActionTest {
             GSON.toJsonTree(
                 ImmutableMap.of("domainList", ImmutableList.of("example.tld"), "reason", "test")));
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_OK);
-    assertThat(fakeResponse.getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getPayload())
         .isEqualTo(
-            """
+"""
 {"example.tld":{"message":"Command completed successfully; action pending",\
-"responseCode":1001}}""");
+"responseCode":1001}}\
+""");
     assertThat(loadByEntity(domain).getDeletionTime()).isEqualTo(clock.nowUtc().plusDays(35));
     ConsoleUpdateHistory history = loadSingleton(ConsoleUpdateHistory.class).get();
     assertThat(history.getType()).isEqualTo(ConsoleUpdateHistory.Type.DOMAIN_DELETE);
@@ -129,25 +113,18 @@ public class ConsoleBulkDomainActionTest {
 
   @Test
   void testSuccess_suspend() throws Exception {
-    User adminUser =
-        persistResource(
-            new User.Builder()
-                .setEmailAddress("email@email.com")
-                .setUserRoles(
-                    new UserRoles.Builder().setGlobalRole(GlobalRole.FTE).setIsAdmin(true).build())
-                .build());
     ConsoleBulkDomainAction action =
         createAction(
             "SUSPEND",
             GSON.toJsonTree(
-                ImmutableMap.of("domainList", ImmutableList.of("example.tld"), "reason", "test")),
-            adminUser);
+                ImmutableMap.of("domainList", ImmutableList.of("example.tld"), "reason", "test")));
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_OK);
-    assertThat(fakeResponse.getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getPayload())
         .isEqualTo(
             """
-            {"example.tld":{"message":"Command completed successfully","responseCode":1000}}""");
+            {"example.tld":{"message":"Command completed successfully","responseCode":1000}}\
+            """);
     assertThat(loadByEntity(domain).getStatusValues())
         .containsAtLeastElementsIn(serverSuspensionStatuses);
     ConsoleUpdateHistory history = loadSingleton(ConsoleUpdateHistory.class).get();
@@ -157,28 +134,21 @@ public class ConsoleBulkDomainActionTest {
 
   @Test
   void testSuccess_unsuspend() throws Exception {
-    User adminUser =
-        persistResource(
-            new User.Builder()
-                .setEmailAddress("email@email.com")
-                .setUserRoles(
-                    new UserRoles.Builder().setGlobalRole(GlobalRole.FTE).setIsAdmin(true).build())
-                .build());
     persistResource(domain.asBuilder().addStatusValues(serverSuspensionStatuses).build());
     ConsoleBulkDomainAction action =
         createAction(
             "UNSUSPEND",
             GSON.toJsonTree(
-                ImmutableMap.of("domainList", ImmutableList.of("example.tld"), "reason", "test")),
-            adminUser);
+                ImmutableMap.of("domainList", ImmutableList.of("example.tld"), "reason", "test")));
     assertThat(loadByEntity(domain).getStatusValues())
         .containsAtLeastElementsIn(serverSuspensionStatuses);
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_OK);
-    assertThat(fakeResponse.getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getPayload())
         .isEqualTo(
             """
-            {"example.tld":{"message":"Command completed successfully","responseCode":1000}}""");
+            {"example.tld":{"message":"Command completed successfully","responseCode":1000}}\
+            """);
     assertThat(loadByEntity(domain).getStatusValues()).containsNoneIn(serverSuspensionStatuses);
     ConsoleUpdateHistory history = loadSingleton(ConsoleUpdateHistory.class).get();
     assertThat(history.getType()).isEqualTo(ConsoleUpdateHistory.Type.DOMAIN_UNSUSPEND);
@@ -197,13 +167,14 @@ public class ConsoleBulkDomainActionTest {
                     "reason",
                     "test")));
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_OK);
-    assertThat(fakeResponse.getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getPayload())
         .isEqualTo(
-            """
+"""
 {"example.tld":{"message":"Command completed successfully; action pending","responseCode":1001},\
 "nonexistent.tld":{"message":"The domain with given ID (nonexistent.tld) doesn\\u0027t exist.",\
-"responseCode":2303}}""");
+"responseCode":2303}}\
+""");
     assertThat(loadByEntity(domain).getDeletionTime()).isEqualTo(clock.nowUtc().plusDays(35));
     ConsoleUpdateHistory history = loadSingleton(ConsoleUpdateHistory.class).get();
     assertThat(history.getType()).isEqualTo(ConsoleUpdateHistory.Type.DOMAIN_DELETE);
@@ -214,8 +185,8 @@ public class ConsoleBulkDomainActionTest {
   void testFailure_badActionString() {
     ConsoleBulkDomainAction action = createAction("bad", GSON.toJsonTree(ImmutableMap.of()));
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat(fakeResponse.getPayload())
+    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(response.getPayload())
         .isEqualTo(
             "No enum constant"
                 + " google.registry.ui.server.console.domains.ConsoleDomainActionType.BulkAction.bad");
@@ -225,8 +196,8 @@ public class ConsoleBulkDomainActionTest {
   void testFailure_emptyBody() {
     ConsoleBulkDomainAction action = createAction("DELETE", null);
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat(fakeResponse.getPayload()).isEqualTo("Bulk action payload must be present");
+    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(response.getPayload()).isEqualTo("Bulk action payload must be present");
   }
 
   @Test
@@ -247,7 +218,7 @@ public class ConsoleBulkDomainActionTest {
                         .build())
                 .build());
     action.run();
-    assertThat(fakeResponse.getStatus()).isEqualTo(SC_FORBIDDEN);
+    assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
   }
 
   // @ptkach - reenable with suspend change
@@ -271,21 +242,14 @@ public class ConsoleBulkDomainActionTest {
   // }
 
   private ConsoleBulkDomainAction createAction(String action, JsonElement payload) {
-    User user =
-        persistResource(
-            new User.Builder()
-                .setEmailAddress("email@email.com")
-                .setUserRoles(
-                    new UserRoles.Builder().setIsAdmin(true).setGlobalRole(GlobalRole.FTE).build())
-                .build());
-    return createAction(action, payload, user);
+    return createAction(action, payload, fteUser);
   }
 
   private ConsoleBulkDomainAction createAction(String action, JsonElement payload, User user) {
     AuthResult authResult = AuthResult.createUser(user);
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(authResult);
     when(params.request().getMethod()).thenReturn("POST");
-    fakeResponse = (FakeResponse) params.response();
+    response = (FakeResponse) params.response();
     return new ConsoleBulkDomainAction(
         params, eppController, "TheRegistrar", action, Optional.ofNullable(payload));
   }

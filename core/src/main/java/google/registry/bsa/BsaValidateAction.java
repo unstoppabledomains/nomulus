@@ -28,7 +28,6 @@ import static google.registry.bsa.persistence.Queries.queryMissedRegisteredUnblo
 import static google.registry.bsa.persistence.Queries.queryUnblockableDomainByLabels;
 import static google.registry.model.tld.Tld.isEnrolledWithBsa;
 import static google.registry.model.tld.Tlds.getTldEntitiesOfType;
-import static google.registry.persistence.transaction.TransactionManagerFactory.replicaTm;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.POST;
 import static google.registry.util.BatchedStreams.toBatches;
@@ -53,9 +52,7 @@ import google.registry.model.ForeignKeyUtils;
 import google.registry.model.domain.Domain;
 import google.registry.model.tld.Tld;
 import google.registry.model.tld.Tld.TldType;
-import google.registry.persistence.VKey;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.Response;
 import google.registry.request.auth.Auth;
 import google.registry.util.Clock;
@@ -68,7 +65,7 @@ import org.joda.time.Duration;
 
 /** Validates the BSA data in the database against the most recent block lists. */
 @Action(
-    service = GaeService.BSA,
+    service = Action.Service.BACKEND,
     path = BsaValidateAction.PATH,
     method = {GET, POST},
     auth = Auth.AUTH_ADMIN)
@@ -185,8 +182,8 @@ public class BsaValidateAction implements Runnable {
     ImmutableList<UnblockableDomain> batch;
     do {
       batch = Queries.batchReadUnblockableDomains(lastRead, transactionBatchSize);
-      ImmutableMap<String, VKey<Domain>> activeDomains =
-          ForeignKeyUtils.load(
+      ImmutableMap<String, Domain> activeDomains =
+          ForeignKeyUtils.loadResources(
               Domain.class,
               batch.stream().map(UnblockableDomain::domainName).collect(toImmutableList()),
               clock.nowUtc());
@@ -201,7 +198,7 @@ public class BsaValidateAction implements Runnable {
   }
 
   Optional<String> verifyDomainStillUnblockableWithReason(
-      UnblockableDomain domain, ImmutableMap<String, VKey<Domain>> activeDomains) {
+      UnblockableDomain domain, ImmutableMap<String, Domain> activeDomains) {
     DateTime now = clock.nowUtc();
     boolean isRegistered = activeDomains.containsKey(domain.domainName());
     boolean isReserved = isReservedDomain(domain.domainName(), now);
@@ -215,10 +212,12 @@ public class BsaValidateAction implements Runnable {
     if (Objects.equals(expectedReason, domain.reason())) {
       return Optional.empty();
     }
-    if (isRegistered || domain.reason().equals(Reason.REGISTERED)) {
-      if (isStalenessAllowed(isRegistered, activeDomains.get(domain.domainName()))) {
+    // Registered name still reported with other reasons: Don't report if registration is recent.
+    // Note that staleness is not tolerated if deregistered name is still reported as registered:
+    // in this case we do not have the VKey on hand, and it is not worth the effort to find it
+    // out.
+    if (isRegistered && isStalenessAllowed(activeDomains.get(domain.domainName()))) {
         return Optional.empty();
-      }
     }
     return Optional.of(
         String.format(
@@ -228,15 +227,8 @@ public class BsaValidateAction implements Runnable {
             domain.reason()));
   }
 
-  boolean isStalenessAllowed(boolean isNewDomain, VKey<Domain> domainVKey) {
-    Domain domain = bsaQuery(() -> replicaTm().loadByKey(domainVKey));
-    var now = clock.nowUtc();
-    if (isNewDomain) {
-      return domain.getCreationTime().plus(maxStaleness).isAfter(now);
-    } else {
-      return domain.getDeletionTime().isBefore(now)
-          && domain.getDeletionTime().plus(maxStaleness).isAfter(now);
-    }
+  boolean isStalenessAllowed(Domain domain) {
+    return domain.getCreationTime().plus(maxStaleness).isAfter(clock.nowUtc());
   }
 
   /** Returns unique labels across all block lists in the download specified by {@code jobName}. */

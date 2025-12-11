@@ -42,6 +42,20 @@ steps:
     rm -rf .git && rm -rf nomulus-internal/.git
     cp -rf nomulus-internal/* .
     rm -rf nomulus-internal
+# Remove environment configs from .gitignore
+- name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    sed -i \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-alpha.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-crash.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-production.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-qa.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-sandbox.yaml#d' \
+        .gitignore
 # Build the builder image and pull the base images, them upload them to GCR.
 - name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
@@ -82,27 +96,17 @@ steps:
     sed -i s%jetty:12-jdk21%gcr.io/${PROJECT_ID}/jetty@$jetty_digest%g jetty/Dockerfile
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-proxy.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-nomulus.yaml
-    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-deploy.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-deploy-gke.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-sync-and-tag.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-deploy.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-verify.yaml
-    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-delete.yaml
-    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-delete-canary.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-restart-proxies.yaml
     sed -i s/GCP_PROJECT/${PROJECT_ID}/ proxy/kubernetes/proxy-*.yaml
     sed -i s/'$${TAG_NAME}'/${TAG_NAME}/g release/cloudbuild-sync-and-tag.yaml
-    sed -i s/'$${TAG_NAME}'/${TAG_NAME}/g release/cloudbuild-deploy.yaml
     sed -i s/'$${TAG_NAME}'/${TAG_NAME}/g release/cloudbuild-deploy-gke.yaml
     for environment in alpha crash qa sandbox production; do
-      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-deploy.yaml \
-        > release/cloudbuild-deploy-${environment}.yaml
       sed s/'$${_ENV}'/${environment}/g release/cloudbuild-deploy-gke.yaml \
         > release/cloudbuild-deploy-gke-${environment}.yaml
-      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-delete.yaml \
-        > release/cloudbuild-delete-${environment}.yaml
-      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-delete-canary.yaml \
-        > release/cloudbuild-delete-canary-${environment}.yaml
       sed s/'$${_ENV}'/${environment}/g release/cloudbuild-restart-proxies.yaml \
         > release/cloudbuild-restart-proxies-${environment}.yaml
       sed s/'$${_ENV}'/${environment}/g release/cloudbuild-restart-proxies.yaml | \
@@ -166,6 +170,8 @@ steps:
         > release/cloudbuild-schema-deploy-${environment}.yaml
       sed s/'$${_ENV}'/${environment}/g release/cloudbuild-schema-verify.yaml \
         > release/cloudbuild-schema-verify-${environment}.yaml
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-renew-prober-certs.yaml \
+        > release/cloudbuild-renew-prober-certs-${environment}.yaml
     done
 # Do text replacement in the k8s manifests.
 - name: 'gcr.io/cloud-builders/gcloud'
@@ -264,27 +270,25 @@ steps:
     rm ${gradle_bin}
     sed -i s%services.gradle.org/distributions%storage.googleapis.com/${gcs_loc}% \
       gradle/wrapper/gradle-wrapper.properties
-# Check out the release repo.
+# Conditionally trigger the appropriate build based on the tag format.
 - name: 'gcr.io/cloud-builders/gcloud'
-  args: ['source', 'repos', 'clone', 'nomulus-release']
-# Tag and check in the release repo.
-- name: 'gcr.io/cloud-builders/git'
-  entrypoint: /bin/bash
+  entrypoint: 'bash'
   args:
   - -c
   - |
     set -e
-    rm -rf gcompute-tools
-    cp -rf nomulus-release/.git .
-    rm -rf nomulus-release
-    git config --global user.name "Cloud Build"
-    git config --global user.email \
-      $(gcloud auth list --format='get(account)' --filter=active)
-    git add .
-    git commit -m "Release commit for tag ${TAG_NAME}"
-    git push -o nokeycheck origin master
-    git tag ${TAG_NAME}
-    git push -o nokeycheck origin ${TAG_NAME}
+    # Check for a nomulus release tag (e.g., "v1.2.3")
+    if [[ "${TAG_NAME}" =~ ^nomulus-20[0-9]{2}[0-1][0-9][0-3][0-9]-RC[0-9]{2}$ ]]; then
+      echo "Tag format matches a nomulus release. Triggering nomulus build..."
+      gcloud builds submit . --config=release/cloudbuild-nomulus.yaml --substitutions=TAG_NAME=$TAG_NAME
+    # Check for a proxy release tag (e.g., "proxy-v1.2.3")
+    elif [[ "${TAG_NAME}" =~ ^proxy-20[0-9]{2}[0-1][0-9][0-3][0-9]-RC[0-9]{2}$ ]]; then
+      echo "Tag format matches a proxy release. Triggering proxy build..."
+      gcloud builds submit . --config=release/cloudbuild-proxy.yaml --substitutions=TAG_NAME=$TAG_NAME
+    else
+      echo "Tag format '$TAG_NAME' does not match a known release type. Exiting."
+      exit 1
+    fi
 timeout: 3600s
 options:
   machineType: 'E2_HIGHCPU_32'

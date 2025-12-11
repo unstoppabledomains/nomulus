@@ -15,10 +15,10 @@
 package google.registry.schema.registrar;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
 import static google.registry.model.registrar.RegistrarPoc.Type.WHOIS;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
-import static google.registry.testing.DatabaseHelper.insertInDb;
-import static google.registry.testing.DatabaseHelper.loadByEntity;
+import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.testing.SqlHelper.saveRegistrar;
 
 import com.google.common.collect.ImmutableSet;
@@ -50,25 +50,26 @@ class RegistrarPocTest {
             .setRegistrar(testRegistrar)
             .setName("Judith Registrar")
             .setEmailAddress("judith.doe@example.com")
-            .setRegistryLockEmailAddress("judith.doe@external.com")
             .setPhoneNumber("+1.2125650000")
             .setFaxNumber("+1.2125650001")
             .setTypes(ImmutableSet.of(WHOIS))
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(false)
-            .setVisibleInDomainWhoisAsAbuse(false)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(false)
+            .setVisibleInDomainRdapAsAbuse(false)
             .build();
   }
 
   @Test
   void testPersistence_succeeds() {
-    insertInDb(testRegistrarPoc);
-    assertThat(loadByEntity(testRegistrarPoc)).isEqualTo(testRegistrarPoc);
+    persistResource(testRegistrarPoc);
+    assertAboutImmutableObjects()
+        .that(testRegistrarPoc)
+        .isEqualExceptFields(testRegistrarPoc, "id");
   }
 
   @Test
   void testSerializable_succeeds() {
-    insertInDb(testRegistrarPoc);
+    persistResource(testRegistrarPoc);
     RegistrarPoc persisted = tm().transact(() -> tm().loadByEntity(testRegistrarPoc));
     assertThat(SerializeUtils.serializeDeserialize(persisted)).isEqualTo(persisted);
   }

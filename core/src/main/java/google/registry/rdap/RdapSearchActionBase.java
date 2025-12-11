@@ -31,7 +31,6 @@ import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.UnprocessableEntityException;
 import google.registry.request.Parameter;
 import google.registry.request.ParameterMap;
-import google.registry.request.RequestUrl;
 import jakarta.inject.Inject;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import java.io.UnsupportedEncodingException;
@@ -45,7 +44,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Base RDAP (new WHOIS) action for domain, nameserver and entity search requests.
+ * Base RDAP action for domain, nameserver and entity search requests.
  *
  * @see <a href="https://tools.ietf.org/html/rfc9082">RFC 9082: Registration Data Access Protocol
  *     (RDAP) Query Format</a>
@@ -54,7 +53,6 @@ public abstract class RdapSearchActionBase extends RdapActionBase {
 
   private static final int RESULT_SET_SIZE_SCALING_FACTOR = 30;
 
-  @Inject @RequestUrl String requestUrl;
   @Inject @ParameterMap ImmutableListMultimap<String, String> parameterMap;
   @Inject @Parameter("cursor") Optional<String> cursorTokenParam;
   @Inject @Parameter("registrar") Optional<String> registrarParam;
@@ -157,7 +155,6 @@ public abstract class RdapSearchActionBase extends RdapActionBase {
    */
   <T extends EppResource> RdapResultSet<T> getMatchingResources(
       CriteriaQueryBuilder<T> builder, boolean checkForVisibility, int querySizeLimit) {
-    replicaTm().assertInTransaction();
     Optional<String> desiredRegistrar = getDesiredRegistrar();
     if (desiredRegistrar.isPresent()) {
       builder =

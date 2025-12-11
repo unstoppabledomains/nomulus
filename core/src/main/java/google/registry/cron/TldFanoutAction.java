@@ -40,14 +40,12 @@ import com.google.common.collect.Streams;
 import com.google.common.flogger.FluentLogger;
 import google.registry.batch.CloudTasksUtils;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.ParameterMap;
 import google.registry.request.RequestParameters;
 import google.registry.request.Response;
 import google.registry.request.auth.Auth;
-import google.registry.util.RegistryEnvironment;
 import jakarta.inject.Inject;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -59,8 +57,7 @@ import java.util.stream.Stream;
  *
  * <ul>
  *   <li>{@code endpoint} (Required) URL path of servlet to launch. This may contain pathargs.
- *   <li>{@code queue} (Required) Name of the App Engine push queue to which this task should be
- *       sent.
+ *   <li>{@code queue} (Required) Name of the queue to which this task should be sent.
  *   <li>{@code forEachRealTld} Launch the task in each real TLD namespace.
  *   <li>{@code forEachTestTld} Launch the task in each test TLD namespace.
  *   <li>{@code runInEmpty} Launch the task once, without the TLD argument.
@@ -80,7 +77,7 @@ import java.util.stream.Stream;
  * </ul>
  */
 @Action(
-    service = GaeService.BACKEND,
+    service = Service.BACKEND,
     path = "/_dr/cron/fanout",
     automaticallyPrintOk = true,
     auth = Auth.AUTH_ADMIN)
@@ -160,10 +157,6 @@ public final class TldFanoutAction implements Runnable {
       params.put(RequestParameters.PARAM_TLD, tld);
     }
     return cloudTasksUtils.createTaskWithJitter(
-        endpoint,
-        Action.Method.POST,
-        RegistryEnvironment.isOnJetty() ? GkeService.BACKEND : GaeService.BACKEND,
-        params,
-        jitterSeconds);
+        endpoint, Action.Method.POST, Service.BACKEND, params, jitterSeconds);
   }
 }

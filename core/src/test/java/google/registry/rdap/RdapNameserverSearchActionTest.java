@@ -21,7 +21,6 @@ import static google.registry.request.Action.Method.GET;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.testing.DatabaseHelper.persistResources;
-import static google.registry.testing.DatabaseHelper.persistSimpleResources;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeDomain;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeRegistrar;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeRegistrarPocs;
@@ -103,7 +102,7 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     Registrar registrar =
         persistResource(
             makeRegistrar("evilregistrar", "Yes Virginia <script>", Registrar.State.ACTIVE));
-    persistSimpleResources(makeRegistrarPocs(registrar));
+    persistResources(makeRegistrarPocs(registrar));
     hostNs1CatLol =
         FullFieldsTestEntityHelper.makeAndPersistHost(
             "ns1.cat.lol", "1.2.3.4", clock.nowUtc().minusYears(1));
@@ -118,34 +117,21 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     // cat.みんな
     createTld("xn--q9jyb4c");
     registrar = persistResource(makeRegistrar("unicoderegistrar", "みんな", Registrar.State.ACTIVE));
-    persistSimpleResources(makeRegistrarPocs(registrar));
+    persistResources(makeRegistrarPocs(registrar));
     FullFieldsTestEntityHelper.makeAndPersistHost(
         "ns1.cat.みんな", "1.2.3.5", clock.nowUtc().minusYears(1));
 
     // cat.1.test
     createTld("1.test");
     registrar = persistResource(makeRegistrar("multiregistrar", "1.test", Registrar.State.ACTIVE));
-    persistSimpleResources(makeRegistrarPocs(registrar));
+    persistResources(makeRegistrarPocs(registrar));
     FullFieldsTestEntityHelper.makeAndPersistHost(
         "ns1.cat.1.test", "1.2.3.6", clock.nowUtc().minusYears(1));
 
     // create a domain so that we can use it as a test nameserver search string suffix
     domainCatLol =
         persistResource(
-            makeDomain(
-                    "cat.lol",
-                    persistResource(
-                        FullFieldsTestEntityHelper.makeContact(
-                            "5372808-ERL", "Goblin Market", "lol@cat.lol", registrar)),
-                    persistResource(
-                        FullFieldsTestEntityHelper.makeContact(
-                            "5372808-IRL", "Santa Claus", "BOFH@cat.lol", registrar)),
-                    persistResource(
-                        FullFieldsTestEntityHelper.makeContact(
-                            "5372808-TRL", "The Raven", "bog@cat.lol", registrar)),
-                    hostNs1CatLol,
-                    hostNs2CatLol,
-                    registrar)
+            makeDomain("cat.lol", null, null, null, hostNs1CatLol, hostNs2CatLol, registrar)
                 .asBuilder()
                 .setSubordinateHosts(ImmutableSet.of("ns1.cat.lol", "ns2.cat.lol"))
                 .build());
@@ -158,26 +144,9 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     action.nameParam = Optional.empty();
   }
 
-  private JsonObject generateExpectedJsonForNameserver(
-      String name,
-      String punycodeName,
-      String handle,
-      String ipAddressType,
-      String ipAddress,
-      String expectedOutputFile) {
-    JsonObject obj =
-        loadJsonFile(
-            expectedOutputFile,
-            "NAME", name,
-            "PUNYCODENAME", punycodeName,
-            "HANDLE", handle,
-            "ADDRESSTYPE", ipAddressType,
-            "ADDRESS", ipAddress,
-            "STATUS", "active",
-            "TYPE", "nameserver");
-    obj = RdapTestHelper.wrapInSearchReply("nameserverSearchResults", obj);
-    RdapTestHelper.addNonDomainBoilerplateNotices(obj, "https://example.tld/rdap/");
-    return obj;
+  private JsonObject addBoilerplate(JsonObject jsonObject) {
+    jsonObject = RdapTestHelper.wrapInSearchReply("nameserverSearchResults", jsonObject);
+    return addPermanentBoilerplateNotices(jsonObject);
   }
 
   private void createManyHosts(int numHosts) {
@@ -221,7 +190,6 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
         action.registrarParam.isPresent(),
         Optional.empty(),
         numHostsRetrieved,
-        Optional.empty(),
         incompletenessWarningType);
   }
 
@@ -318,8 +286,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns1.cat.lol"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.lol", null, "2-ROID", "v4", "1.2.3.4", "rdap_host_linked.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.lol", "2-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.4")
+                    .load("rdap_host_linked.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -329,8 +300,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("Ns1.CaT.lOl"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.lol", null, "2-ROID", "v4", "1.2.3.4", "rdap_host_linked.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.lol", "2-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.4")
+                    .load("rdap_host_linked.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -356,13 +330,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns2.cat.lol"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns2.cat.lol",
-                null,
-                "4-ROID",
-                "v6",
-                "bad:f00d:cafe::15:beef",
-                "rdap_host_linked.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns2.cat.lol", "4-ROID")
+                    .putAll("ADDRESSTYPE", "v6", "ADDRESS", "bad:f00d:cafe::15:beef")
+                    .load("rdap_host_linked.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -380,8 +352,10 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns1.cat.external"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.external", null, "8-ROID", null, null, "rdap_host_external.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.external", "8-ROID")
+                    .load("rdap_host_external.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -391,13 +365,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns1.cat.みんな"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.みんな",
-                "ns1.cat.xn--q9jyb4c",
-                "B-ROID",
-                "v4",
-                "1.2.3.5",
-                "rdap_host_unicode.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.みんな", "B-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.5")
+                    .load("rdap_host_unicode.json")));
     metricWildcardType = WildcardType.NO_WILDCARD;
     metricPrefixLength = 19;
     assertThat(response.getStatus()).isEqualTo(200);
@@ -409,13 +381,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns1.cat.xn--q9jyb4c"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.みんな",
-                "ns1.cat.xn--q9jyb4c",
-                "B-ROID",
-                "v4",
-                "1.2.3.5",
-                "rdap_host_unicode.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.みんな", "B-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.5")
+                    .load("rdap_host_unicode.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -425,8 +395,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns1.cat.1.test"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.1.test", null, "E-ROID", "v4", "1.2.3.6", "rdap_host.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.1.test", "E-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.6", "STATUS", "active")
+                    .load("rdap_host.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -553,13 +526,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithName("ns*.cat.lol"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns2.cat.lol",
-                null,
-                "4-ROID",
-                "v6",
-                "bad:f00d:cafe::15:beef",
-                "rdap_host_linked.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns2.cat.lol", "4-ROID")
+                    .putAll("ADDRESSTYPE", "v6", "ADDRESS", "bad:f00d:cafe::15:beef")
+                    .load("rdap_host_linked.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(2);
   }
@@ -749,8 +720,11 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
     assertAboutJson()
         .that(generateActualJsonWithIp("1.2.3.4"))
         .isEqualTo(
-            generateExpectedJsonForNameserver(
-                "ns1.cat.lol", null, "2-ROID", "v4", "1.2.3.4", "rdap_host_linked.json"));
+            addBoilerplate(
+                jsonFileBuilder()
+                    .addNameserver("ns1.cat.lol", "2-ROID")
+                    .putAll("ADDRESSTYPE", "v4", "ADDRESS", "1.2.3.4")
+                    .load("rdap_host_linked.json")));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(1);
   }
@@ -814,7 +788,7 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
         .that(generateActualJsonWithIp("5.5.5.1"))
         .isEqualTo(
             loadJsonFile(
-                "rdap_truncated_hosts.json", "QUERY", "ip=5.5.5.1&cursor=MTctUk9JRA%3D%3D"));
+                "rdap_truncated_hosts.json", "QUERY", "ip=5.5.5.1&cursor=MTQtUk9JRA%3D%3D"));
     assertThat(response.getStatus()).isEqualTo(200);
     verifyMetrics(5, IncompletenessWarningType.TRUNCATED);
   }
@@ -826,7 +800,7 @@ class RdapNameserverSearchActionTest extends RdapSearchActionTestCase<RdapNamese
         .that(generateActualJsonWithIp("5.5.5.1"))
         .isEqualTo(
             loadJsonFile(
-                "rdap_truncated_hosts.json", "QUERY", "ip=5.5.5.1&cursor=MTctUk9JRA%3D%3D"));
+                "rdap_truncated_hosts.json", "QUERY", "ip=5.5.5.1&cursor=MTQtUk9JRA%3D%3D"));
     assertThat(response.getStatus()).isEqualTo(200);
     // When searching by address and not including deleted, we don't need to search for extra
     // matches.

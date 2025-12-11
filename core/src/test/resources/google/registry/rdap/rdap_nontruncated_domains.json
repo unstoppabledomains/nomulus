@@ -8,7 +8,8 @@
         {
           "href": "https://example.tld/rdap/domain/%DOMAIN_PUNYCODE_NAME_1%",
           "type": "application/rdap+json",
-          "rel": "self"
+          "rel": "self",
+          "value": "https://example.tld/rdap/domains"
         }
       ],
       "remarks": [
@@ -29,7 +30,8 @@
         {
           "href": "https://example.tld/rdap/domain/%DOMAIN_PUNYCODE_NAME_2%",
           "type": "application/rdap+json",
-          "rel": "self"
+          "rel": "self",
+          "value": "https://example.tld/rdap/domains"
         }
       ],
       "remarks": [
@@ -50,7 +52,8 @@
         {
           "href": "https://example.tld/rdap/domain/%DOMAIN_PUNYCODE_NAME_3%",
           "type": "application/rdap+json",
-          "rel": "self"
+          "rel": "self",
+          "value": "https://example.tld/rdap/domains"
         }
       ],
       "remarks": [
@@ -71,7 +74,8 @@
         {
           "href": "https://example.tld/rdap/domain/%DOMAIN_PUNYCODE_NAME_4%",
           "type": "application/rdap+json",
-          "rel": "self"
+          "rel": "self",
+          "value": "https://example.tld/rdap/domains"
         }
       ],
       "remarks": [
@@ -87,8 +91,8 @@
   ],
   "rdapConformance": [
     "rdap_level_0",
-    "icann_rdap_response_profile_0",
-    "icann_rdap_technical_implementation_guide_0"
+    "icann_rdap_response_profile_1",
+    "icann_rdap_technical_implementation_guide_1"
   ],
   "notices" :
   [
@@ -112,19 +116,15 @@
         {
           "href": "https://example.tld/rdap/help/tos",
           "rel": "self",
-          "type": "application/rdap+json"
+          "type": "application/rdap+json",
+          "value": "https://example.tld/rdap/domains"
         },
         {
-          "href": "https://www.registry.tld/about/rdap/tos.html",
-          "rel": "alternate",
-          "type": "text/html"
+          "href": "https://www.example.tld/about/rdap/tos.html",
+          "rel": "terms-of-service",
+          "type": "text/html",
+          "value": "https://example.tld/rdap/domains"
         }
-      ]
-    },
-    {
-      "description" :
-      [
-        "This response conforms to the RDAP Operational Profile for gTLD Registries and Registrars version 1.0"
       ]
     },
     {
@@ -136,9 +136,10 @@
       "links" :
       [
         {
-          "rel" : "alternate",
+          "rel" : "glossary",
           "href" : "https://icann.org/epp",
-          "type" : "text/html"
+          "type" : "text/html",
+          "value": "https://example.tld/rdap/domains"
         }
       ]
     },
@@ -148,9 +149,10 @@
       "links" :
       [
         {
-          "rel" : "alternate",
+          "rel" : "help",
           "href" : "https://icann.org/wicf",
-          "type" : "text/html"
+          "type" : "text/html",
+          "value": "https://example.tld/rdap/domains"
         }
       ]
     }

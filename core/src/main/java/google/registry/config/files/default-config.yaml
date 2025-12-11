@@ -12,17 +12,11 @@ gcpProject:
   projectIdNumber: 123456789012
   # Location of the GCP project, note that us-central1 and europe-west1 are special in that
   # they are used without the trailing number in GCP commands and Google Cloud Console.
-  # See: https://cloud.google.com/appengine/docs/locations as an example
+  # See: https://docs.cloud.google.com/compute/docs/regions-zones as an example
   locationId: registry-location-id
 
   # whether to use local/test credentials when connecting to the servers
   isLocal: true
-  # URLs of the services for the project.
-  defaultServiceUrl: https://default.example.com
-  backendServiceUrl: https://backend.example.com
-  bsaServiceUrl: https://bsa.example.com
-  toolsServiceUrl: https://tools.example.com
-  pubapiServiceUrl: https://pubapi.example.com
 
   # The base domain name of the registry service. Services are reachable at [service].baseDomain.
   baseDomain: registry.test
@@ -32,9 +26,9 @@ gSuite:
   domainName: domain-registry.example
 
   # Display name and email address used on outgoing emails through G Suite.
-  # The email address must be valid and have permission in the GAE app to send
-  # emails. For more info see:
-  # https://cloud.google.com/appengine/docs/standard/java/mail/#who_can_send_mail
+  # The email address must be valid and the domain must be set up to send emails.
+  # For more info see
+  # https://docs.cloud.google.com/compute/docs/tutorials/sending-mail
   outgoingEmailDisplayName: Example Registry
   outgoingEmailAddress: noreply@project-id.appspotmail.com
   # TODO(b/279671974): reuse `outgoingEmailAddress` after migration
@@ -64,10 +58,6 @@ registryPolicy:
   # Custom logic factory fully-qualified class name.
   # See flows/custom/CustomLogicFactory.java
   customLogicFactoryClass: google.registry.flows.custom.CustomLogicFactory
-
-  # WHOIS command factory fully-qualified class name.
-  # See whois/WhoisCommandFactory.java
-  whoisCommandFactoryClass: google.registry.whois.WhoisCommandFactory
 
   # Custom logic class for handling DNS query count reporting for ICANN.
   # See reporting/icann/DnsCountQueryCoordinator.java
@@ -113,31 +103,6 @@ registryPolicy:
     but not included in this list, including terms the registry chooses not
     to publish. This list is subject to change. The most up-to-date source
     is always the registry itself, by sending domain check EPP commands.
-
-  # Redaction text for email address in WHOIS
-  whoisRedactedEmailText: |
-    Please query the WHOIS server of the owning registrar identified in this
-    output for information on how to contact the Registrant, Admin, or Tech
-    contact of the queried domain name.
-
-  # Disclaimer at the top of WHOIS results.
-  whoisDisclaimer: |
-    WHOIS information is provided by the registry solely for query-based,
-    informational purposes. Any information provided is "as is" without any
-    guarantee of accuracy. You may not use such information to (a) allow,
-    enable, or otherwise support the transmission of mass unsolicited,
-    commercial advertising or solicitations; (b) enable high volume, automated,
-    electronic processes that access the registry's systems or any
-    ICANN-Accredited Registrar, except as reasonably necessary to register
-    domain names or modify existing registrations; or (c) engage in or support
-    unlawful behavior. We reserve the right to restrict or deny your access to
-    the WHOIS database, and may modify these terms at any time.
-
-  # BSA blocked domain name template.
-  domainBlockedByBsaTemplate: |
-    Domain Name: %s
-    >>> This name is not available for registration.
-    >>> This name has been blocked by a GlobalBlock service.
 
   # RDAP Terms of Service text displayed at the /rdap/help/tos endpoint.
   rdapTos: >
@@ -230,20 +195,18 @@ hibernate:
   # but lock tables explicitly, either using framework-dependent API, or execute
   # "select table for update" statements directly.
   connectionIsolation: TRANSACTION_SERIALIZABLE
-  # Whether to log all SQL queries to App Engine logs. Overridable at runtime.
+  # Whether to log all SQL queries. Overridable at runtime.
   logSqlQueries: false
 
   # Connection pool configurations.
   hikariConnectionTimeout: 20000
   # Cloud SQL connections are a relatively scarce resource (maximum is 1000 as
   # of March 2021). The minimumIdle should be a small value so that machines may
-  # release connections after a demand spike. The maximumPoolSize is set to 10
-  # because that is the maximum number of concurrent requests a Nomulus server
-  # instance can handle (as limited by AppEngine for basic/manual scaling). Note
-  # that BEAM pipelines are not subject to the maximumPoolSize value defined
-  # here. See PersistenceModule.java for more information.
+  # release connections after a demand spike. Note that BEAM pipelines are not
+  # subject to the maximumPoolSize value defined here. See PersistenceModule.java
+  # for more information.
   hikariMinimumIdle: 1
-  hikariMaximumPoolSize: 20
+  hikariMaximumPoolSize: 40
   hikariIdleTimeout: 300000
   # The batch size is basically the number of insertions / updates in a single
   # transaction that will be batched together into one INSERT/UPDATE statement.
@@ -255,7 +218,7 @@ hibernate:
   # The fetch size is the number of entities retrieved at a time from the
   # database cursor. Here we set a small default geared toward Nomulus server
   # transactions. Large queries can override the defaults on a per-query basis.
-  jdbcFetchSize: 20
+  jdbcFetchSize: 40
 
 cloudSql:
   # jdbc url for the Cloud SQL database.
@@ -293,8 +256,8 @@ caching:
 
   # Maximum total number of static premium list entry entities to cache in
   # memory, across all premium lists for all TLDs. Tuning this up will use more
-  # memory (and might require using larger App Engine instances). Note that
-  # premium list entries that are absent are cached in addition to ones that are
+  # memory (and might require using larger instances). Note that premium list
+  # entries that are absent are cached in addition to ones that are
   # present, so the total cache size is not bounded by the total number of
   # premium price entries that exist.
   staticPremiumListMaxCachedEntries: 200000
@@ -375,12 +338,8 @@ credentialOAuth:
   localCredentialOauthScopes:
   # View and manage data in all Google Cloud APIs.
   - https://www.googleapis.com/auth/cloud-platform
-  # Call App Engine APIs locally.
-  - https://www.googleapis.com/auth/appengine.apis
   # View your email address.
   - https://www.googleapis.com/auth/userinfo.email
-  # View and manage your applications deployed on Google App Engine
-  - https://www.googleapis.com/auth/appengine.admin
   # The lifetime of an access token generated by our custom credentials classes
   # Must be shorter than one hour.
   tokenRefreshDelaySeconds: 1800
@@ -462,7 +421,7 @@ misc:
   spec11BccEmailAddresses:
     - abuse@example.com
 
-  # Number of times to retry a GAE operation when a transient exception is thrown.
+  # Number of times to retry an operation when a transient exception is thrown.
   # The number of milliseconds it'll sleep before giving up is (2^n - 2) * 100.
   transientFailureRetries: 12
 
@@ -657,3 +616,30 @@ bsa:
   unblockableDomainsUrl: "https://"
   # API endpoint for uploading the list of unavailable domain names.
   uploadUnavailableDomainsUrl: "https://"
+
+mosapi:
+  # URL for the MosAPI
+  serviceUrl: https://mosapi.icann.org
+  # The type of entity being monitored.
+  # For registries, this is 'ry'
+  # For registrars, this is 'rr'
+  entityType: ry
+  # Add your List of TLDs to be monitored
+  tlds:
+  - your_tld1
+  - your_tld2
+  # Add tls cert secret name
+  # you configured in secret manager
+  tlsCertSecretName: YOUR_TLS_CERT_SECRET_NAME
+  # Add tls key secret name
+  # you configured in secret manager
+  tlsKeySecretName:  YOUR_TLS_KEY_SECRET_NAME
+  # List of services to check for each TLD.
+  services:
+  - "dns"
+  - "rdap"
+  - "rdds"
+  - "epp"
+  - "dnssec"
+
+

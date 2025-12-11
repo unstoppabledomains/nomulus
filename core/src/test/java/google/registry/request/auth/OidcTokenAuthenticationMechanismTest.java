@@ -19,7 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static google.registry.request.auth.AuthModule.BEARER_PREFIX;
 import static google.registry.request.auth.AuthModule.IAP_HEADER_NAME;
 import static google.registry.testing.DatabaseHelper.createAdminUser;
-import static google.registry.testing.DatabaseHelper.insertInDb;
+import static google.registry.testing.DatabaseHelper.persistResource;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +54,9 @@ public class OidcTokenAuthenticationMechanismTest {
 
   private static final String rawToken = "this-token";
   private static final String email = "user@email.test";
+
+  private static final String unknownEmail = "bad-guy@evil.real";
+
   private static final String gaiaId = "gaia-id";
   private static final ImmutableSet<String> serviceAccounts =
       ImmutableSet.of("service@email.test", "email@service.goog");
@@ -78,6 +81,7 @@ public class OidcTokenAuthenticationMechanismTest {
     payload.setEmail(email);
     payload.setSubject(gaiaId);
     user = createAdminUser(email);
+    when(request.getServerName()).thenReturn("frontend.registry.test");
   }
 
   @AfterEach
@@ -139,22 +143,21 @@ public class OidcTokenAuthenticationMechanismTest {
   @Test
   void testAuthenticate_bothUserAndServiceAccount() throws Exception {
     User serviceUser =
-        new User.Builder()
-            .setEmailAddress("service@email.test")
-            .setUserRoles(
-                new UserRoles.Builder().setIsAdmin(true).setGlobalRole(GlobalRole.FTE).build())
-            .build();
-    insertInDb(serviceUser);
+        persistResource(
+            new User.Builder()
+                .setEmailAddress("service@email.test")
+                .setUserRoles(
+                    new UserRoles.Builder().setIsAdmin(true).setGlobalRole(GlobalRole.FTE).build())
+                .build());
     payload.setEmail("service@email.test");
     authResult = authenticationMechanism.authenticate(request);
     assertThat(authResult.isAuthenticated()).isTrue();
-    assertThat(authResult.authLevel()).isEqualTo(AuthLevel.USER);
-    assertThat(authResult.user().get()).isEqualTo(serviceUser);
+    assertThat(authResult.authLevel()).isEqualTo(AuthLevel.APP);
   }
 
   @Test
   void testAuthenticate_unknownEmailAddress() throws Exception {
-    payload.setEmail("bad-guy@evil.real");
+    payload.setEmail(unknownEmail);
     authResult = authenticationMechanism.authenticate(request);
     assertThat(authResult).isEqualTo(AuthResult.NOT_AUTHENTICATED);
   }

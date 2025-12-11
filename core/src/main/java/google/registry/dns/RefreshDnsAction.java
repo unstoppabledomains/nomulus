@@ -16,17 +16,16 @@ package google.registry.dns;
 
 import static google.registry.dns.DnsUtils.requestDomainDnsRefresh;
 import static google.registry.dns.DnsUtils.requestHostDnsRefresh;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import google.registry.dns.DnsUtils.TargetType;
 import google.registry.model.EppResource;
 import google.registry.model.EppResource.ForeignKeyedEppResource;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.annotations.ExternalMessagingName;
 import google.registry.model.domain.Domain;
 import google.registry.model.host.Host;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.request.Parameter;
@@ -36,7 +35,7 @@ import jakarta.inject.Inject;
 
 /** Action that manually triggers refresh of DNS information. */
 @Action(
-    service = GaeService.BACKEND,
+    service = Action.Service.BACKEND,
     path = "/_dr/task/dnsRefresh",
     automaticallyPrintOk = true,
     auth = Auth.AUTH_ADMIN)
@@ -79,7 +78,7 @@ public final class RefreshDnsAction implements Runnable {
 
   private <T extends EppResource & ForeignKeyedEppResource>
       T loadAndVerifyExistence(Class<T> clazz, String foreignKey) {
-    return loadByForeignKey(clazz, foreignKey, clock.nowUtc())
+    return ForeignKeyUtils.loadResource(clazz, foreignKey, clock.nowUtc())
         .orElseThrow(
             () ->
                 new NotFoundException(
