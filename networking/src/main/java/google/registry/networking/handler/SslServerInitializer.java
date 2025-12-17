@@ -254,10 +254,10 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
           "SSLException in initChannel: %s (Remote: %s)",
           e.getMessage(),
           channel.remoteAddress() != null ? channel.remoteAddress().toString() : "unknown");
-      channel.close();
+      ChannelFuture unusedFuture = channel.close();
     } catch (Exception e) {
       logger.atSevere().withCause(e).log("Exception in initChannel");
-      channel.close();
+      ChannelFuture unusedFuture = channel.close();
     }
   }
 }
