@@ -116,12 +116,15 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
     this.sslProvider = sslProvider;
     this.privateKeySupplier = privateKeySupplier;
     this.certificatesSupplier = certificatesSupplier;
-    this.supportedSslVersions =
-        sslProvider == SslProvider.OPENSSL
-            ? ImmutableList.of("TLSv1.3", "TLSv1.2")
-            // JDK support for TLS 1.3 won't be available until 2021-04-20 at the earliest.
-            // See: https://java.com/en/jre-jdk-cryptoroadmap.html
-            : ImmutableList.of("TLSv1.2");
+    this.supportedSslVersions = ImmutableList.of("TLSv1.3", "TLSv1.2");
+    logger.atInfo().log(
+        "Configured TLS protocol versions: %s (SSL Provider: %s)",
+        supportedSslVersions,
+        sslProvider);
+    // Note: JDK 11+ supports TLS 1.3, but Netty's JDK provider may handle it differently
+    // than OpenSSL. If TLS 1.3 doesn't work with JDK provider, consider:
+    // 1. Ensuring OpenSSL is available (netty-tcnative-boringssl-static)
+    // 2. Or conditionally enabling TLS 1.3 only with OpenSSL provider
   }
 
   @Override
@@ -137,7 +140,10 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
             .ciphers(ALLOWED_TLS_CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
             .build();
 
-    logger.atInfo().log("Available Cipher Suites: %s", sslContext.cipherSuites());
+    logger.atInfo().log(
+        "SSL Context created - Protocols: %s, Cipher Suites: %s",
+        supportedSslVersions,
+        sslContext.cipherSuites());
     SslHandler sslHandler = sslContext.newHandler(channel.alloc());
     if (requireClientCert) {
       Promise<X509Certificate> clientCertificatePromise = channel.eventLoop().newPromise();
@@ -215,7 +221,20 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                     }
                   });
       channel.attr(CLIENT_CERTIFICATE_PROMISE_KEY).set(clientCertificatePromise);
+      logger.atFine().log(
+          "Client certificate promise set for channel %s (Remote: %s)",
+          channel,
+          channel.remoteAddress() != null ? channel.remoteAddress().toString() : "unknown");
+    } else {
+      logger.atFine().log(
+          "Client certificate not required for channel %s (Remote: %s)",
+          channel,
+          channel.remoteAddress() != null ? channel.remoteAddress().toString() : "unknown");
     }
     channel.pipeline().addLast(sslHandler);
+    logger.atFine().log(
+        "SSL handler added to pipeline for channel %s (Remote: %s)",
+        channel,
+        channel.remoteAddress() != null ? channel.remoteAddress().toString() : "unknown");
   }
 }
