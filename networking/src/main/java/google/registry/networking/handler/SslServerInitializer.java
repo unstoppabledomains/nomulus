@@ -191,8 +191,27 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                       Promise<X509Certificate> unusedPromise =
                           clientCertificatePromise.setSuccess(clientCertificate);
                     } else {
+                      Throwable cause = future.cause();
+                      // Log detailed handshake failure information
+                      String remoteAddress = channel.remoteAddress() != null
+                          ? channel.remoteAddress().toString()
+                          : "unknown";
+                      logger.atWarning().withCause(cause).log(
+                          """
+                              --SSL Handshake Failure--
+                              Remote Address: %s
+                              Error Type: %s
+                              Error Message: %s
+                              Server Supported Protocols: %s
+                              Server Supported Ciphers: %s
+                              """,
+                          remoteAddress,
+                          cause.getClass().getSimpleName(),
+                          cause.getMessage(),
+                          supportedSslVersions,
+                          ALLOWED_TLS_CIPHERS);
                       Promise<X509Certificate> unusedPromise =
-                          clientCertificatePromise.setFailure(future.cause());
+                          clientCertificatePromise.setFailure(cause);
                     }
                   });
       channel.attr(CLIENT_CERTIFICATE_PROMISE_KEY).set(clientCertificatePromise);
