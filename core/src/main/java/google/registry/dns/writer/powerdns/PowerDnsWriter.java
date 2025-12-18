@@ -855,10 +855,8 @@ public class PowerDnsWriter extends DnsUpdateWriter {
                 zone.getName(),
                 (Long.parseLong(dnssecZskExpireDate) - System.currentTimeMillis()) / 1000);
           }
-        }
-
-        // check for a ZSK rollover key activation flag
-        else if (zone.getAccount().contains(DNSSEC_ZSK_ACTIVATION_FLAG)) {
+        } else if (zone.getAccount().contains(DNSSEC_ZSK_ACTIVATION_FLAG)) {
+          // check for a ZSK rollover key activation flag
           // check for a ZSK activation date
           String dnssecZskActivationDate =
               Iterables.get(Splitter.on(':').split(zone.getAccount()), 1);
