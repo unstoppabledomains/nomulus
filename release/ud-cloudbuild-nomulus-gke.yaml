@@ -17,6 +17,11 @@ steps:
     git config --global credential.helper store
     echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
     git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
+    if [ "${_NOMUULS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
+      cd nomulus-internal
+      git checkout "${_NOMUULS_SECRETS_COMMIT_SHA}"
+      cd ..
+    fi
 # Merge the repos. 
 - id: Merge-Internal-Repo
   name: 'gcr.io/cloud-builders/git'
@@ -273,6 +278,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _NOMUULS_SECRETS_COMMIT_SHA: HEAD
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 
