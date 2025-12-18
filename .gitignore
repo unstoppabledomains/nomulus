@@ -123,3 +123,7 @@ core/**/registrar_dbg*.css
 
 # jEnv
 .java-version
+
+
+# AI-generated content not for git
+AI-generated-content-not-for-git/** 
