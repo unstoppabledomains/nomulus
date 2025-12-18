@@ -257,8 +257,10 @@ artifacts:
 # The images are already uploaded, but we still need to include them there so that
 # the GCB pubsub message contains them (for Spinnaker to consume).
 images:
-  - 'gcr.io/${PROJECT_ID}/nomulus:${TAG_NAME}'
-  - 'gcr.io/${PROJECT_ID}/proxy:${TAG_NAME}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}'
 
 timeout: 7200s
 options:
