@@ -40,6 +40,8 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
@@ -146,6 +148,61 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
     // 2. Or conditionally enabling TLS 1.3 only with OpenSSL provider
   }
 
+  /**
+   * Extracts detailed certificate information for logging.
+   *
+   * @return A formatted string with certificate details, or "N/A" if extraction fails
+   */
+  private String getCertificateDetails(X509Certificate cert) {
+    try {
+      StringBuilder details = new StringBuilder();
+      // Subject DN (contains CN)
+      details.append("Subject: ").append(cert.getSubjectDN().getName()).append("\n");
+      // Issuer DN
+      details.append("Issuer: ").append(cert.getIssuerDN().getName()).append("\n");
+      // Serial number
+      details.append("Serial Number: ").append(cert.getSerialNumber().toString(16)).append("\n");
+      // Key usage (if available)
+      try {
+        boolean[] keyUsage = cert.getKeyUsage();
+        if (keyUsage != null) {
+          List<String> keyUsageNames = Arrays.asList(
+              "digitalSignature", "nonRepudiation", "keyEncipherment",
+              "dataEncipherment", "keyAgreement", "keyCertSign", "cRLSign",
+              "encipherOnly", "decipherOnly");
+          details.append("Key Usage: ");
+          boolean first = true;
+          for (int i = 0; i < keyUsage.length && i < keyUsageNames.size(); i++) {
+            if (keyUsage[i]) {
+              if (!first) {
+                details.append(", ");
+              }
+              details.append(keyUsageNames.get(i));
+              first = false;
+            }
+          }
+          details.append("\n");
+        }
+      } catch (Exception e) {
+        details.append("Key Usage: not available\n");
+      }
+      // Basic constraints (CA flag)
+      try {
+        int pathLen = cert.getBasicConstraints();
+        if (pathLen >= 0) {
+          details.append("Basic Constraints: CA=true, pathLen=").append(pathLen).append("\n");
+        } else {
+          details.append("Basic Constraints: CA=false\n");
+        }
+      } catch (Exception e) {
+        details.append("Basic Constraints: not available\n");
+      }
+      return details.toString();
+    } catch (Exception e) {
+      return "Certificate details extraction failed: " + e.getMessage();
+    }
+  }
+
   @Override
   protected void initChannel(C channel) throws Exception {
     try {
@@ -183,7 +240,7 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                         """
                             --SSL Information--
                             Client Certificate Hash: %s
-                            SSL Protocol: %s
+                            %sSSL Protocol: %s
                             Cipher Suite: %s
                             Not Before: %s
                             Not After: %s
@@ -191,6 +248,7 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                             Client Certificate Length: %s
                             """,
                         getCertificateHash(clientCertificate),
+                        getCertificateDetails(clientCertificate),
                         sslSession.getProtocol(),
                         sslSession.getCipherSuite(),
                         clientCertificate.getNotBefore(),
@@ -216,16 +274,37 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                     String remoteAddress = channel.remoteAddress() != null
                         ? channel.remoteAddress().toString()
                         : "unknown";
+                    // Try to extract certificate information even if handshake failed
+                    // (certificate is sent before CertificateVerify, so it may be available)
+                    String certificateHash = "unknown";
+                    String certificateDetails = "";
+                    try {
+                      SSLSession sslSession = sslHandler.engine().getSession();
+                      if (sslSession.getPeerCertificates() != null
+                          && sslSession.getPeerCertificates().length > 0) {
+                        X509Certificate clientCertificate =
+                            (X509Certificate) sslSession.getPeerCertificates()[0];
+                        certificateHash = getCertificateHash(clientCertificate);
+                        certificateDetails = getCertificateDetails(clientCertificate);
+                      }
+                    } catch (Exception e) {
+                      // Certificate not available or session not established
+                      certificateHash = "not available";
+                      certificateDetails = "Certificate details not available (session not fully established)";
+                    }
                     logger.atWarning().withCause(cause).log(
                         """
                             --SSL Handshake Failure--
                             Remote Address: %s
-                            Error Type: %s
+                            Client Certificate Hash: %s
+                            %sError Type: %s
                             Error Message: %s
                             Server Supported Protocols: %s
                             Server Supported Ciphers: %s
                             """,
                         remoteAddress,
+                        certificateHash,
+                        certificateDetails.isEmpty() ? "" : (certificateDetails + "\n"),
                         cause.getClass().getSimpleName(),
                         cause.getMessage(),
                         supportedSslVersions,
