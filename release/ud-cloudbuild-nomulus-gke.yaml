@@ -124,23 +124,24 @@ steps:
   # labels:
   #   image-policy.k8s.io/break-glass: "true"
 
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- id: sign-and-create-attestations
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
-    nomulus_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/nomulus \
-    --format="get(digest)" --filter="tags = ${TAG_NAME}")
-    proxy_digest=$(gcloud container images list-tags gcr.io/${PROJECT_ID}/proxy \
-    --format="get(digest)" --filter="tags = ${TAG_NAME}")
+    nomulus_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus \
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
+    proxy_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy \
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
     gcloud --project=${PROJECT_ID} beta container binauthz attestations \
-      sign-and-create --artifact-url=gcr.io/${PROJECT_ID}/nomulus@$nomulus_digest \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus@$nomulus_digest \
       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
       --keyversion-project=${PROJECT_ID} --keyversion-location=global \
       --keyversion-keyring=attestor-keys --keyversion-key=signing \
       --keyversion=1
     gcloud --project=${PROJECT_ID} beta container binauthz attestations \
-      sign-and-create --artifact-url=gcr.io/${PROJECT_ID}/proxy@$proxy_digest \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy@$proxy_digest \
       --attestor=build-attestor --attestor-project=${PROJECT_ID} \
       --keyversion-project=${PROJECT_ID} --keyversion-location=global \
       --keyversion-keyring=attestor-keys --keyversion-key=signing \
@@ -161,7 +162,7 @@ steps:
 
 # Build and upload the prober_cert_updater image. This image extends from the `builder` and the
 # nomulus.jar built earlier.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
@@ -169,17 +170,17 @@ steps:
     set -e
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
-    docker build -t gcr.io/${PROJECT_ID}/prober_cert_updater:${TAG_NAME} \
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
       --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA} \
-      gcr.io/${PROJECT_ID}/prober_cert_updater:latest
-    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}
-    docker push gcr.io/${PROJECT_ID}/prober_cert_updater:latest
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:latest
   dir: 'release/prober-cert-updater/'
 
 
 # Build and stage Dataflow Flex templates.
-- name: 'gcr.io/${PROJECT_ID}/builder:latest'
+- name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with the previous steps above
   # and ./build_nomulus_for_env.sh
@@ -276,7 +277,7 @@ options:
 substitutions:
   _ENV: crash
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
-  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-sandbox-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
   _NOMULUS_SECRETS_COMMIT_SHA: HEAD
 
