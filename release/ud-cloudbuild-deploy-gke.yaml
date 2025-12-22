@@ -20,6 +20,11 @@ steps:
     git config --global credential.helper store
     echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
     git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-secrets
+    if [ "${_NOMULUS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
+      cd nomulus-internal
+      git checkout "${_NOMULUS_SECRETS_COMMIT_SHA}"
+      cd ..
+    fi
 - id: Merge-Internal-Repo
   name: 'gcr.io/cloud-builders/git'
   entrypoint: /bin/bash
