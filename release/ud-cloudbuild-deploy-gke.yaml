@@ -21,7 +21,7 @@ steps:
     echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
     git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-secrets
     if [ "${_NOMULUS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
-      cd nomulus-internal
+      cd nomulus-secrets
       git checkout "${_NOMULUS_SECRETS_COMMIT_SHA}"
       cd ..
     fi
@@ -55,6 +55,7 @@ substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _NOMULUS_SECRETS_COMMIT_SHA: HEAD
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 
