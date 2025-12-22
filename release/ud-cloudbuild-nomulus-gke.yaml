@@ -43,12 +43,14 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  # Optimized for e2-highcpu-32: 32 vCPU, 16 cores, 32 GB RAM
+  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches', 'GRADLE_OPTS=-Xmx16g -XX:MaxMetaspaceSize=2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ParallelRefProcEnabled' ]
   args: ['./gradlew',
          'test',
          '-PskipDockerIncompatibleTests=true',
          '-PmavenUrl=https://repo.maven.apache.org/maven2',
-         '-PpluginsUrl=https://plugins.gradle.org/m2'
+         '-PpluginsUrl=https://plugins.gradle.org/m2',
+         '--max-workers=28'
   ]
 # Replace secrets in config file
 - id: Replace-Config-Secrets
@@ -172,7 +174,8 @@ steps:
     # The nomulus jar is not under the working dir. Must be copied over. 
     cp ../../output/nomulus.jar .
     docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
-      --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
+      --build-arg TAG_NAME=latest --build-arg PROJECT_ID=${PROJECT_ID} \
+      --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
     docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
       $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:latest
     docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA}
@@ -186,11 +189,15 @@ steps:
   entrypoint: /bin/bash
   # Set home for Gradle caches. Must be consistent with the previous steps above
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  env: 
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT_EMAIL}'
+    - 'LOGS_BUCKET=${_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD}'
   args:
   - -c
   - |
-    ./release/stage_beam_pipeline.sh \
+    set -e
+    ./release/ud_stage_beam_pipeline.sh \
       beamPipelineCommon \
       beam_pipeline_common \
       ${COMMIT_SHA} \
@@ -255,20 +262,20 @@ artifacts:
     - 'core/src/main/java/google/registry/config/files/power-dns/env-*.yaml'
     - 'release/cloudbuild-sync-and-tag.yaml'
     - 'release/cloudbuild-deploy-*.yaml'
-    - 'release/cloudbuild-renew-prober-certs-*.yaml'
-    - 'release/cloudbuild-schema-deploy-*.yaml'
-    - 'release/cloudbuild-schema-verify-*.yaml'
-    - 'release/cloudbuild-restart-proxies-*.yaml'
+    - 'release/cloudbuild-renew-prober-certs.yaml'
+    - 'release/cloudbuild-schema-deploy.yaml'
+    - 'release/cloudbuild-schema-verify.yaml'
+    - 'release/cloudbuild-restart-proxies.yaml'
     - 'jetty/kubernetes/*.yaml'
     - 'jetty/kubernetes/gateway/*.yaml'
 
 # The images are already uploaded, but we still need to include them there so that
 # the GCB pubsub message contains them (for Spinnaker to consume).
 images:
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus:${COMMIT_SHA}'
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/proxy:${COMMIT_SHA}'
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus-tool:${COMMIT_SHA}'
-  - '$_GCR_HOSTNAME/${PROJECT_ID}/prober_cert_updater:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA}'
 
 timeout: 7200s
 options:
@@ -287,5 +294,6 @@ logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 
 availableSecrets:
   secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+  - versionName: projects/${PROJECT_ID}/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
     env: GITHUB_OAUTH_TOKEN
+
