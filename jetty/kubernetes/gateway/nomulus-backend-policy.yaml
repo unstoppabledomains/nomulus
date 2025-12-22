@@ -1,0 +1,21 @@
+# UD reverse engieered this - it may not be accurrate
+# TODO: have google provide a valid YAML file for this.
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: SERVICE
+spec:
+  default:
+    # Timeout in seconds for backend requests (default is 30)
+    timeoutSec: 30
+    # Enable logging to Cloud Logging
+    logging:
+      enabled: true
+      sampleRate: 1000000  # 100% sampling (1 in 1,000,000 = 100%)
+    # Connection draining configuration
+    connectionDraining:
+      drainingTimeoutSec: 60
+  targetRef:
+    group: net.gke.io
+    kind: ServiceImport
+    name: SERVICE
