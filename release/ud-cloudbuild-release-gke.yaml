@@ -1,0 +1,321 @@
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-release.yaml --substitutions \
+#   COMMIT_SHA=[TAG],_INTERNAL_REPO_URL=[URL] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+#
+# This pipeline prepares a release. The pipeline should be run against the Nomulus public repo on
+# GitHub. It builds the builder and base images, and hard codes the sha256 hashes of the resulting
+# images in the merged code base (internal + public), which is tagged and pushed into the release
+# repo. Actual release artifacts are built from the release repo, ensuring reproducibility.
+steps:
+# Check the out internal repo.
+- id: check-out-internal-repo
+  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git clone https://gerrit.googlesource.com/gcompute-tools
+    sed -i s@/usr/bin/python@/usr/bin/python3@g ./gcompute-tools/git-cookie-authdaemon
+    ./gcompute-tools/git-cookie-authdaemon
+    git clone ${_INTERNAL_REPO_URL} nomulus-internal
+# Tag and push the internal repo.
+# UD: commented this out because it's redundant if we are using COMMIT_SHA
+# TODO: have @cursor remove this step before PR merge
+# - name: '${_GCR_HOSTNAME}/cloud-builders/git'
+#   entrypoint: /bin/bash
+#   args:
+#   - -c
+#   - |
+#     set -e
+#     git tag ${COMMIT_SHA}
+#     git push origin ${COMMIT_SHA}
+#   dir: 'nomulus-internal'
+# Merge the repos.
+- id: merge-repos
+  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    shopt -s dotglob
+    rm -rf .git && rm -rf nomulus-internal/.git
+    cp -rf nomulus-internal/* .
+    rm -rf nomulus-internal
+# Remove environment configs from .gitignore
+- id: remove-env-configs-from-gitignore
+  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    sed -i \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-alpha.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-crash.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-production.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-qa.yaml#d' \
+        -e '\#core/src/main/java/google/registry/config/files/nomulus-config-sandbox.yaml#d' \
+        .gitignore
+# Build the builder image and pull the base images, them upload them to GCR.
+- id: build-builder-base-images-and-push
+  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA} ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
+    docker pull jetty:12-jdk21
+    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:${COMMIT_SHA}
+    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:latest
+    docker pull eclipse-temurin:21
+    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:${COMMIT_SHA}
+    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:latest
+  dir: 'release/builder/'
+# Do text replacement in the merged repo, hardcoding image digests.
+- id: hardcode-image-digests
+  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/builder \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    jetty_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    temurin_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/temurin@$temurin_digest%g proxy/Dockerfile
+    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/temurin@$temurin_digest%g core/Dockerfile
+    sed -i s%jetty:12-jdk21%${_GCR_HOSTNAME}/${PROJECT_ID}/jetty@$jetty_digest%g jetty/Dockerfile
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-proxy.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-nomulus.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-deploy-gke.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-sync-and-tag.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-deploy.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-verify.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-restart-proxies.yaml
+    sed -i s/GCP_PROJECT/${PROJECT_ID}/ proxy/kubernetes/proxy-*.yaml
+    sed -i s/'$${COMMIT_SHA}'/${COMMIT_SHA}/g release/cloudbuild-sync-and-tag.yaml
+    sed -i s/'$${COMMIT_SHA}'/${COMMIT_SHA}/g release/cloudbuild-deploy-gke.yaml
+    for environment in alpha crash qa sandbox production; do
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-deploy-gke.yaml \
+        > release/cloudbuild-deploy-gke-${environment}.yaml
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-restart-proxies.yaml \
+        > release/cloudbuild-restart-proxies-${environment}.yaml
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-restart-proxies.yaml | \
+        sed s/proxy-deployment/proxy-deployment-canary/g \
+        > release/cloudbuild-restart-proxies-${environment}-canary.yaml
+    done
+# Build and upload the schema_deployer image.
+- id: build-schema-deployer-image-and-push
+  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA} --build-arg COMMIT_SHA=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA} \
+      ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:latest
+  dir: 'release/schema-deployer/'
+# Build and upload the schema_verifier image.
+- id: build-schema-verifier-image-and-push
+  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA} --build-arg COMMIT_SHA=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA} \
+      ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:latest
+  dir: 'release/schema-verifier/'
+# Do text replacement in the cloud build YAML files.
+- id: hardcode-schema-image-digests-in-cloudbuild-files
+  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/builder \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    schema_deployer_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    schema_verifier_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier \
+      --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
+    sed -i s/builder:latest/builder@$builder_digest/g \
+      release/cloudbuild-schema-deploy.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g \
+      release/cloudbuild-schema-verify.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g \
+      release/cloudbuild-renew-prober-certs.yaml
+    sed -i s/builder:latest/builder@$builder_digest/g \
+      release/cloudbuild-sync-db-objects.yaml
+    sed -i s/schema_deployer:latest/schema_deployer@$schema_deployer_digest/g \
+      release/cloudbuild-schema-deploy.yaml
+    sed -i s/schema_verifier:latest/schema_verifier@$schema_verifier_digest/g \
+      release/cloudbuild-schema-verify.yaml
+    sed -i s/'$${COMMIT_SHA}'/${COMMIT_SHA}/g release/cloudbuild-schema-deploy.yaml
+    for environment in alpha crash qa sandbox production; do
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-schema-deploy.yaml \
+        > release/cloudbuild-schema-deploy-${environment}.yaml
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-schema-verify.yaml \
+        > release/cloudbuild-schema-verify-${environment}.yaml
+      sed s/'$${_ENV}'/${environment}/g release/cloudbuild-renew-prober-certs.yaml \
+        > release/cloudbuild-renew-prober-certs-${environment}.yaml
+    done
+# Do text replacement in the k8s manifests.
+- id: generate-kubernetes-manifests
+  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    for env in alpha crash qa sandbox production
+    do
+      # This is the project where Nomulus runs, and we need it to correctly bind the k8s service
+      # account to the GCP service account.
+      if [ ${env} == production ]
+      then
+        project="domain-registry"
+      else
+        project="domain-registry-${env}"
+      fi
+      base_domain=$(grep baseDomain \
+        ./core/src/main/java/google/registry/config/files/nomulus-config-${env}.yaml | \
+        awk '{print $2}')
+      for service in frontend backend pubapi console
+      do
+        # non-canary
+        sed s/GCP_PROJECT/${PROJECT_ID}/g ./jetty/kubernetes/nomulus-${service}.yaml | \
+          sed s/latest/${COMMIT_SHA}/g | \
+          sed s/ENVIRONMENT/${env}/g | \
+          sed s/PROXY_ENV/"${env}"/g | \
+          sed s/EPP/"epp"/g > ./jetty/kubernetes/nomulus-${env}-${service}.yaml
+        # Proxy '--log' flag does not work on production.
+        if [ ${env} == production ]
+        then
+          sed -i s/--log,//g ./jetty/kubernetes/nomulus-${env}-${service}.yaml
+        fi
+        if [ ${service} == frontend ]
+        then
+          sed -i s/${PROJECT_ID}.iam.gserviceaccount.com/${project}.iam.gserviceaccount.com/g \
+            ./jetty/kubernetes/nomulus-${env}-${service}.yaml
+        fi
+        # canary
+        sed s/GCP_PROJECT/${PROJECT_ID}/g ./jetty/kubernetes/nomulus-${service}.yaml | \
+          sed s/latest/${COMMIT_SHA}/g | \
+          sed s/ENVIRONMENT/${env}/g | \
+          sed s/PROXY_ENV/"${env}_canary"/g | \
+          sed s/EPP/"epp-canary"/g | \
+          sed s/${service}/${service}-canary/g | \
+          # Undo prober endpoint replacement done in the previous line.
+          # The link should stay as /ready/${service}.
+          sed s/"ready\/${service}-canary"/"ready\/${service}"/g \
+          > ./jetty/kubernetes/nomulus-${env}-${service}-canary.yaml
+        # Proxy '--log' flag does not work on production.
+        if [ ${env} == production ]
+        then
+          sed -i s/--log,//g ./jetty/kubernetes/nomulus-${env}-${service}-canary.yaml
+        fi
+        if [ ${service} == frontend ]
+        then
+          sed -i s/${PROJECT_ID}.iam.gserviceaccount.com/${project}.iam.gserviceaccount.com/g \
+            ./jetty/kubernetes/nomulus-${env}-${service}-canary.yaml
+        fi
+        # gateway
+        sed s/BASE_DOMAIN/${base_domain}/g \
+          ./jetty/kubernetes/gateway/nomulus-route-${service}.yaml \
+          > ./jetty/kubernetes/gateway/nomulus-route-${env}-${service}.yaml
+        # GCP backend policy
+          sed s/SERVICE/${service}/g ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}.yaml \
+            > ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}-${service}.yaml
+          sed s/SERVICE/${service}-canary/g ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}.yaml \
+            > ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}-${service}-canary.yaml
+      done
+    done
+# Upload the Gradle binary to GCS if it does not exist and point URL in Gradle wrapper to it.
+- id: upload-gradle-binary-to-gcs
+  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    gradle_url=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties \
+      | awk -F = '{print $2}' | sed 's/\\//g')
+    gradle_bin=$(basename $gradle_url)
+    gcs_loc="domain-registry-maven-repository/gradle"
+    curl -O -L ${gradle_url}
+    if gcloud storage objects describe gs://${gcs_loc}/${gradle_bin}
+    then
+      local_md5=$(md5sum ${gradle_bin} | awk '{print $1}')
+      remote_md5=$(gcloud storage hash -h gs://${gcs_loc}/${gradle_bin} | grep md5 | awk '{print $3}')
+      if [[ ${local_md5} != ${remote_md5} ]]
+      then
+        echo "${gradle_bin} HAS CHANGED ON GRADLE WEBSITE, USING THE BINARY ON GCS."
+      fi
+    else
+      gcloud storage cp $gradle_bin gs://${gcs_loc}/
+      gcloud storage objects update --predefined-acl=publicRead gs://${gcs_loc}/${gradle_bin}
+    fi
+    rm ${gradle_bin}
+    sed -i s%services.gradle.org/distributions%storage.googleapis.com/${gcs_loc}% \
+      gradle/wrapper/gradle-wrapper.properties
+# Conditionally trigger the appropriate build based on the tag format.
+- id: trigger-nomulus-or-proxy-build
+  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - -c
+  - |
+    set -e
+    # Check for a nomulus release tag (e.g., "v1.2.3")
+    if [[ "${COMMIT_SHA}" =~ ^nomulus-20[0-9]{2}[0-1][0-9][0-3][0-9]-RC[0-9]{2}$ ]]; then
+      echo "Tag format matches a nomulus release. Triggering nomulus build..."
+      gcloud builds submit . --config=release/cloudbuild-nomulus.yaml --substitutions=COMMIT_SHA=$COMMIT_SHA
+    # Check for a proxy release tag (e.g., "proxy-v1.2.3")
+    elif [[ "${COMMIT_SHA}" =~ ^proxy-20[0-9]{2}[0-1][0-9][0-3][0-9]-RC[0-9]{2}$ ]]; then
+      echo "Tag format matches a proxy release. Triggering proxy build..."
+      gcloud builds submit . --config=release/cloudbuild-proxy.yaml --substitutions=COMMIT_SHA=$COMMIT_SHA
+    else
+      echo "Tag format '$COMMIT_SHA' does not match a known release type. Exiting."
+      exit 1
+    fi
+timeout: 3600s
+options:
+  machineType: 'E2_HIGHCPU_32'
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+substitutions:
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+    env: GITHUB_OAUTH_TOKEN
