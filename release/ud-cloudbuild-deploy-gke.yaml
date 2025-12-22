@@ -36,15 +36,23 @@ steps:
     rm -rf .git && rm -rf nomulus-secrets/.git
     cp -rf nomulus-secrets/* .
     rm -rf nomulus-secrets
-# Build the proxy docker image.
+# Deploy Nomulus services to GKE.
 - id: Deploy-Nomulus-Proxy
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
   - -c
   - |
-    ./deploy-nomulus-for-env.sh ${_ENV}
-  dir: 'proxy'
+    set -e
+    if [ -z "${_BASE_DOMAIN}" ]; then
+      base_domain=$(grep baseDomain \
+        ./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml | \
+        awk '{print $2}')
+    else
+      base_domain="${_BASE_DOMAIN}"
+    fi
+    ./deploy-nomulus-for-env.sh ${_ENV} ${base_domain}
+  dir: 'jetty'
 timeout: 3600s
 options:
   pool: 
@@ -52,6 +60,7 @@ options:
 
 substitutions:
   _ENV: crash
+  _BASE_DOMAIN: "BASE_DOMAIN_DEFAULT_FROM_CLOUDBUILD"
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
