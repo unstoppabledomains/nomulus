@@ -12,7 +12,7 @@
 steps:
 # Check the out internal repo.
 - id: check-out-internal-repo
-  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  name: 'gcr.io/cloud-builders/git'
   entrypoint: /bin/bash
   secretEnv:
     - GITHUB_OAUTH_TOKEN
@@ -20,10 +20,14 @@ steps:
   - -c
   - |
     set -e
-    git clone https://gerrit.googlesource.com/gcompute-tools
-    sed -i s@/usr/bin/python@/usr/bin/python3@g ./gcompute-tools/git-cookie-authdaemon
-    ./gcompute-tools/git-cookie-authdaemon
-    git clone ${_INTERNAL_REPO_URL} nomulus-internal
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-secrets
+    if [ "${_NOMULUS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
+      cd nomulus-secrets
+      git checkout "${_NOMULUS_SECRETS_COMMIT_SHA}"
+      cd ..
+    fi
 # Tag and push the internal repo.
 # UD: commented this out because it's redundant if we are using COMMIT_SHA
 # TODO: have @cursor remove this step before PR merge
@@ -35,22 +39,22 @@ steps:
 #     set -e
 #     git tag ${COMMIT_SHA}
 #     git push origin ${COMMIT_SHA}
-#   dir: 'nomulus-internal'
+#   dir: 'nomulus-secrets'
 # Merge the repos.
 - id: merge-repos
-  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  name: 'gcr.io/cloud-builders/git'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
     shopt -s dotglob
-    rm -rf .git && rm -rf nomulus-internal/.git
-    cp -rf nomulus-internal/* .
-    rm -rf nomulus-internal
+    rm -rf .git && rm -rf nomulus-secrets/.git
+    cp -rf nomulus-secrets/* .
+    rm -rf nomulus-secrets
 # Remove environment configs from .gitignore
 - id: remove-env-configs-from-gitignore
-  name: '${_GCR_HOSTNAME}/cloud-builders/git'
+  name: 'gcr.io/cloud-builders/git'
   entrypoint: /bin/bash
   args:
   - -c
@@ -65,44 +69,44 @@ steps:
         .gitignore
 # Build the builder image and pull the base images, them upload them to GCR.
 - id: build-builder-base-images-and-push
-  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA} .
-    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA} ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:${COMMIT_SHA}
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/builder:latest
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA} ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:latest
     docker pull jetty:12-jdk21
-    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:${COMMIT_SHA}
-    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:latest
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:${COMMIT_SHA}
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty:latest
+    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty:${COMMIT_SHA}
+    docker tag jetty:12-jdk21 ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty:latest
     docker pull eclipse-temurin:21
-    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:${COMMIT_SHA}
-    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:latest
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:${COMMIT_SHA}
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin:latest
+    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
+    docker tag eclipse-temurin:21 ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin:latest
   dir: 'release/builder/'
 # Do text replacement in the merged repo, hardcoding image digests.
 - id: hardcode-image-digests
-  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/builder \
+    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
-    jetty_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/jetty \
+    jetty_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
-    temurin_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/temurin \
+    temurin_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
-    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/temurin@$temurin_digest%g proxy/Dockerfile
-    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/temurin@$temurin_digest%g core/Dockerfile
-    sed -i s%jetty:12-jdk21%${_GCR_HOSTNAME}/${PROJECT_ID}/jetty@$jetty_digest%g jetty/Dockerfile
+    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin@$temurin_digest%g proxy/Dockerfile
+    sed -i s%eclipse-temurin:21%${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/temurin@$temurin_digest%g core/Dockerfile
+    sed -i s%jetty:12-jdk21%${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/jetty@$jetty_digest%g jetty/Dockerfile
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-proxy.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-nomulus.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-deploy-gke.yaml
@@ -124,45 +128,45 @@ steps:
     done
 # Build and upload the schema_deployer image.
 - id: build-schema-deployer-image-and-push
-  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA} --build-arg COMMIT_SHA=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA} \
-      ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:latest
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:${COMMIT_SHA}
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer:latest
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=${_GCR_HOSTNAME} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA} \
+      ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer:latest
   dir: 'release/schema-deployer/'
 # Build and upload the schema_verifier image.
 - id: build-schema-verifier-image-and-push
-  name: '${_GCR_HOSTNAME}/cloud-builders/docker'
+  name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA} --build-arg COMMIT_SHA=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} .
-    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA} \
-      ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:latest
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:${COMMIT_SHA}
-    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier:latest
+    docker build -t ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} --build-arg TAG_NAME=${COMMIT_SHA} --build-arg PROJECT_ID=${PROJECT_ID} --build-arg GCR_HOSTNAME=${_GCR_HOSTNAME} .
+    docker tag ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA} \
+      ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier:latest
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier:${COMMIT_SHA}
+    docker push ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier:latest
   dir: 'release/schema-verifier/'
 # Do text replacement in the cloud build YAML files.
 - id: hardcode-schema-image-digests-in-cloudbuild-files
-  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: /bin/bash
   args:
   - -c
   - |
     set -e
-    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/builder \
+    builder_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
-    schema_deployer_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_deployer \
+    schema_deployer_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_deployer \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
-    schema_verifier_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/schema_verifier \
+    schema_verifier_digest=$(gcloud container images list-tags ${_GCR_HOSTNAME}/${PROJECT_ID}/nomulus/schema_verifier \
       --format='get(digest)' --filter='tags = ${COMMIT_SHA}')
     sed -i s/builder:latest/builder@$builder_digest/g \
       release/cloudbuild-schema-deploy.yaml
@@ -187,7 +191,7 @@ steps:
     done
 # Do text replacement in the k8s manifests.
 - id: generate-kubernetes-manifests
-  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: /bin/bash
   args:
   - -c
@@ -249,16 +253,18 @@ steps:
         sed s/BASE_DOMAIN/${base_domain}/g \
           ./jetty/kubernetes/gateway/nomulus-route-${service}.yaml \
           > ./jetty/kubernetes/gateway/nomulus-route-${env}-${service}.yaml
-        # GCP backend policy
+        # GCP backend policy (only if template exists)
+        if [ -f ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}.yaml ]; then
           sed s/SERVICE/${service}/g ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}.yaml \
             > ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}-${service}.yaml
           sed s/SERVICE/${service}-canary/g ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}.yaml \
             > ./jetty/kubernetes/gateway/nomulus-backend-policy-${env}-${service}-canary.yaml
+        fi
       done
     done
 # Upload the Gradle binary to GCS if it does not exist and point URL in Gradle wrapper to it.
 - id: upload-gradle-binary-to-gcs
-  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: /bin/bash
   args:
   - -c
@@ -286,7 +292,7 @@ steps:
       gradle/wrapper/gradle-wrapper.properties
 # Conditionally trigger the appropriate build based on the tag format.
 - id: trigger-nomulus-or-proxy-build
-  name: '${_GCR_HOSTNAME}/cloud-builders/gcloud'
+  name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
   args:
   - -c
@@ -301,8 +307,7 @@ steps:
       echo "Tag format matches a proxy release. Triggering proxy build..."
       gcloud builds submit . --config=release/cloudbuild-proxy.yaml --substitutions=COMMIT_SHA=$COMMIT_SHA
     else
-      echo "Tag format '$COMMIT_SHA' does not match a known release type. Exiting."
-      exit 1
+      echo "Tag format '$COMMIT_SHA' does not match a known release type. Skipping trigger step."
     fi
 timeout: 3600s
 options:
@@ -311,7 +316,8 @@ options:
 substitutions:
   _GCR_HOSTNAME: us-central1-docker.pkg.dev
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
-  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-323df1
+  _NOMULUS_SECRETS_COMMIT_SHA: HEAD
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 
 availableSecrets:
