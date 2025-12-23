@@ -27,12 +27,36 @@ fi
 
 environment=${1}
 base_domain=${2}
-project="domain-registry-"${environment}
-current_context=$(kubectl config current-context)
-line=$(gcloud container clusters list --project "${project}" | grep nomulus | grep main)
+echo "Environment: ${environment}"
+echo "Base domain: ${base_domain}"
+if [ "${environment}" == "production" ]; then
+  project="ud-registry"
+else
+  project="ud-registry-${environment}-gke"
+fi
+echo "Project: ${project}"
+current_context=$(kubectl config current-context 2>/dev/null || echo "")
+echo "Listing clusters in project ${project}..."
+set +e
+line=$(gcloud container clusters list --project "${project}" 2>&1 | grep nomulus)
+cluster_list_exit=$?
+set -e
+if [ $cluster_list_exit -ne 0 ] || [ -z "$line" ]; then
+  echo "ERROR: Failed to list clusters or no matching cluster found"
+  echo "Cluster list output:"
+  gcloud container clusters list --project "${project}" 2>&1 || true
+  exit 1
+fi
 parts=(${line})
-echo "Updating cluster ${parts[0]} in location ${parts[1]}..."
-gcloud container fleet memberships get-credentials "${parts[0]}" --project "${project}"
+cluster_name=${parts[0]}
+location=${parts[1]}
+echo "Found cluster: ${cluster_name} in location ${location}"
+echo "Updating cluster ${cluster_name} in location ${location}..."
+# Try fleet membership first, fall back to regular get-credentials if fleet API not enabled
+if ! gcloud container fleet memberships get-credentials "${cluster_name}" --project "${project}" 2>/dev/null; then
+  echo "Fleet membership not available, using regular cluster credentials..."
+  gcloud container clusters get-credentials "${cluster_name}" --project "${project}" --location "${location}"
+fi
 for service in frontend backend pubapi console
 do
   sed s/GCP_PROJECT/"${project}"/g "./kubernetes/nomulus-${service}.yaml" | \
@@ -65,4 +89,6 @@ do
   kubectl apply -f -
 done
 
-kubectl config use-context "$current_context"
+if [ -n "$current_context" ]; then
+  kubectl config use-context "$current_context"
+fi
