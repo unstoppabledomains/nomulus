@@ -69,3 +69,23 @@ spec:
     # Optional: Session affinity
     # sessionAffinity: NONE
     # affinityCookieTtlSec: 0
+
+---
+# Example: This is what the policy looks like after SERVICE is replaced with "frontend"
+#
+# apiVersion: networking.gke.io/v1
+# kind: GCPBackendPolicy
+# metadata:
+#   name: frontend
+# spec:
+#   targetRef:
+#     group: net.gke.io
+#     kind: ServiceImport
+#     name: frontend
+#   default:
+#     timeoutSec: 30
+#     connectionDraining:
+#       drainingTimeoutSec: 60
+#     logging:
+#       enabled: true
+#       sampleRate: 1000000

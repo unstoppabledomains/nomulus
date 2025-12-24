@@ -1,21 +1,71 @@
-# UD reverse engieered this - it may not be accurrate
-# TODO: have google provide a valid YAML file for this.
+# ALL UD kubernetes config was moved to nomulus-secrets
+# this is to avoid merge conflicts when pulling in upstream
+
+# GCPBackendPolicy Template
+# This template is used by cloudbuild-release.yaml and deploy-nomulus-for-env.sh
+# The SERVICE placeholder is replaced with the actual service name (frontend, backend, console, pubapi)
+# For canary deployments, SERVICE is replaced with "{service}-canary"
+#
+# This policy configures the GCP Backend Service created by the Gateway API
+# for services that use ServiceImport (multi-cluster networking)
+
 apiVersion: networking.gke.io/v1
 kind: GCPBackendPolicy
 metadata:
   name: SERVICE
+  # Namespace is optional - defaults to default namespace
+  # namespace: default
 spec:
-  default:
-    # Timeout in seconds for backend requests (default is 30)
-    timeoutSec: 30
-    # Enable logging to Cloud Logging
-    logging:
-      enabled: true
-      sampleRate: 1000000  # 100% sampling (1 in 1,000,000 = 100%)
-    # Connection draining configuration
-    connectionDraining:
-      drainingTimeoutSec: 60
+  # targetRef specifies which Kubernetes resource this policy applies to
+  # For Gateway API with multi-cluster networking, we target ServiceImport
   targetRef:
     group: net.gke.io
     kind: ServiceImport
     name: SERVICE
+    # namespace is optional if policy is in same namespace as target
+    # namespace: default
+  
+  # default configuration applies to all backends unless overridden
+  default:
+    # Timeout in seconds for backend requests
+    # Default is 30 seconds if not specified
+    timeoutSec: 30
+    
+    # Connection draining configuration
+    # Allows in-flight requests to complete before removing backend
+    connectionDraining:
+      # Time in seconds to wait for connections to drain
+      # Default is 0 (immediate removal)
+      drainingTimeoutSec: 60
+    
+    # Logging configuration for backend requests
+    logging:
+      # Enable access logging to Cloud Logging
+      enabled: true
+      # Sample rate: 1 in N requests will be logged
+      # 1000000 = 100% (log all requests)
+      # Lower values = less logging (e.g., 100 = 1% of requests)
+      sampleRate: 1000000
+    
+    # Optional: Load balancing mode
+    # Options: RATE, CUSTOM_METRICS
+    # If not specified, uses default balancing mode
+    # balancingMode: RATE
+    
+    # Optional: Custom metrics for load balancing
+    # Only used when balancingMode is CUSTOM_METRICS
+    # customMetrics:
+    #   - name: gke.cpu
+    #     maxUtilizationPercent: 70
+    
+    # Optional: Security policy (Google Cloud Armor)
+    # References a security policy resource
+    # securityPolicy:
+    #   name: my-security-policy
+    
+    # Optional: CDN configuration
+    # enableCDN: false
+    
+    # Optional: Session affinity
+    # sessionAffinity: NONE
+    # affinityCookieTtlSec: 0
