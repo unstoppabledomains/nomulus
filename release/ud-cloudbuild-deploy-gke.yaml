@@ -56,7 +56,7 @@ steps:
     fi
     echo "=== End Merge-Internal-Repo Debug ==="
 # Deploy Nomulus services to GKE.
-- id: Deploy-Nomulus-Proxy
+- id: Deploy-Nomulus-Services
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args:
@@ -72,6 +72,16 @@ steps:
     fi
     ./deploy-nomulus-for-env.sh ${_ENV} ${base_domain}
   dir: 'jetty'
+# Deploy Proxy to GKE.
+- id: Deploy-Proxy
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    ./deploy-proxy-for-env.sh ${_ENV}
+  dir: 'proxy'
 timeout: 3600s
 options:
   pool: 
