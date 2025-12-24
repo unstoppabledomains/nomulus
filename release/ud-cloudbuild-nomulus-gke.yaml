@@ -30,10 +30,26 @@ steps:
   - -c
   - |
     set -e
+    echo "=== Merge-Internal-Repo Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Contents of nomulus-internal directory:"
+    ls -la nomulus-internal/ || echo "nomulus-internal directory not found"
     shopt -s dotglob
+    echo "Removing .git directories..."
     rm -rf .git && rm -rf nomulus-internal/.git
+    echo "Copying files from nomulus-internal..."
     cp -rf nomulus-internal/* .
+    echo "Files copied. Current directory contents:"
+    ls -la
+    echo "Removing nomulus-internal directory..."
     rm -rf nomulus-internal
+    echo "=== Displaying nomulus-config files ==="
+    find . -name "nomulus-config-*.yaml" -type f 2>/dev/null | while read config_file; do
+      echo "Found config file: $config_file"
+      cat "$config_file"
+      echo "---"
+    done || echo "No nomulus-config files found"
+    echo "=== End Merge-Internal-Repo Debug ==="
 # Create a directory to store the artifacts
 - id: Create-Nomulus-Directory
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
