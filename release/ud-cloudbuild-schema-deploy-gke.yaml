@@ -60,12 +60,15 @@ steps:
     ls -la
     echo "Removing nomulus-internal directory..."
     rm -rf nomulus-internal
-    echo "=== Displaying nomulus-config files ==="
-    find . -name "nomulus-config-*.yaml" -type f 2>/dev/null | while read config_file; do
+    echo "=== Displaying nomulus-config file for ${_ENV} ==="
+    config_file="core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    if [ -f "$config_file" ]; then
       echo "Found config file: $config_file"
       cat "$config_file"
       echo "---"
-    done || echo "No nomulus-config files found"
+    else
+      echo "No nomulus-config file found for ${_ENV}: $config_file"
+    fi
     echo "=== End Merge-Internal-Repo Debug ==="
 # Download and decrypt the nomulus tool credential, which has the privilege to
 # start Cloud SQL proxy to all environments. This credential is also used to

@@ -45,13 +45,14 @@ steps:
     ls -la
     echo "Removing nomulus-secrets directory..."
     rm -rf nomulus-secrets
-    echo "=== Displaying nomulus-config-${_ENV}.yaml ==="
-    if [ -f "./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml" ]; then
-      cat "./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    echo "=== Displaying nomulus-config file for ${_ENV} ==="
+    config_file="core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    if [ -f "$config_file" ]; then
+      echo "Found config file: $config_file"
+      cat "$config_file"
+      echo "---"
     else
-      echo "WARNING: nomulus-config-${_ENV}.yaml not found!"
-      echo "Looking for config files:"
-      find . -name "nomulus-config-*.yaml" -type f 2>/dev/null || echo "No nomulus-config files found"
+      echo "No nomulus-config file found for ${_ENV}: $config_file"
     fi
     echo "=== End Merge-Internal-Repo Debug ==="
 # Deploy Nomulus services to GKE.
