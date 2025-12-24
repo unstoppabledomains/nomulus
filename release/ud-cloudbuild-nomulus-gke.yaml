@@ -44,14 +44,24 @@ steps:
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
   # Optimized for e2-highcpu-32: 32 vCPU, 16 cores, 32 GB RAM
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches', 'GRADLE_OPTS=-Xmx16g -XX:MaxMetaspaceSize=2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ParallelRefProcEnabled' ]
-  args: ['./gradlew',
-         'test',
-         '-PskipDockerIncompatibleTests=true',
-         '-PmavenUrl=https://repo.maven.apache.org/maven2',
-         '-PpluginsUrl=https://plugins.gradle.org/m2',
-         '--max-workers=28'
-  ]
+  env: 
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'GRADLE_OPTS=-Xmx16g -XX:MaxMetaspaceSize=2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ParallelRefProcEnabled'
+    - '_UD_FAST_BUILD=${_UD_FAST_BUILD}'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ "$${_UD_FAST_BUILD}" = "true" ]; then
+      echo "Skipping tests (fast build mode enabled)"
+      exit 0
+    fi
+    ./gradlew test \
+      -PskipDockerIncompatibleTests=true \
+      -PmavenUrl=https://repo.maven.apache.org/maven2 \
+      -PpluginsUrl=https://plugins.gradle.org/m2 \
+      --max-workers=28
 # Replace secrets in config file
 - id: Replace-Config-Secrets
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
@@ -193,10 +203,15 @@ steps:
     - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
     - 'SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT_EMAIL}'
     - 'LOGS_BUCKET=${_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD}'
+    - '_UD_FAST_BUILD=${_UD_FAST_BUILD}'
   args:
   - -c
   - |
     set -e
+    if [ "$${_UD_FAST_BUILD}" = "true" ]; then
+      echo "Skipping Dataflow Flex templates build (fast build mode enabled)"
+      exit 0
+    fi
     ./release/ud_stage_beam_pipeline.sh \
       beamPipelineCommon \
       beam_pipeline_common \
@@ -289,6 +304,7 @@ substitutions:
   _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-sandbox-nomulus-deploy-cloudbuild-logs"
   _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
   _NOMULUS_SECRETS_COMMIT_SHA: HEAD
+  _UD_FAST_BUILD: 'false'
 
 logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
 

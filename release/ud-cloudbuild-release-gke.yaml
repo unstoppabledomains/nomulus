@@ -48,10 +48,26 @@ steps:
   - -c
   - |
     set -e
+    echo "=== merge-repos Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Contents of nomulus-secrets directory:"
+    ls -la nomulus-secrets/ || echo "nomulus-secrets directory not found"
     shopt -s dotglob
+    echo "Removing .git directories..."
     rm -rf .git && rm -rf nomulus-secrets/.git
+    echo "Copying files from nomulus-secrets..."
     cp -rf nomulus-secrets/* .
+    echo "Files copied. Current directory contents:"
+    ls -la
+    echo "Removing nomulus-secrets directory..."
     rm -rf nomulus-secrets
+    echo "=== Displaying nomulus-config files ==="
+    find . -name "nomulus-config-*.yaml" -type f 2>/dev/null | while read config_file; do
+      echo "Found config file: $config_file"
+      cat "$config_file"
+      echo "---"
+    done || echo "No nomulus-config files found"
+    echo "=== End merge-repos Debug ==="
 # Remove environment configs from .gitignore
 - id: remove-env-configs-from-gitignore
   name: 'gcr.io/cloud-builders/git'

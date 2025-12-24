@@ -17,6 +17,8 @@
 # kills all running pods to force k8s to create new pods using the just-pushed
 # manifest.
 
+# this should probably get moved to nomulus-secrets if there are any merge conflicts in the future
+
 # Abort on error.
 set -e
 
