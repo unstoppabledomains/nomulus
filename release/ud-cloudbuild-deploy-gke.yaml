@@ -32,10 +32,28 @@ steps:
   - -c
   - |
     set -e
+    echo "=== Merge-Internal-Repo Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Contents of nomulus-secrets directory:"
+    ls -la nomulus-secrets/ || echo "nomulus-secrets directory not found"
     shopt -s dotglob
+    echo "Removing .git directories..."
     rm -rf .git && rm -rf nomulus-secrets/.git
+    echo "Copying files from nomulus-secrets..."
     cp -rf nomulus-secrets/* .
+    echo "Files copied. Current directory contents:"
+    ls -la
+    echo "Removing nomulus-secrets directory..."
     rm -rf nomulus-secrets
+    echo "=== Displaying nomulus-config-${_ENV}.yaml ==="
+    if [ -f "./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml" ]; then
+      cat "./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    else
+      echo "WARNING: nomulus-config-${_ENV}.yaml not found!"
+      echo "Looking for config files:"
+      find . -name "nomulus-config-*.yaml" -type f 2>/dev/null || echo "No nomulus-config files found"
+    fi
+    echo "=== End Merge-Internal-Repo Debug ==="
 # Deploy Nomulus services to GKE.
 - id: Deploy-Nomulus-Proxy
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
