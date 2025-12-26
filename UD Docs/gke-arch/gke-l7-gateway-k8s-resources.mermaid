@@ -1,0 +1,50 @@
+graph TD
+    GATEWAY["Kubernetes Gateway<br/>Name: nomulus<br/>API: gateway.networking.k8s.io/v1beta1<br/>GatewayClassName: gke-l7-global-external-managed-mc<br/><br/>Addresses:<br/>- type: NamedAddress, value: nomulus-ipv4-address<br/>- type: NamedAddress, value: nomulus-ipv6-address<br/><br/>Listeners:<br/>- http (port 80)<br/>- https (port 443, TLS terminate, cert: nomulus)"]
+    
+    HTTPROUTE["Kubernetes HTTPRoute<br/>Name: frontend<br/>Parent: Gateway/nomulus (https listener)<br/>Hostnames: frontend.BASE_DOMAIN<br/><br/>Rules:<br/>- Path: /_dr/epp → ServiceImport/frontend:80<br/>- Path: /_dr/epp + Header canary=true →<br/>  ServiceImport/frontend-canary:80"]
+    
+    SVCIMPORT["Kubernetes ServiceImport<br/>Name: frontend<br/>API: net.gke.io/v1<br/>(Exported from Service via ServiceExport)"]
+    
+    SVC["Kubernetes Service<br/>Name: frontend<br/>Namespace: default<br/>Type: ClusterIP<br/>Ports: [{port: 80, targetPort: http}]<br/>Selector: {service: frontend}"]
+    
+    DEPLOY["Kubernetes Deployment<br/>Name: frontend<br/>Namespace: default<br/>Labels: {service: frontend}"]
+    
+    PODS["Kubernetes Pods<br/>Labels: {service: frontend}<br/>Containers:<br/>- frontend (port 8080/http)"]
+    
+    HPA["HorizontalPodAutoscaler<br/>Name: frontend"]
+    
+    SA["ServiceAccount<br/>Name: nomulus"]
+    
+    EXPORT["ServiceExport<br/>Name: frontend"]
+    
+    HCP["HealthCheckPolicy<br/>Name: frontend"]
+    
+    BPPOLICY["GCPBackendPolicy<br/>Name: frontend"]
+    
+    GATEWAY --> HTTPROUTE
+    HTTPROUTE --> SVCIMPORT
+    SVCIMPORT --> SVC
+    SVC --> DEPLOY
+    DEPLOY --> PODS
+    DEPLOY --> HPA
+    DEPLOY --> SA
+    SVC --> EXPORT
+    HTTPROUTE --> HCP
+    HTTPROUTE --> BPPOLICY
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient
+    classDef gateway fill:#E1C7FF,stroke:#C9A3FF,stroke-width:2px,color:#6B2D9F
+    classDef route fill:#C9A3FF,stroke:#B080FF,stroke-width:2px,color:#ffffff
+    classDef serviceimport fill:#8E5CFF,stroke:#6B4DFF,stroke-width:2px,color:#ffffff
+    classDef service fill:#B080FF,stroke:#8E5CFF,stroke-width:2px,color:#ffffff
+    classDef deployment fill:#2DD4BF,stroke:#14B8A6,stroke-width:2px,color:#ffffff
+    classDef pod fill:#6B4DFF,stroke:#4A7FFF,stroke-width:2px,color:#ffffff
+    classDef policy fill:#37B2E3,stroke:#2A9FD4,stroke-width:2px,color:#ffffff
+    
+    class GATEWAY gateway
+    class HTTPROUTE route
+    class SVCIMPORT serviceimport
+    class SVC service
+    class DEPLOY deployment
+    class PODS pod
+    class HPA,SA,EXPORT,HCP,BPPOLICY policy

@@ -1,0 +1,26 @@
+graph TD
+    EPP_IP["GCP Static IP Address<br/>(Regional)<br/>Name: EPP-ipv4-main<br/>Type: EXTERNAL, IPv4<br/>Region: us-central1"]
+    
+    EPP_FR["GCP Forwarding Rule<br/>(Regional)<br/>Type: TCP Forwarding Rule<br/>Port: 700<br/>Description:<br/>networking.gke.io/service-name: default/epp<br/>networking.gke.io/api-version: ga"]
+    
+    EPP_BS["GCP Regional Backend Service<br/>Name: k8s2-*-default-epp-*<br/>Type: Regional Backend Service L4 RBS<br/>Protocol: TCP<br/>Description:<br/>networking.gke.io/service-name: default/epp<br/>networking.gke.io/api-version: ga"]
+    
+    EPP_NEG_A["GCP Network Endpoint Group<br/>Zone: us-central1-a<br/>Type: GCE_VM_IP_PORT"]
+    
+    EPP_NEG_B["GCP Network Endpoint Group<br/>Zone: us-central1-b<br/>Type: GCE_VM_IP_PORT"]
+    
+    EPP_NEG_C["GCP Network Endpoint Group<br/>Zone: us-central1-c<br/>Type: GCE_VM_IP_PORT"]
+    
+    EPP_HC["GCP Health Check<br/>Name: k8s2-*-default-epp-*<br/>Type: Regional Health Check"]
+    
+    EPP_IP --> EPP_FR
+    EPP_FR --> EPP_BS
+    EPP_BS --> EPP_NEG_A
+    EPP_BS --> EPP_NEG_B
+    EPP_BS --> EPP_NEG_C
+    EPP_BS --> EPP_HC
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient - GCP resources
+    classDef gcp fill:#4A7FFF,stroke:#37B2E3,stroke-width:2px,color:#ffffff
+    
+    class EPP_IP,EPP_FR,EPP_BS,EPP_NEG_A,EPP_NEG_B,EPP_NEG_C,EPP_HC gcp
