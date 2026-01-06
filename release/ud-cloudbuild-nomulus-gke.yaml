@@ -290,6 +290,8 @@ steps:
     set -e
     if [ ${_ENV} == production ]; then
       project_id="ud-registry"
+    elif [ ${_ENV} == sandbox ]; then
+      project_id="ud-registry-sandbox-gke"
     else
       project_id="ud-registry-${_ENV}"
     fi
