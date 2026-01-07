@@ -243,7 +243,7 @@ func (manager QueuesSyncManager) getXmlEntries() []Queue {
 
 func (manager QueuesSyncManager) getArgs(queue Queue, operationType string) []string {
 	args := []string{
-		"tasks", "queues", operationType, queue.Name, "--project", projectName,
+		"tasks", "queues", operationType, queue.Name, "--project", projectName, "--location", GcpLocation,
 	}
 	if queue.MaxAttempts != "" {
 		args = append(args, "--max-attempts", queue.MaxAttempts)
@@ -283,7 +283,7 @@ func (manager QueuesSyncManager) syncDeleted(taskName string) ([]byte, error) {
 		return []byte{}, nil
 	}
 	log.Default().Println("Pausing cloud tasks queue " + taskName)
-	cmd := exec.Command("gcloud", "tasks", "queues", "pause", taskName, "--project="+projectName, "--quiet")
+	cmd := exec.Command("gcloud", "tasks", "queues", "pause", taskName, "--project="+projectName, "--location="+GcpLocation, "--quiet")
 	return cmd.CombinedOutput()
 }
 
@@ -296,7 +296,7 @@ func (manager QueuesSyncManager) syncCreated(queue Queue) ([]byte, error) {
 func (manager QueuesSyncManager) syncUpdated(queue Queue, existingQueue ExistingEntry) ([]byte, error) {
 	if existingQueue.State == "PAUSED" {
 		log.Default().Println("Resuming cloud tasks queue " + queue.Name)
-		cmdResume := exec.Command("gcloud", "tasks", "queues", "resume", queue.Name, "--project="+projectName, "--quiet")
+		cmdResume := exec.Command("gcloud", "tasks", "queues", "resume", queue.Name, "--project="+projectName, "--location="+GcpLocation, "--quiet")
 		r, err := cmdResume.CombinedOutput()
 		if err != nil {
 			return r, err
