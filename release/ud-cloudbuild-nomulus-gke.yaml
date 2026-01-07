@@ -122,7 +122,26 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
   args: [ '-c', 'echo ${COMMIT_SHA} > output/tag_name' ]
-# Build Nomulus, tool and proxy image, them upload them to GCR.
+# TODO: determine if we want to deploy cloud scheduler and tasks during the build, or should we do it during the ud-cloudbuild-deploy-gke.yaml ?
+# Create/Update cloud scheduler and cloud tasks based on a cloud-scheduler-tasks.xml
+- id: Create-Cloud-Scheduler-Tasks
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    elif [ ${_ENV} == sandbox ]; then
+      project_id="ud-registry-sandbox-gke"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    echo "Deploying Cloud Scheduler and Cloud Tasks"
+    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-${_ENV}.xml $project_id
+    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/cloud-tasks-queue.xml $project_id
+## Build Nomulus, tool and proxy image, them upload them to GCR.
 - id: Build-Nomulus-Tool-Image-And-Push
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
@@ -279,25 +298,6 @@ steps:
     cp db/build/libs/schema.jar output/
     cp core/build/libs/nomulus-public.jar output/
     cp core/build/libs/nomulus-tests-alldeps.jar output/
-# TODO: determine if we want to deploy cloud scheduler and tasks during the build, or should we do it during the ud-cloudbuild-deploy-gke.yaml ?
-# Create/Update cloud scheduler and cloud tasks based on a cloud-scheduler-tasks.xml
-- id: Create-Cloud-Scheduler-Tasks
-  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
-  entrypoint: /bin/bash
-  args:
-  - -c
-  - |
-    set -e
-    if [ ${_ENV} == production ]; then
-      project_id="ud-registry"
-    elif [ ${_ENV} == sandbox ]; then
-      project_id="ud-registry-sandbox-gke"
-    else
-      project_id="ud-registry-${_ENV}"
-    fi
-    echo "Deploying Cloud Scheduler and Cloud Tasks"
-    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-${_ENV}.xml $project_id
-    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/cloud-tasks-queue.xml $project_id
 # The tarballs and jars to upload to GCS.
 artifacts:
   objects:
