@@ -66,9 +66,9 @@ kubectl cluster-info --request-timeout=10s || (echo "ERROR: Failed to connect to
 echo "Cluster connection verified"
 
 echo "checking if we need to deploy ud-ci-nom-tool to the cluster"
-if [ -f "./kubernetes/ud-ci-nom-tool.yaml" ]; then
+if [ -f "./kubernetes/nomulus-ud-ci.yaml" ]; then
   echo "Deploying ud-ci-nom-tool service..."
-  kubectl apply -f "./kubernetes/ud-ci-nom-tool.yaml" || echo "WARNING: Failed to apply ud-ci-nom-tool.yaml"
+  kubectl apply -f "./kubernetes/nomulus-ud-ci.yaml" || echo "WARNING: Failed to apply ud-ci-nom-tool.yaml"
 else
   echo "WARNING: ud-ci-nom-tool.yaml not found, skipping deployment. Some CI jobs may fail without this deployment!"
 fi
