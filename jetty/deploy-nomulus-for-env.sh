@@ -73,14 +73,6 @@ else
   echo "WARNING: ud-ci-nom-tool.yaml not found, skipping deployment. Some CI jobs may fail without this deployment!"
 fi
 
-echo "checking if we need to deploy nomulus-frontend-ipv6-temp to the cluster"
-if [ -f "./kubernetes/nomulus-frontend-ipv6-temp.yaml" ]; then
-  echo "Deploying nomulus-frontend-ipv6-temp service..."
-  kubectl apply -f "./kubernetes/nomulus-frontend-ipv6-temp.yaml" || echo "WARNING: Failed to apply nomulus-frontend-ipv6-temp.yaml"
-else
-  echo "WARNING: nomulus-frontend-ipv6-temp.yaml not found, skipping deployment."
-fi
-
 for service in frontend backend pubapi console 
 do
   echo "Deploying ${service} service..."
