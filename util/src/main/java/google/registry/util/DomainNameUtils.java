@@ -48,7 +48,9 @@ public final class DomainNameUtils {
     // rules (HYPHEN_3_4 error) because hyphens at positions 3-4 are reserved for ACE prefixes
     // like "xn--". However, ICANN mandates this format for RSP testing, so we must allow it.
     // See: https://www.icann.org/en/contracted-parties/registry-operators/registry-system-testing
-    if (labelLowercased.startsWith("zz--")) {
+    // Check for zz-- TLD either as standalone (e.g., "zz--main-udi2569-m62") or as part of a
+    // full domain name (e.g., "nic.zz--main-udi2569-m62")
+    if (labelLowercased.startsWith("zz--") || labelLowercased.contains(".zz--")) {
       return labelLowercased;
     }
     // UD SPECIFIC CODE END
