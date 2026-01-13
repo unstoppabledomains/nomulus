@@ -268,8 +268,8 @@ steps:
       google.registry.beam.wipeout.WipeOutContactHistoryPiiPipeline \
       google/registry/beam/wipe_out_contact_history_pii_pipeline_metadata.json
 
-# Tentatively build and publish Cloud SQL schema jar here, before the schema release process is
-# finalized. Also publish nomulus:core jars that are needed for server/schema compatibility tests.
+# Build Cloud SQL schema jar and nomulus:core jars needed for server/schema compatibility tests.
+# Note: Upstream removed the maven publishing configuration, so we build jars directly.
 - id: Build-And-Publish-Schema-Jar
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   entrypoint: /bin/bash
@@ -281,20 +281,11 @@ steps:
   - |
     set -e
     ./gradlew \
-      :db:publish \
+      :db:schemaJar \
+      :core:nomulusFossJar \
+      :core:testUberJar \
       -PmavenUrl=https://repo.maven.apache.org/maven2 \
-      -PpluginsUrl=https://plugins.gradle.org/m2 \
-      -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
-      -Pschema_version=${COMMIT_SHA}
-    ./gradlew \
-      :core:publish \
-      -PmavenUrl=https://repo.maven.apache.org/maven2 \
-      -PpluginsUrl=https://plugins.gradle.org/m2 \
-      -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
-      -Pnomulus_version=${COMMIT_SHA}
-    # Upload schema jar for use by schema deployment.
-    # TODO(weiminyu): consider using the jar in maven repo during deployment and
-    # stop the  upload here.
+      -PpluginsUrl=https://plugins.gradle.org/m2
     cp db/build/libs/schema.jar output/
     cp core/build/libs/nomulus-public.jar output/
     cp core/build/libs/nomulus-tests-alldeps.jar output/

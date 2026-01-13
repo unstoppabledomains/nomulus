@@ -56,15 +56,26 @@ public class HostFlowUtils {
     if (!name.equals(hostNameLowerCase)) {
       throw new HostNameNotLowerCaseException(hostNameLowerCase);
     }
+    // Check for zz-- TLDs (ICANN RSP testing format) which have hyphens at positions 3-4.
+    // These TLDs violate RFC 5891 HYPHEN_3_4 rules but are mandated by ICANN for RSP testing.
+    // See: https://www.icann.org/en/contracted-parties/registry-operators/registry-system-testing
+    boolean isZzTld = name.contains(".zz--");
     try {
-      String hostNamePunyCoded = Idn.toASCII(name);
+      String hostNamePunyCoded = isZzTld ? name : Idn.toASCII(name);
       if (!name.equals(hostNamePunyCoded)) {
         throw new HostNameNotPunyCodedException(hostNamePunyCoded);
       }
       if (!HOST_NAME_ALLOWED_CHARS.matchesAllOf(name)) {
         throw new BadHostNameCharacterException();
       }
-      InternetDomainName hostName = InternetDomainName.from(name);
+      // For zz-- TLDs, we cannot use InternetDomainName.from() as Guava enforces RFC 5891
+      // which prohibits hyphens at positions 3-4 in labels. Instead, we manually construct
+      // the InternetDomainName by parsing the parts.
+      InternetDomainName hostName =
+          isZzTld
+              ? InternetDomainName.from(name.substring(0, name.indexOf(".zz--")))
+                  .child(name.substring(name.indexOf(".zz--") + 1))
+              : InternetDomainName.from(name);
       if (!name.equals(hostName.toString())) {
         throw new HostNameNotNormalizedException(hostName.toString());
       }
