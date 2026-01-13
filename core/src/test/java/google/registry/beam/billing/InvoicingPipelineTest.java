@@ -335,7 +335,7 @@ class InvoicingPipelineTest {
             .build();
     persistResource(registrar);
     Tld test =
-        newTld("test", "_TEST", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
+        newTld("test", "TEST", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
             .asBuilder()
             .setInvoicingEnabled(true)
             .build();
@@ -449,13 +449,13 @@ AND cr.id IS NULL
     persistResource(registrar3);
 
     Tld test =
-        newTld("test", "_TEST", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
+        newTld("test", "TEST", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
             .asBuilder()
             .setInvoicingEnabled(true)
             .build();
     persistResource(test);
     Tld hello =
-        newTld("hello", "_HELLO", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
+        newTld("hello", "HELLO", ImmutableSortedMap.of(START_OF_TIME, GENERAL_AVAILABILITY))
             .asBuilder()
             .setInvoicingEnabled(true)
             .build();

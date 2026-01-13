@@ -194,12 +194,26 @@ public final class ResourceFlowUtils {
     }
   }
 
-  /** Check that the same values aren't being added and removed in an update command. */
-  public static void checkSameValuesNotAddedAndRemoved(
-      ImmutableSet<?> fieldsToAdd, ImmutableSet<?> fieldsToRemove)
-      throws AddRemoveSameValueException {
+  /**
+   * Verifies the adds and removes on a resource.
+   *
+   * <p>This throws an exception in three different situations: if the same value is being both
+   * added and removed, if a value is being added that is already present, or if a value is being
+   * removed that isn't present.
+   */
+  public static <T> void verifyAddsAndRemoves(
+      ImmutableSet<T> existingFields, ImmutableSet<T> fieldsToAdd, ImmutableSet<T> fieldsToRemove)
+      throws AddRemoveSameValueException,
+          AddExistingValueException,
+          RemoveNonexistentValueException {
     if (!intersection(fieldsToAdd, fieldsToRemove).isEmpty()) {
       throw new AddRemoveSameValueException();
+    }
+    if (!intersection(fieldsToAdd, existingFields).isEmpty()) {
+      throw new AddExistingValueException();
+    }
+    if (intersection(fieldsToRemove, existingFields).size() != fieldsToRemove.size()) {
+      throw new RemoveNonexistentValueException();
     }
   }
 
@@ -263,6 +277,20 @@ public final class ResourceFlowUtils {
   public static class AddRemoveSameValueException extends ParameterValuePolicyErrorException {
     public AddRemoveSameValueException() {
       super("Cannot add and remove the same value");
+    }
+  }
+
+  /** Cannot add a value that is already present. */
+  public static class AddExistingValueException extends ParameterValuePolicyErrorException {
+    public AddExistingValueException() {
+      super("Cannot add a value that is already present");
+    }
+  }
+
+  /** Cannot remove a value that does not exist. */
+  public static class RemoveNonexistentValueException extends ParameterValuePolicyErrorException {
+    public RemoveNonexistentValueException() {
+      super("Cannot remove a value that does not exist");
     }
   }
 

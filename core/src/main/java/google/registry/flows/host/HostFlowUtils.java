@@ -14,12 +14,15 @@
 
 package google.registry.flows.host;
 
+import static google.registry.flows.domain.DomainFlowUtils.validateFirstLabel;
 import static google.registry.model.EppResourceUtils.isActive;
 import static google.registry.model.tld.Tlds.findTldForName;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.base.Ascii;
+import com.google.common.base.CharMatcher;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthorizationErrorException;
@@ -32,11 +35,16 @@ import google.registry.model.ForeignKeyUtils;
 import google.registry.model.domain.Domain;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.util.Idn;
+import java.net.InetAddress;
 import java.util.Optional;
 import org.joda.time.DateTime;
 
 /** Static utility functions for host flows. */
 public class HostFlowUtils {
+
+  /** Validator for ASCII lowercase letters, digits, and "-_", allowing "." as a separator */
+  private static final CharMatcher HOST_NAME_ALLOWED_CHARS =
+      CharMatcher.inRange('a', 'z').or(CharMatcher.inRange('0', '9').or(CharMatcher.anyOf("-._")));
 
   /** Checks that a host name is valid. */
   public static InternetDomainName validateHostName(String name) throws EppException {
@@ -52,6 +60,9 @@ public class HostFlowUtils {
       String hostNamePunyCoded = Idn.toASCII(name);
       if (!name.equals(hostNamePunyCoded)) {
         throw new HostNameNotPunyCodedException(hostNamePunyCoded);
+      }
+      if (!HOST_NAME_ALLOWED_CHARS.matchesAllOf(name)) {
+        throw new BadHostNameCharacterException();
       }
       InternetDomainName hostName = InternetDomainName.from(name);
       if (!name.equals(hostName.toString())) {
@@ -71,6 +82,7 @@ public class HostFlowUtils {
       if (hostName.parts().size() < effectiveTld.parts().size() + 2) {
         throw new HostNameTooShallowException();
       }
+      validateFirstLabel(hostName.parts().getFirst());
       return hostName;
     } catch (IllegalArgumentException e) {
       throw new InvalidHostNameException();
@@ -96,6 +108,24 @@ public class HostFlowUtils {
       throw new SuperordinateDomainDoesNotExistException(domainName);
     }
     return superordinateDomain;
+  }
+
+  /** Makes sure that no provided IP addresses are local / loopback addresses. */
+  public static void validateInetAddresses(ImmutableSet<InetAddress> inetAddresses)
+      throws EppException {
+    if (inetAddresses == null) {
+      return;
+    }
+    if (inetAddresses.stream().anyMatch(InetAddress::isLoopbackAddress)) {
+      throw new LoopbackIpNotValidForHostException();
+    }
+  }
+
+  /** Loopback IPs are not valid for hosts. */
+  static class LoopbackIpNotValidForHostException extends ParameterValuePolicyErrorException {
+    public LoopbackIpNotValidForHostException() {
+      super("Loopback IPs are not valid for hosts");
+    }
   }
 
   /** Superordinate domain for this hostname does not exist. */
@@ -178,6 +208,13 @@ public class HostFlowUtils {
     public HostNameNotNormalizedException(String expectedHostName) {
       super(
           String.format("Host names must be in normalized format; expected %s", expectedHostName));
+    }
+  }
+
+  /** Host names can only contain a-z, 0-9, '.', '_', and '-'. */
+  static class BadHostNameCharacterException extends ParameterValueSyntaxErrorException {
+    public BadHostNameCharacterException() {
+      super("Host names can only contain a-z, 0-9, '.', '_', and '-'");
     }
   }
 }

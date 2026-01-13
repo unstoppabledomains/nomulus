@@ -21,8 +21,8 @@ import static com.google.common.collect.Sets.union;
 import static google.registry.dns.DnsUtils.requestDomainDnsRefresh;
 import static google.registry.flows.FlowUtils.persistEntityChanges;
 import static google.registry.flows.FlowUtils.validateRegistrarIsLoggedIn;
-import static google.registry.flows.ResourceFlowUtils.checkSameValuesNotAddedAndRemoved;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
+import static google.registry.flows.ResourceFlowUtils.verifyAddsAndRemoves;
 import static google.registry.flows.ResourceFlowUtils.verifyAllStatusesAreClientSettable;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfo;
@@ -39,8 +39,6 @@ import static google.registry.flows.domain.DomainFlowUtils.validateNoDuplicateCo
 import static google.registry.flows.domain.DomainFlowUtils.validateUpdateContactData;
 import static google.registry.flows.domain.DomainFlowUtils.verifyClientUpdateNotProhibited;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotInPendingDelete;
-import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
-import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_PROHIBITED;
 import static google.registry.model.reporting.HistoryEntry.Type.DOMAIN_UPDATE;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
@@ -61,13 +59,11 @@ import google.registry.flows.custom.DomainUpdateFlowCustomLogic;
 import google.registry.flows.custom.DomainUpdateFlowCustomLogic.AfterValidationParameters;
 import google.registry.flows.custom.DomainUpdateFlowCustomLogic.BeforeSaveParameters;
 import google.registry.flows.custom.EntityChanges;
-import google.registry.flows.domain.DomainFlowUtils.MissingRegistrantException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedForTldWithNameserverAllowListException;
 import google.registry.flows.domain.DomainFlowUtils.RegistrantProhibitedException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
-import google.registry.model.common.FeatureFlag;
 import google.registry.model.contact.Contact;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.Domain;
@@ -79,6 +75,8 @@ import google.registry.model.domain.fee.FeeUpdateCommandExtension;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.secdns.DomainDsData;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension;
+import google.registry.model.domain.secdns.SecDnsUpdateExtension.Add;
+import google.registry.model.domain.secdns.SecDnsUpdateExtension.Remove;
 import google.registry.model.domain.superuser.DomainUpdateSuperuserExtension;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.StatusValue;
@@ -123,10 +121,7 @@ import org.joda.time.DateTime;
  * @error {@link DomainFlowUtils.LinkedResourcesDoNotExistException}
  * @error {@link DomainFlowUtils.LinkedResourceInPendingDeleteProhibitsOperationException}
  * @error {@link DomainFlowUtils.MaxSigLifeChangeNotSupportedException}
- * @error {@link DomainFlowUtils.MissingAdminContactException}
  * @error {@link DomainFlowUtils.MissingContactTypeException}
- * @error {@link DomainFlowUtils.MissingTechnicalContactException}
- * @error {@link DomainFlowUtils.MissingRegistrantException}
  * @error {@link DomainFlowUtils.NameserversNotAllowedForTldException}
  * @error {@link NameserversNotSpecifiedForTldWithNameserverAllowListException}
  * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
@@ -252,12 +247,19 @@ public final class DomainUpdateFlow implements MutatingFlow {
   private Domain performUpdate(Update command, Domain domain, DateTime now) throws EppException {
     AddRemove add = command.getInnerAdd();
     AddRemove remove = command.getInnerRemove();
-    checkSameValuesNotAddedAndRemoved(add.getNameservers(), remove.getNameservers());
-    checkSameValuesNotAddedAndRemoved(add.getContacts(), remove.getContacts());
-    checkSameValuesNotAddedAndRemoved(add.getStatusValues(), remove.getStatusValues());
-    Change change = command.getInnerChange();
     Optional<SecDnsUpdateExtension> secDnsUpdate =
         eppInput.getSingleExtension(SecDnsUpdateExtension.class);
+    verifyAddsAndRemoves(domain.getNameservers(), add.getNameservers(), remove.getNameservers());
+    verifyAddsAndRemoves(domain.getContacts(), add.getContacts(), remove.getContacts());
+    verifyAddsAndRemoves(domain.getStatusValues(), add.getStatusValues(), remove.getStatusValues());
+    if (secDnsUpdate.isPresent()) {
+      SecDnsUpdateExtension ext = secDnsUpdate.get();
+      verifyAddsAndRemoves(
+          domain.getDsData(),
+          ext.getAdd().map(Add::getDsData).orElse(ImmutableSet.of()),
+          ext.getRemove().map(Remove::getDsData).orElse(ImmutableSet.of()));
+    }
+    Change change = command.getInnerChange();
 
     // We have to verify no duplicate contacts _before_ constructing the domain because it is
     // illegal to construct a domain with duplicate contacts.
@@ -307,18 +309,11 @@ public final class DomainUpdateFlow implements MutatingFlow {
     return domainBuilder.build();
   }
 
-  private Optional<VKey<Contact>> determineUpdatedRegistrant(Change change, Domain domain)
-      throws EppException {
+  private Optional<VKey<Contact>> determineUpdatedRegistrant(Change change, Domain domain) {
     // During or after the minimum dataset transition, allow registrant to be removed.
     if (change.getRegistrantContactId().isPresent()
         && change.getRegistrantContactId().get().isEmpty()) {
-      // TODO(b/353347632): Change this flag check to a registry config check.
-      if (FeatureFlag.isActiveNow(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-          || FeatureFlag.isActiveNow(MINIMUM_DATASET_CONTACTS_PROHIBITED)) {
-        return Optional.empty();
-      } else {
-        throw new MissingRegistrantException();
-      }
+      return Optional.empty();
     }
     return change.getRegistrant().or(domain::getRegistrant);
   }

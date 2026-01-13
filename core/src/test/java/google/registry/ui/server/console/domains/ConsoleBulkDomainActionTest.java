@@ -15,14 +15,10 @@
 package google.registry.ui.server.console.domains;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
-import static google.registry.model.common.FeatureFlag.FeatureStatus.INACTIVE;
 import static google.registry.testing.DatabaseHelper.loadByEntity;
 import static google.registry.testing.DatabaseHelper.loadSingleton;
-import static google.registry.testing.DatabaseHelper.persistActiveContact;
 import static google.registry.testing.DatabaseHelper.persistDomainWithDependentResources;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
@@ -31,12 +27,10 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedMap;
 import com.google.gson.JsonElement;
 import google.registry.flows.DaggerEppTestComponent;
 import google.registry.flows.EppController;
 import google.registry.flows.EppTestComponent;
-import google.registry.model.common.FeatureFlag;
 import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.RegistrarRole;
 import google.registry.model.console.User;
@@ -68,12 +62,6 @@ public class ConsoleBulkDomainActionTest extends ConsoleActionBaseTestCase {
 
   @BeforeEach
   void beforeEach() {
-    persistResource(
-        new FeatureFlag()
-            .asBuilder()
-            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .setStatusMap(ImmutableSortedMap.of(START_OF_TIME, INACTIVE))
-            .build());
     eppController =
         DaggerEppTestComponent.builder()
             .fakesAndMocksModule(EppTestComponent.FakesAndMocksModule.create(clock))
@@ -84,7 +72,7 @@ public class ConsoleBulkDomainActionTest extends ConsoleActionBaseTestCase {
         persistDomainWithDependentResources(
             "example",
             "tld",
-            persistActiveContact("contact1234"),
+            null,
             clock.nowUtc(),
             clock.nowUtc().minusMonths(1),
             clock.nowUtc().plusMonths(11));

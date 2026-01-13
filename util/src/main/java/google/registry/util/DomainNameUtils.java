@@ -19,9 +19,11 @@ import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 
 import com.google.common.base.Ascii;
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
+import java.util.List;
 
 /** Utility methods related to domain names. */
 public final class DomainNameUtils {
@@ -39,26 +41,34 @@ public final class DomainNameUtils {
             .equals(potentialParent.parts());
   }
 
-  /** Canonicalizes a hostname/domain name by lowercasing and converting unicode to punycode. */
+  /**
+   * Canonicalizes a hostname/domain name by lowercasing and converting Unicode to punycode.
+   *
+   * <p>This applies slightly stricter rules to all labels other than the TLD part (all other labels
+   * are not allowed to have hyphens in the third and fourth position except when using
+   * ACE-formatted Punycode). This restriction is not enforced on the last label (so multi-part TLDs
+   * still cannot have said characters except on the last part).
+   */
   public static String canonicalizeHostname(String label) {
     String labelLowercased = Ascii.toLowerCase(label);
-    // UD SPECIFIC CODE START
-    // ICANN RST (Registry System Testing) for RSP Evaluation uses TLD labels of the form
-    // "zz--[type]-[number]" (e.g., zz--main-UDI2569-M62). This format violates standard IDNA
-    // rules (HYPHEN_3_4 error) because hyphens at positions 3-4 are reserved for ACE prefixes
-    // like "xn--". However, ICANN mandates this format for RSP testing, so we must allow it.
-    // See: https://www.icann.org/en/contracted-parties/registry-operators/registry-system-testing
-    // Check for zz-- TLD either as standalone (e.g., "zz--main-udi2569-m62") or as part of a
-    // full domain name (e.g., "nic.zz--main-udi2569-m62")
-    if (labelLowercased.startsWith("zz--") || labelLowercased.contains(".zz--")) {
-      return labelLowercased;
+    String finalChar = "";
+    if (labelLowercased.endsWith(".")) {
+      labelLowercased = labelLowercased.substring(0, labelLowercased.length() - 1);
+      finalChar = ".";
     }
-    // UD SPECIFIC CODE END
-    try {
-      return Idn.toASCII(labelLowercased);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(String.format("Error ASCIIfying label '%s'", label), e);
+    List<String> parts = Splitter.on('.').splitToList(labelLowercased);
+    // If the hostname only has one part, just canonicalize that.
+    if (parts.size() == 1) {
+      return Idn.toASCII(parts.getFirst()) + finalChar;
     }
+    // If the hostname has multiple parts, apply stricter validation to all labels but the last
+    // one (which relaxes the hyphens in third and fourth positions rule).
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < parts.size() - 1; i++) {
+      sb.append(Idn.toASCII(parts.get(i))).append('.');
+    }
+    sb.append(Idn.tldToASCII(parts.getLast())).append(finalChar);
+    return sb.toString();
   }
 
   /**
