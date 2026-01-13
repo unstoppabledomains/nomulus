@@ -18,11 +18,14 @@ import static com.google.monitoring.metrics.contrib.DistributionMetricSubject.as
 import static com.google.monitoring.metrics.contrib.LongMetricSubject.assertThat;
 import static google.registry.proxy.TestUtils.makeHttpPostRequest;
 import static google.registry.proxy.TestUtils.makeHttpResponse;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import java.util.Random;
 import org.joda.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,10 +37,11 @@ class BackendMetricsTest {
   private final String certHash = "blah12345";
   private final String protocol = "frontend protocol";
 
-  private final BackendMetrics metrics = new BackendMetrics();
+  private BackendMetrics metrics;
 
   @BeforeEach
   void beforeEach() {
+    metrics = new BackendMetrics(1.0, new Random());
     metrics.resetMetrics();
   }
 
@@ -107,22 +111,37 @@ class BackendMetricsTest {
 
   @Test
   void testSuccess_multipleResponses() {
+    Random mockRandom = mock(Random.class);
+    metrics = new BackendMetrics(0.3, mockRandom);
+    // The reciprocal of this metrics ratio is 3.3..., so depending on stochastic rounding each
+    // response will be recorded as either 3 or 4 (which we hard-code in test by mocking the RNG).
+    when(mockRandom.nextDouble())
+        .thenReturn(
+            /* record response1 */ .1,
+            /* ... as 3 */ .5,
+            /* record response2 */ .04,
+            /* ... as 4 */ .2,
+            /* don't record response3 (skips stochastic rounding) */ .5,
+            /* record response4 */ .15,
+            /* ... as 3 */ .5);
     String content1 = "some response";
     String content2 = "other response";
     String content3 = "a very bad response";
     FullHttpResponse response1 = makeHttpResponse(content1, HttpResponseStatus.OK);
     FullHttpResponse response2 = makeHttpResponse(content2, HttpResponseStatus.OK);
-    FullHttpResponse response3 = makeHttpResponse(content3, HttpResponseStatus.BAD_REQUEST);
+    FullHttpResponse response3 = makeHttpResponse(content2, HttpResponseStatus.OK);
+    FullHttpResponse response4 = makeHttpResponse(content3, HttpResponseStatus.BAD_REQUEST);
     metrics.responseReceived(protocol, certHash, response1, Duration.millis(5));
     metrics.responseReceived(protocol, certHash, response2, Duration.millis(8));
-    metrics.responseReceived(protocol, certHash, response3, Duration.millis(2));
+    metrics.responseReceived(protocol, certHash, response3, Duration.millis(15));
+    metrics.responseReceived(protocol, certHash, response4, Duration.millis(2));
 
     assertThat(BackendMetrics.requestsCounter).hasNoOtherValues();
     assertThat(BackendMetrics.requestBytes).hasNoOtherValues();
     assertThat(BackendMetrics.responsesCounter)
-        .hasValueForLabels(2, protocol, certHash, "200 OK")
+        .hasValueForLabels(7, protocol, certHash, "200 OK")
         .and()
-        .hasValueForLabels(1, protocol, certHash, "400 Bad Request")
+        .hasValueForLabels(3, protocol, certHash, "400 Bad Request")
         .and()
         .hasNoOtherValues();
     assertThat(BackendMetrics.responseBytes)

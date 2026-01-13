@@ -1,0 +1,11 @@
+# Cursor Rules
+
+1. Read all the rules in this file before you start working on any task.
+1. Any content you need to create, documentation, test scripts, etc. should be stored in the AI-generated-content-not-for-git directory. If appropriate, create sub directories in AI-generated-content-not-for-git.
+2. Do not commit any content from the AI-generated-content-not-for-git directory to the repository.
+3. The user will move any AI-generated-content-not-for-git into appropriate locations and commit it themeselves
+4. If asked for a commit message, keep it to 1 sentance
+
+
+
+Did you read all the rules?

@@ -42,6 +42,18 @@ public final class DomainNameUtils {
   /** Canonicalizes a hostname/domain name by lowercasing and converting unicode to punycode. */
   public static String canonicalizeHostname(String label) {
     String labelLowercased = Ascii.toLowerCase(label);
+    // UD SPECIFIC CODE START
+    // ICANN RST (Registry System Testing) for RSP Evaluation uses TLD labels of the form
+    // "zz--[type]-[number]" (e.g., zz--main-UDI2569-M62). This format violates standard IDNA
+    // rules (HYPHEN_3_4 error) because hyphens at positions 3-4 are reserved for ACE prefixes
+    // like "xn--". However, ICANN mandates this format for RSP testing, so we must allow it.
+    // See: https://www.icann.org/en/contracted-parties/registry-operators/registry-system-testing
+    // Check for zz-- TLD either as standalone (e.g., "zz--main-udi2569-m62") or as part of a
+    // full domain name (e.g., "nic.zz--main-udi2569-m62")
+    if (labelLowercased.startsWith("zz--") || labelLowercased.contains(".zz--")) {
+      return labelLowercased;
+    }
+    // UD SPECIFIC CODE END
     try {
       return Idn.toASCII(labelLowercased);
     } catch (IllegalArgumentException e) {

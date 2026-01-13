@@ -14,7 +14,6 @@
 
 package google.registry.rdap;
 
-import static google.registry.model.EppResourceUtils.loadByForeignKeyCached;
 import static google.registry.persistence.transaction.TransactionManagerFactory.replicaTm;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.HEAD;
@@ -25,6 +24,7 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.InetAddresses;
 import com.google.common.primitives.Booleans;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.domain.Domain;
 import google.registry.model.host.Host;
 import google.registry.persistence.transaction.CriteriaQueryBuilder;
@@ -34,7 +34,6 @@ import google.registry.rdap.RdapMetrics.SearchType;
 import google.registry.rdap.RdapSearchResults.IncompletenessWarningType;
 import google.registry.rdap.RdapSearchResults.NameserverSearchResponse;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.request.HttpException.UnprocessableEntityException;
@@ -47,9 +46,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * RDAP (new WHOIS) action for nameserver search requests.
+ * RDAP action for nameserver search requests.
  *
- * <p>All commands and responses conform to the RDAP spec as defined in RFCs 7480 through 7485.
+ * <p>All commands and responses conform to the RDAP spec as defined in STD 95 and its RFCs.
  *
  * @see <a href="http://tools.ietf.org/html/rfc9082">RFC 9082: Registration Data Access Protocol
  *     (RDAP) Query Format</a>
@@ -57,7 +56,7 @@ import java.util.Optional;
  *     Data Access Protocol (RDAP)</a>
  */
 @Action(
-    service = GaeService.PUBAPI,
+    service = Action.Service.PUBAPI,
     path = "/rdap/nameservers",
     method = {GET, HEAD},
     auth = Auth.AUTH_PUBLIC)
@@ -159,7 +158,8 @@ public class RdapNameserverSearchAction extends RdapSearchActionBase {
             .setIncompletenessWarningType(IncompletenessWarningType.COMPLETE);
 
     Optional<Host> host =
-        loadByForeignKeyCached(Host.class, partialStringQuery.getInitialString(), getRequestTime());
+        ForeignKeyUtils.loadResourceByCache(
+            Host.class, partialStringQuery.getInitialString(), getRequestTime());
 
     metricInformationBuilder.setNumHostsRetrieved(host.isPresent() ? 1 : 0);
 
@@ -175,7 +175,8 @@ public class RdapNameserverSearchAction extends RdapSearchActionBase {
   private NameserverSearchResponse searchByNameUsingSuperordinateDomain(
       RdapSearchPattern partialStringQuery) {
     Optional<Domain> domain =
-        loadByForeignKeyCached(Domain.class, partialStringQuery.getSuffix(), getRequestTime());
+        ForeignKeyUtils.loadResourceByCache(
+            Domain.class, partialStringQuery.getSuffix(), getRequestTime());
     if (domain.isEmpty()) {
       // Don't allow wildcards with suffixes which are not domains we manage. That would risk a
       // table scan in many easily foreseeable cases. The user might ask for ns*.zombo.com,
@@ -193,7 +194,8 @@ public class RdapNameserverSearchAction extends RdapSearchActionBase {
       // We can't just check that the host name starts with the initial query string, because
       // then the query ns.exam*.example.com would match against nameserver ns.example.com.
       if (partialStringQuery.matches(fqhn)) {
-        Optional<Host> host = loadByForeignKeyCached(Host.class, fqhn, getRequestTime());
+        Optional<Host> host =
+            ForeignKeyUtils.loadResourceByCache(Host.class, fqhn, getRequestTime());
         if (shouldBeVisible(host)) {
           hostList.add(host.get());
           if (hostList.size() > rdapResultSetMaxSize) {

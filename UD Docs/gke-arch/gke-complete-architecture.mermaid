@@ -1,0 +1,141 @@
+%%{init: {'theme':'base', 'themeVariables': {'primaryBgColor':'#ffffff', 'primaryTextColor':'#000000', 'primaryBorderColor':'#000000', 'lineColor':'#000000', 'secondaryColor':'#f5f5f5', 'tertiaryColor':'#ffffff'}}}%%
+graph TB
+    subgraph "GCP Static IP Addresses"
+        EPP_IPV4["EPP-ipv4-main<br/>(Regional IPv4)"]
+        EPP_IPV6["EPP-ipv6-main<br/>(Regional IPv6)"]
+        GATEWAY_IPV4["nomulus-ipv4-address<br/>(Global IPv4)"]
+        GATEWAY_IPV6["nomulus-ipv6-address<br/>(Global IPv6)"]
+    end
+
+    subgraph "L4 Load Balancer Path (EPP Service)"
+        EPP_IPV4 --> EPP_FR["GCP Forwarding Rule<br/>(Regional TCP)<br/>Port: 700"]
+        EPP_FR --> EPP_BS["GCP Regional Backend Service<br/>k8s2-*-default-epp-*"]
+        EPP_BS --> EPP_NEG1["GCP NEG<br/>(us-central1-a)"]
+        EPP_BS --> EPP_NEG2["GCP NEG<br/>(us-central1-b)"]
+        EPP_BS --> EPP_NEG3["GCP NEG<br/>(us-central1-c)"]
+        EPP_BS --> EPP_HC["GCP Health Check"]
+        EPP_NEG1 --> FRONTEND_PODS["Frontend Pods<br/>(Same pods for both services)<br/>Containers:<br/>- frontend:8080<br/>- EPP:30002"]
+        EPP_NEG2 --> FRONTEND_PODS
+        EPP_NEG3 --> FRONTEND_PODS
+    end
+
+    subgraph "Kubernetes EPP Service Resources"
+        EPP_SVC["K8s Service: epp<br/>(LoadBalancer)<br/>Selector: service: frontend<br/>Annotations:<br/>- l4-rbs: enabled<br/>- load-balancer-ip-addresses:<br/>  EPP-ipv6-main,EPP-ipv4-main"]
+        EPP_SVC -.creates.-> EPP_FR
+        EPP_SVC -.creates.-> EPP_BS
+        EPP_SVC --> EPP_DEPLOY["K8s Deployment: frontend<br/>(Same deployment for both services)"]
+        EPP_DEPLOY --> FRONTEND_PODS
+        EPP_DEPLOY --> EPP_HPA["K8s HPA: frontend"]
+        EPP_DEPLOY --> EPP_SA["K8s ServiceAccount: nomulus"]
+    end
+
+    subgraph "L7 Load Balancer Path (Gateway API)"
+        GATEWAY_IPV4 --> GATEWAY_FR["GCP Global Forwarding Rule<br/>(HTTP/HTTPS)<br/>Ports: 80, 443"]
+        GATEWAY_IPV6 --> GATEWAY_FR
+        GATEWAY_FR --> GATEWAY_URLMAP["GCP URL Map<br/>(Routes by hostname/path)"]
+        GATEWAY_URLMAP --> BS_FRONTEND["GCP Backend Service<br/>(Service: frontend)"]
+        GATEWAY_URLMAP --> BS_BACKEND["GCP Backend Service<br/>(Service: backend)"]
+        GATEWAY_URLMAP --> BS_CONSOLE["GCP Backend Service<br/>(Service: console)"]
+        GATEWAY_URLMAP --> BS_PUBAPI["GCP Backend Service<br/>(Service: pubapi)"]
+    end
+
+    subgraph "Kubernetes Gateway Resources"
+        GATEWAY["K8s Gateway: nomulus<br/>GatewayClass: gke-l7-global-external-managed-mc<br/>Addresses: nomulus-ipv4-address, nomulus-ipv6-address"]
+        GATEWAY -.creates.-> GATEWAY_FR
+        GATEWAY -.creates.-> GATEWAY_URLMAP
+        GATEWAY --> HTTPROUTE_FRONTEND["K8s HTTPRoute: frontend<br/>Hostname: frontend.BASE_DOMAIN<br/>Path: /_dr/epp"]
+        GATEWAY --> HTTPROUTE_BACKEND["K8s HTTPRoute: backend<br/>Hostname: backend.BASE_DOMAIN<br/>Paths: /_dr/{task,cron,admin,...}"]
+        GATEWAY --> HTTPROUTE_CONSOLE["K8s HTTPRoute: console<br/>Hostname: console.BASE_DOMAIN<br/>Paths: /console-api, /console"]
+        GATEWAY --> HTTPROUTE_PUBAPI["K8s HTTPRoute: pubapi<br/>Hostname: pubapi.BASE_DOMAIN<br/>Paths: /check, /rdap"]
+    end
+
+    %% Connections from GCP Backend Services to ServiceImports (creates vertical spacing)
+    BS_FRONTEND --> SVCIMPORT_FRONTEND
+    BS_BACKEND --> SVCIMPORT_BACKEND
+    BS_CONSOLE --> SVCIMPORT_CONSOLE
+    BS_PUBAPI --> SVCIMPORT_PUBAPI
+
+    subgraph "Frontend Service Resources"
+        HTTPROUTE_FRONTEND --> SVCIMPORT_FRONTEND["K8s ServiceImport: frontend"]
+        SVCIMPORT_FRONTEND --> SVC_FRONTEND["K8s Service: frontend<br/>(ClusterIP)<br/>Selector: service: frontend<br/>Port: 80"]
+        SVC_FRONTEND --> DEPLOY_FRONTEND["K8s Deployment: frontend<br/>(Same deployment for both services)"]
+        DEPLOY_FRONTEND --> FRONTEND_PODS
+        DEPLOY_FRONTEND --> HPA_FRONTEND["K8s HPA: frontend"]
+        DEPLOY_FRONTEND --> SA_FRONTEND["K8s ServiceAccount: nomulus"]
+        SVC_FRONTEND --> SVCEXPORT_FRONTEND["K8s ServiceExport: frontend"]
+        HTTPROUTE_FRONTEND --> HCP_FRONTEND["K8s HealthCheckPolicy: frontend"]
+        HTTPROUTE_FRONTEND --> BPPOLICY_FRONTEND["K8s GCPBackendPolicy: frontend<br/>targetRef: ServiceImport/frontend"]
+        BPPOLICY_FRONTEND -.configures.-> BS_FRONTEND
+        EPP_SVC --> DEPLOY_FRONTEND
+    end
+
+    subgraph "Backend Service Resources"
+        HTTPROUTE_BACKEND --> SVCIMPORT_BACKEND["K8s ServiceImport: backend"]
+        SVCIMPORT_BACKEND --> SVC_BACKEND["K8s Service: backend<br/>(ClusterIP)<br/>Port: 80"]
+        SVC_BACKEND --> DEPLOY_BACKEND["K8s Deployment: backend"]
+        DEPLOY_BACKEND --> PODS_BACKEND["K8s Pods<br/>Container: backend:8080"]
+        DEPLOY_BACKEND --> HPA_BACKEND["K8s HPA: backend"]
+        DEPLOY_BACKEND --> SA_BACKEND["K8s ServiceAccount: nomulus"]
+        SVC_BACKEND --> SVCEXPORT_BACKEND["K8s ServiceExport: backend"]
+        HTTPROUTE_BACKEND --> HCP_BACKEND["K8s HealthCheckPolicy: backend"]
+        HTTPROUTE_BACKEND --> BPPOLICY_BACKEND["K8s GCPBackendPolicy: backend<br/>targetRef: ServiceImport/backend"]
+        BPPOLICY_BACKEND -.configures.-> BS_BACKEND
+    end
+
+    subgraph "Console Service Resources"
+        HTTPROUTE_CONSOLE --> SVCIMPORT_CONSOLE["K8s ServiceImport: console"]
+        SVCIMPORT_CONSOLE --> SVC_CONSOLE["K8s Service: console<br/>(ClusterIP)<br/>Port: 80"]
+        SVC_CONSOLE --> DEPLOY_CONSOLE["K8s Deployment: console"]
+        DEPLOY_CONSOLE --> PODS_CONSOLE["K8s Pods<br/>Container: console:8080"]
+        DEPLOY_CONSOLE --> HPA_CONSOLE["K8s HPA: console"]
+        DEPLOY_CONSOLE --> SA_CONSOLE["K8s ServiceAccount: nomulus"]
+        SVC_CONSOLE --> SVCEXPORT_CONSOLE["K8s ServiceExport: console"]
+        HTTPROUTE_CONSOLE --> HCP_CONSOLE["K8s HealthCheckPolicy: console"]
+        HTTPROUTE_CONSOLE --> BPPOLICY_CONSOLE["K8s GCPBackendPolicy: console<br/>targetRef: ServiceImport/console"]
+        BPPOLICY_CONSOLE -.configures.-> BS_CONSOLE
+    end
+
+    subgraph "PubAPI Service Resources"
+        HTTPROUTE_PUBAPI --> SVCIMPORT_PUBAPI["K8s ServiceImport: pubapi"]
+        SVCIMPORT_PUBAPI --> SVC_PUBAPI["K8s Service: pubapi<br/>(ClusterIP)<br/>Port: 80"]
+        SVC_PUBAPI --> DEPLOY_PUBAPI["K8s Deployment: pubapi"]
+        DEPLOY_PUBAPI --> PODS_PUBAPI["K8s Pods<br/>Container: pubapi:8080"]
+        DEPLOY_PUBAPI --> HPA_PUBAPI["K8s HPA: pubapi"]
+        DEPLOY_PUBAPI --> SA_PUBAPI["K8s ServiceAccount: nomulus"]
+        SVC_PUBAPI --> SVCEXPORT_PUBAPI["K8s ServiceExport: pubapi"]
+        HTTPROUTE_PUBAPI --> HCP_PUBAPI["K8s HealthCheckPolicy: pubapi"]
+        HTTPROUTE_PUBAPI --> BPPOLICY_PUBAPI["K8s GCPBackendPolicy: pubapi<br/>targetRef: ServiceImport/pubapi"]
+        BPPOLICY_PUBAPI -.configures.-> BS_PUBAPI
+    end
+
+    subgraph "Color Legend"
+        LEGEND_GCP["GCP Resources<br/>(IPs, Forwarding Rules,<br/>Backend Services, NEGs, etc.)"]
+        LEGEND_GATEWAY["Gateway API Resources<br/>(Gateway)"]
+        LEGEND_ROUTE["HTTPRoute Resources<br/>(HTTPRoute)"]
+        LEGEND_SERVICE["Kubernetes Services<br/>(Service)"]
+        LEGEND_SERVICEIMPORT["Kubernetes ServiceImport<br/>(ServiceImport)"]
+        LEGEND_DEPLOYMENT["Kubernetes Deployments<br/>(Deployment)"]
+        LEGEND_POD["Kubernetes Pods<br/>(Pods)"]
+        LEGEND_POLICY["Policy & Other Resources<br/>(HPA, ServiceAccount,<br/>ServiceExport, HealthCheckPolicy,<br/>GCPBackendPolicy)"]
+    end
+
+    %% Color scheme 4: Unstoppable Domains inspired gradient (white -> purple -> blue)
+    %% 8 evenly spaced colors from the gradient
+    classDef external fill:#F5E8FF,stroke:#E1C7FF,stroke-width:2px,color:#6B2D9F
+    classDef gateway fill:#E1C7FF,stroke:#C9A3FF,stroke-width:2px,color:#6B2D9F
+    classDef route fill:#C9A3FF,stroke:#B080FF,stroke-width:2px,color:#ffffff
+    classDef service fill:#B080FF,stroke:#8E5CFF,stroke-width:2px,color:#ffffff
+    classDef serviceimport fill:#8E5CFF,stroke:#6B4DFF,stroke-width:2px,color:#ffffff
+    classDef pod fill:#6B4DFF,stroke:#4A7FFF,stroke-width:2px,color:#ffffff
+    classDef gcp fill:#4A7FFF,stroke:#37B2E3,stroke-width:2px,color:#ffffff
+    classDef deployment fill:#2DD4BF,stroke:#14B8A6,stroke-width:2px,color:#ffffff
+    classDef policy fill:#37B2E3,stroke:#2A9FD4,stroke-width:2px,color:#ffffff
+    
+    class EPP_IPV4,EPP_IPV6,GATEWAY_IPV4,GATEWAY_IPV6,EPP_FR,EPP_BS,EPP_NEG1,EPP_NEG2,EPP_NEG3,EPP_HC,GATEWAY_FR,GATEWAY_URLMAP,BS_FRONTEND,BS_BACKEND,BS_CONSOLE,BS_PUBAPI,LEGEND_GCP gcp
+    class GATEWAY,LEGEND_GATEWAY gateway
+    class HTTPROUTE_FRONTEND,HTTPROUTE_BACKEND,HTTPROUTE_CONSOLE,HTTPROUTE_PUBAPI,LEGEND_ROUTE route
+    class EPP_SVC,SVC_FRONTEND,SVC_BACKEND,SVC_CONSOLE,SVC_PUBAPI,LEGEND_SERVICE service
+    class SVCIMPORT_FRONTEND,SVCIMPORT_BACKEND,SVCIMPORT_CONSOLE,SVCIMPORT_PUBAPI,LEGEND_SERVICEIMPORT serviceimport
+    class EPP_DEPLOY,DEPLOY_FRONTEND,DEPLOY_BACKEND,DEPLOY_CONSOLE,DEPLOY_PUBAPI,LEGEND_DEPLOYMENT deployment
+    class FRONTEND_PODS,PODS_BACKEND,PODS_CONSOLE,PODS_PUBAPI,LEGEND_POD pod
+    class HCP_FRONTEND,HCP_BACKEND,HCP_CONSOLE,HCP_PUBAPI,BPPOLICY_FRONTEND,BPPOLICY_BACKEND,BPPOLICY_CONSOLE,BPPOLICY_PUBAPI,EPP_HPA,EPP_SA,HPA_FRONTEND,SA_FRONTEND,SVCEXPORT_FRONTEND,HPA_BACKEND,SA_BACKEND,SVCEXPORT_BACKEND,HPA_CONSOLE,SA_CONSOLE,SVCEXPORT_CONSOLE,HPA_PUBAPI,SA_PUBAPI,SVCEXPORT_PUBAPI,LEGEND_POLICY policy

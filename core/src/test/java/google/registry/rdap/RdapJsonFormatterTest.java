@@ -18,7 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static google.registry.rdap.RdapDataStructures.EventAction.TRANSFER;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResources;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeAndPersistHost;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeDomain;
 import static google.registry.testing.FullFieldsTestEntityHelper.makeHistoryEntry;
@@ -33,7 +33,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import google.registry.model.contact.Contact;
 import google.registry.model.domain.Domain;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.Host;
@@ -46,12 +45,9 @@ import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.persistence.transaction.JpaTestExtensions.JpaIntegrationTestExtension;
 import google.registry.rdap.RdapJsonFormatter.OutputDataType;
 import google.registry.rdap.RdapObjectClasses.BoilerplateType;
-import google.registry.rdap.RdapObjectClasses.RdapEntity;
 import google.registry.rdap.RdapObjectClasses.ReplyPayloadBase;
 import google.registry.rdap.RdapObjectClasses.TopLevelReplyObject;
 import google.registry.testing.FakeClock;
-import google.registry.testing.FullFieldsTestEntityHelper;
-import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,10 +73,6 @@ class RdapJsonFormatterTest {
   private Host hostNoAddresses;
   private Host hostNotLinked;
   private Host hostSuperordinatePendingTransfer;
-  @Nullable private Contact contactRegistrant;
-  private Contact contactAdmin;
-  private Contact contactTech;
-  private Contact contactNotLinked;
 
   @BeforeEach
   void beforeEach() {
@@ -95,35 +87,8 @@ class RdapJsonFormatterTest {
     clock.setTo(DateTime.parse("2000-01-01T00:00:00Z"));
     registrar = persistResource(registrar);
 
-    persistSimpleResources(makeMoreRegistrarContacts(registrar));
+    persistResources(makeMoreRegistrarPocs(registrar));
 
-    contactRegistrant =
-        FullFieldsTestEntityHelper.makeAndPersistContact(
-            "8372808-ERL", "(◕‿◕)", "lol@cat.みんな", null, clock.nowUtc().minusYears(1), registrar);
-    contactAdmin =
-        FullFieldsTestEntityHelper.makeAndPersistContact(
-            "8372808-IRL",
-            "Santa Claus",
-            null,
-            ImmutableList.of("Santa Claus Tower", "41st floor", "Suite みんな"),
-            clock.nowUtc().minusYears(2),
-            registrar);
-    contactTech =
-        FullFieldsTestEntityHelper.makeAndPersistContact(
-            "8372808-TRL",
-            "The Raven",
-            "bog@cat.みんな",
-            ImmutableList.of("Chamber Door", "upper level"),
-            clock.nowUtc().minusYears(3),
-            registrar);
-    contactNotLinked =
-        FullFieldsTestEntityHelper.makeAndPersistContact(
-            "8372808-QRL",
-            "The Wizard",
-            "dog@cat.みんな",
-            ImmutableList.of("Somewhere", "Over the Rainbow"),
-            clock.nowUtc().minusYears(4),
-            registrar);
     hostIpv4 =
         makeAndPersistHost(
             "ns1.cat.みんな", "1.2.3.4", null, clock.nowUtc().minusYears(1), "unicoderegistrar");
@@ -147,6 +112,11 @@ class RdapJsonFormatterTest {
     hostNotLinked =
         makeAndPersistHost(
             "ns5.cat.みんな", null, null, clock.nowUtc().minusYears(5), "unicoderegistrar");
+    // Create an unused domain that references hostBoth and hostNoAddresses so that
+    // they will have "associated" (ie, StatusValue.LINKED) status.
+    Domain dog =
+        persistResource(
+            makeDomain("dog.みんな", null, null, null, hostBoth, hostNoAddresses, registrar));
     hostSuperordinatePendingTransfer =
         persistResource(
             makeAndPersistHost(
@@ -154,15 +124,7 @@ class RdapJsonFormatterTest {
                 .asBuilder()
                 .setSuperordinateDomain(
                     persistResource(
-                            makeDomain(
-                                    "dog.みんな",
-                                    contactRegistrant,
-                                    contactAdmin,
-                                    contactTech,
-                                    null,
-                                    null,
-                                    registrar)
-                                .asBuilder()
+                            dog.asBuilder()
                                 .addStatusValue(StatusValue.PENDING_TRANSFER)
                                 .setTransferData(
                                     new DomainTransferData.Builder()
@@ -180,43 +142,18 @@ class RdapJsonFormatterTest {
                 .build());
     domainFull =
         persistResource(
-            makeDomain(
-                    "cat.みんな",
-                    contactRegistrant,
-                    contactAdmin,
-                    contactTech,
-                    hostIpv4,
-                    hostIpv6,
-                    registrar)
+            makeDomain("cat.みんな", null, null, null, hostIpv4, hostIpv6, registrar)
                 .asBuilder()
                 .setCreationTimeForTest(clock.nowUtc().minusMonths(4))
                 .setLastEppUpdateTime(clock.nowUtc().minusMonths(3))
                 .build());
     domainNoNameserversNoTransfers =
         persistResource(
-            makeDomain(
-                    "fish.みんな",
-                    contactRegistrant,
-                    contactRegistrant,
-                    contactRegistrant,
-                    null,
-                    null,
-                    registrar)
+            makeDomain("fish.みんな", null, null, null, null, null, registrar)
                 .asBuilder()
                 .setCreationTimeForTest(clock.nowUtc())
                 .setLastEppUpdateTime(null)
                 .build());
-    // Create an unused domain that references hostBoth and hostNoAddresses so that
-    // they will have "associated" (ie, StatusValue.LINKED) status.
-    persistResource(
-        makeDomain(
-            "dog.みんな",
-            contactRegistrant,
-            contactAdmin,
-            contactTech,
-            hostBoth,
-            hostNoAddresses,
-            registrar));
 
     // history entries
     // We create 3 "transfer approved" entries, to make sure we only save the last one
@@ -252,7 +189,7 @@ class RdapJsonFormatterTest {
             clock.nowUtc().minusMonths(3)));
   }
 
-  static ImmutableList<RegistrarPoc> makeMoreRegistrarContacts(Registrar registrar) {
+  static ImmutableList<RegistrarPoc> makeMoreRegistrarPocs(Registrar registrar) {
     return ImmutableList.of(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -261,8 +198,8 @@ class RdapJsonFormatterTest {
             .setPhoneNumber("+1.2125551217")
             .setFaxNumber("+1.2125551218")
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
-            .setVisibleInWhoisAsAdmin(false)
-            .setVisibleInWhoisAsTech(false)
+            .setVisibleInRdapAsAdmin(false)
+            .setVisibleInRdapAsTech(false)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -270,8 +207,8 @@ class RdapJsonFormatterTest {
             .setEmailAddress("johndoe@example.com")
             .setFaxNumber("+1.2125551213")
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
-            .setVisibleInWhoisAsAdmin(false)
-            .setVisibleInWhoisAsTech(true)
+            .setVisibleInRdapAsAdmin(false)
+            .setVisibleInRdapAsTech(true)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -279,8 +216,8 @@ class RdapJsonFormatterTest {
             .setEmailAddress("janedoe@example.com")
             .setPhoneNumber("+1.2125551215")
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH, RegistrarPoc.Type.ADMIN))
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(false)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(false)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -289,8 +226,8 @@ class RdapJsonFormatterTest {
             .setPhoneNumber("+1.2125551217")
             .setFaxNumber("+1.2125551218")
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.BILLING))
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(true)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(true)
             .build());
   }
 
@@ -366,88 +303,6 @@ class RdapJsonFormatterTest {
   }
 
   @Test
-  void testRegistrant() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(
-                    contactRegistrant,
-                    ImmutableSet.of(RdapEntity.Role.REGISTRANT),
-                    OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_registrant.json"));
-  }
-
-  @Test
-  void testRegistrant_summary() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(
-                    contactRegistrant,
-                    ImmutableSet.of(RdapEntity.Role.REGISTRANT),
-                    OutputDataType.SUMMARY)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_registrant_summary.json"));
-  }
-
-  @Test
-  void testRegistrant_loggedOut() {
-    rdapJsonFormatter.rdapAuthorization = RdapAuthorization.PUBLIC_AUTHORIZATION;
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(
-                    contactRegistrant,
-                    ImmutableSet.of(RdapEntity.Role.REGISTRANT),
-                    OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_registrant_logged_out.json"));
-  }
-
-  @Test
-  void testAdmin() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(
-                    contactAdmin, ImmutableSet.of(RdapEntity.Role.ADMIN), OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_admincontact.json"));
-  }
-
-  @Test
-  void testTech() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(
-                    contactTech, ImmutableSet.of(RdapEntity.Role.TECH), OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_techcontact.json"));
-  }
-
-  @Test
-  void testRolelessContact() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(contactTech, ImmutableSet.of(), OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_rolelesscontact.json"));
-  }
-
-  @Test
-  void testUnlinkedContact() {
-    assertAboutJson()
-        .that(
-            rdapJsonFormatter
-                .createRdapContactEntity(contactNotLinked, ImmutableSet.of(), OutputDataType.FULL)
-                .toJson())
-        .isEqualTo(loadJson("rdapjson_unlinkedcontact.json"));
-  }
-
-  @Test
   void testDomain_full() {
     assertAboutJson()
         .that(rdapJsonFormatter.createRdapDomain(domainFull, OutputDataType.FULL).toJson())
@@ -462,12 +317,12 @@ class RdapJsonFormatterTest {
   }
 
   @Test
-  void testGetLastHistoryEntryByType() {
+  void testGetLastHistoryByType() {
     // Expected data are from "rdapjson_domain_summary.json"
     assertThat(
             Maps.transformValues(
-                rdapJsonFormatter.getLastHistoryEntryByType(domainFull),
-                HistoryEntry::getModificationTime))
+                RdapJsonFormatter.getLastHistoryByType(domainFull),
+                RdapJsonFormatter.HistoryTimeAndRegistrar::modificationTime))
         .containsExactlyEntriesIn(
             ImmutableMap.of(TRANSFER, DateTime.parse("1999-12-01T00:00:00.000Z")));
   }
@@ -481,7 +336,7 @@ class RdapJsonFormatterTest {
   }
 
   @Test
-  void testDomain_noNameserversNoTransfersMultipleRoleContact() {
+  void testDomain_noNameserversNoTransfers() {
     assertAboutJson()
         .that(
             rdapJsonFormatter

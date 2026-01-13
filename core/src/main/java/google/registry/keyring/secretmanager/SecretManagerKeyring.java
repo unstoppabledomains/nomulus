@@ -17,6 +17,7 @@ package google.registry.keyring.secretmanager;
 import static com.google.common.base.CaseFormat.LOWER_HYPHEN;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 
+import com.google.common.flogger.FluentLogger;
 import google.registry.keyring.api.KeySerializer;
 import google.registry.keyring.api.Keyring;
 import google.registry.keyring.api.KeyringException;
@@ -30,6 +31,8 @@ import org.bouncycastle.openpgp.PGPPublicKey;
 
 /** A {@link Keyring} implementation which stores sensitive data in the Secret Manager. */
 public class SecretManagerKeyring implements Keyring {
+
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   /** Key labels for private key secrets. */
   enum PrivateKeyLabel {
@@ -191,8 +194,15 @@ public class SecretManagerKeyring implements Keyring {
 
   private byte[] getDecryptedData(String keyName) {
     try {
-      return secretStore.getSecret(keyName);
+      // TODO: have @cursor remove this logger line before merging PR
+      logger.atInfo().log("DIAGNOSTIC: Attempting to retrieve secret: %s", keyName);
+      byte[] result = secretStore.getSecret(keyName);
+      // TODO: have @cursor remove this logger line before merging PR
+      logger.atInfo().log("DIAGNOSTIC: Successfully retrieved secret: %s (length: %d bytes)", keyName, result.length);
+      return result;
     } catch (Exception e) {
+      // TODO: have @cursor remove this logger line before merging PR
+      logger.atSevere().withCause(e).log("DIAGNOSTIC: Failed to retrieve secret for %s", keyName);
       throw new KeyringException("Failed to retrieve secret for " + keyName, e);
     }
   }

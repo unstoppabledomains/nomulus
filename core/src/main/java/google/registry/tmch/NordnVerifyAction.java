@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.FluentLogger;
 import com.google.common.io.ByteSource;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.ConflictException;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
@@ -51,7 +50,7 @@ import java.util.Map.Entry;
  *     http://tools.ietf.org/html/draft-lozano-tmch-func-spec-08#section-5.2.3.3</a>
  */
 @Action(
-    service = GaeService.BACKEND,
+    service = Action.Service.BACKEND,
     path = NordnVerifyAction.PATH,
     method = Action.Method.POST,
     automaticallyPrintOk = true,
@@ -113,7 +112,7 @@ public final class NordnVerifyAction implements Runnable {
       logger.atInfo().log(
           "LORDN verify task %s response: HTTP response code %d", actionLogId, responseCode);
       if (responseCode == SC_NO_CONTENT) {
-        // Send a 400+ status code so App Engine will retry the task.
+        // Send a 400+ status code so Cloud Tasks will retry the task.
         throw new ConflictException("Not ready");
       }
       if (responseCode != SC_OK) {

@@ -15,7 +15,6 @@ spec:
     spec:
       serviceAccountName: nomulus
       nodeSelector:
-        cloud.google.com/compute-class: "Performance"
         cloud.google.com/machine-family: c4
       containers:
       - name: frontend
@@ -25,8 +24,17 @@ spec:
           name: http
         resources:
           requests:
-            cpu: "100m"
-            memory: "1Gi"
+            # explicit pod-slots 0 is required in order to downgrade node
+            # class from performance, which has implicit pod-slots 1
+            cloud.google.com/pod-slots: 0
+            cpu: "600m"
+            memory: "2.3Gi"
+          limits:
+            # explicit pod-slots 0 is required in order to downgrade node
+            # class from performance, which has implicit pod-slots 1
+            cloud.google.com/pod-slots: 0
+            cpu: "1000m"
+            memory: "4Gi"
         args: [ENVIRONMENT]
         env:
         - name: POD_ID
@@ -50,8 +58,17 @@ spec:
           name: epp
         resources:
           requests:
-            cpu: "100m"
-            memory: "512Mi"
+            # explicit pod-slots 0 is required in order to downgrade node
+            # class from performance, which has implicit pod-slots 1
+            cloud.google.com/pod-slots: 0
+            cpu: "600m"
+            memory: "700Mi"
+          limits:
+            # explicit pod-slots 0 is required in order to downgrade node
+            # class from performance, which has implicit pod-slots 1
+            cloud.google.com/pod-slots: 0
+            cpu: "1000m"
+            memory: "2Gi"
         args: [--env, PROXY_ENV, --log, --local]
         env:
         - name: POD_ID
@@ -82,15 +99,15 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: frontend
-  minReplicas: 5
+  minReplicas: 16
   maxReplicas: 20
   metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 100
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
 ---
 apiVersion: v1
 kind: Service

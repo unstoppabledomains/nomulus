@@ -15,6 +15,7 @@
 package google.registry.tools;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
 import static google.registry.model.registrar.RegistrarPoc.Type.ABUSE;
 import static google.registry.model.registrar.RegistrarPoc.Type.ADMIN;
 import static google.registry.model.registrar.RegistrarPoc.Type.TECH;
@@ -22,9 +23,7 @@ import static google.registry.model.registrar.RegistrarPoc.Type.WHOIS;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.testing.DatabaseHelper.loadRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResources;
-import static google.registry.testing.DatabaseHelper.putInDb;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -60,7 +59,7 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
                             .setName("John Doe")
                             .setEmailAddress("john.doe@example.com")
                             .setTypes(ImmutableSet.of(ADMIN))
-                            .setVisibleInWhoisAsAdmin(true)
+                            .setVisibleInRdapAsAdmin(true)
                             .build())));
     runCommandForced("--mode=LIST", "--output=" + output, "NewRegistrar");
     assertThat(Files.readAllLines(Paths.get(output), UTF_8))
@@ -68,9 +67,9 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
             "John Doe",
             "john.doe@example.com",
             "Types: [ADMIN]",
-            "Visible in registrar WHOIS query as Admin contact: Yes",
-            "Visible in registrar WHOIS query as Technical contact: No",
-            "Phone number and email visible in domain WHOIS query as "
+            "Visible in registrar RDAP query as Admin contact: Yes",
+            "Visible in registrar RDAP query as Technical contact: No",
+            "Phone number and email visible in domain RDAP query as "
                 + "Registrar Abuse contact info: No");
   }
 
@@ -84,81 +83,81 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
                 .setName("Judith Doe")
                 .setEmailAddress("judith.doe@example.com")
                 .setTypes(ImmutableSet.of(WHOIS))
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(true)
-                .setVisibleInDomainWhoisAsAbuse(false)
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(true)
+                .setVisibleInDomainRdapAsAbuse(false)
                 .build());
-    persistSimpleResources(contacts);
+    persistResources(contacts);
     runCommandForced(
         "--mode=UPDATE",
         "--name=Judith Registrar",
         "--email=judith.doe@example.com",
-        "--registry_lock_email=judith.doe@external.com",
         "--phone=+1.2125650000",
         "--fax=+1.2125650001",
         "--contact_type=WHOIS",
-        "--visible_in_whois_as_admin=true",
-        "--visible_in_whois_as_tech=false",
-        "--visible_in_domain_whois_as_abuse=false",
+        "--visible_in_rdap_as_admin=true",
+        "--visible_in_rdap_as_tech=false",
+        "--visible_in_domain_rdap_as_abuse=false",
         "NewRegistrar");
     RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().get(1);
-    assertThat(registrarPoc)
-        .isEqualTo(
+    assertAboutImmutableObjects()
+        .that(registrarPoc)
+        .isEqualExceptFields(
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
                 .setName("Judith Registrar")
                 .setEmailAddress("judith.doe@example.com")
-                .setRegistryLockEmailAddress("judith.doe@external.com")
                 .setPhoneNumber("+1.2125650000")
                 .setFaxNumber("+1.2125650001")
                 .setTypes(ImmutableSet.of(WHOIS))
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(false)
-                .setVisibleInDomainWhoisAsAbuse(false)
-                .build());
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(false)
+                .setVisibleInDomainRdapAsAbuse(false)
+                .build(),
+            "id");
   }
 
   @Test
-  void testUpdate_unsetOtherWhoisAbuseFlags() throws Exception {
+  void testUpdate_unsetOtherRdapAbuseFlags() throws Exception {
     Registrar registrar = loadRegistrar("NewRegistrar");
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("John Doe")
             .setEmailAddress("john.doe@example.com")
             .build());
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("Johnna Doe")
             .setEmailAddress("johnna.doe@example.com")
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
     runCommandForced(
         "--mode=UPDATE",
         "--email=john.doe@example.com",
-        "--visible_in_domain_whois_as_abuse=true",
+        "--visible_in_domain_rdap_as_abuse=true",
         "NewRegistrar");
     ImmutableList<RegistrarPoc> registrarPocs =
         loadRegistrar("NewRegistrar").getContacts().asList();
     for (RegistrarPoc registrarPoc : registrarPocs) {
       if ("John Doe".equals(registrarPoc.getName())) {
-        assertThat(registrarPoc.getVisibleInDomainWhoisAsAbuse()).isTrue();
+        assertThat(registrarPoc.getVisibleInDomainRdapAsAbuse()).isTrue();
       } else {
-        assertThat(registrarPoc.getVisibleInDomainWhoisAsAbuse()).isFalse();
+        assertThat(registrarPoc.getVisibleInDomainRdapAsAbuse()).isFalse();
       }
     }
   }
 
   @Test
-  void testUpdate_cannotUnsetOnlyWhoisAbuseContact() {
+  void testUpdate_cannotUnsetOnlyRdapAbuseContact() {
     Registrar registrar = loadRegistrar("NewRegistrar");
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("John Doe")
             .setEmailAddress("john.doe@example.com")
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
     IllegalArgumentException thrown =
         assertThrows(
@@ -167,20 +166,20 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
                 runCommandForced(
                     "--mode=UPDATE",
                     "--email=john.doe@example.com",
-                    "--visible_in_domain_whois_as_abuse=false",
+                    "--visible_in_domain_rdap_as_abuse=false",
                     "NewRegistrar"));
     assertThat(thrown)
         .hasMessageThat()
-        .contains("Cannot clear visible_in_domain_whois_as_abuse flag");
+        .contains("Cannot clear visible_in_domain_rdap_as_abuse flag");
     RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().get(1);
-    assertThat(registrarPoc.getVisibleInDomainWhoisAsAbuse()).isTrue();
+    assertThat(registrarPoc.getVisibleInDomainRdapAsAbuse()).isTrue();
   }
 
   @Test
   void testUpdate_emptyCommandModifiesNothing() throws Exception {
     Registrar registrar = loadRegistrar("NewRegistrar");
     RegistrarPoc existingContact =
-        persistSimpleResource(
+        persistResource(
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
                 .setName("John Doe")
@@ -188,9 +187,9 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
                 .setPhoneNumber("123-456-7890")
                 .setFaxNumber("123-456-7890")
                 .setTypes(ImmutableSet.of(ADMIN, ABUSE))
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(true)
-                .setVisibleInDomainWhoisAsAbuse(true)
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(true)
+                .setVisibleInDomainRdapAsAbuse(true)
                 .build());
     runCommandForced("--mode=UPDATE", "--email=john.doe@example.com", "NewRegistrar");
     RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().get(1);
@@ -199,18 +198,18 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
     assertThat(registrarPoc.getPhoneNumber()).isEqualTo(existingContact.getPhoneNumber());
     assertThat(registrarPoc.getFaxNumber()).isEqualTo(existingContact.getFaxNumber());
     assertThat(registrarPoc.getTypes()).isEqualTo(existingContact.getTypes());
-    assertThat(registrarPoc.getVisibleInWhoisAsAdmin())
-        .isEqualTo(existingContact.getVisibleInWhoisAsAdmin());
-    assertThat(registrarPoc.getVisibleInWhoisAsTech())
-        .isEqualTo(existingContact.getVisibleInWhoisAsTech());
-    assertThat(registrarPoc.getVisibleInDomainWhoisAsAbuse())
-        .isEqualTo(existingContact.getVisibleInDomainWhoisAsAbuse());
+    assertThat(registrarPoc.getVisibleInRdapAsAdmin())
+        .isEqualTo(existingContact.getVisibleInRdapAsAdmin());
+    assertThat(registrarPoc.getVisibleInRdapAsTech())
+        .isEqualTo(existingContact.getVisibleInRdapAsTech());
+    assertThat(registrarPoc.getVisibleInDomainRdapAsAbuse())
+        .isEqualTo(existingContact.getVisibleInDomainRdapAsAbuse());
   }
 
   @Test
   void testUpdate_listOfTypesWorks() throws Exception {
     Registrar registrar = loadRegistrar("NewRegistrar");
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("John Doe")
@@ -218,9 +217,9 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
             .setPhoneNumber("123-456-7890")
             .setFaxNumber("123-456-7890")
             .setTypes(ImmutableSet.of(ADMIN, ABUSE))
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(true)
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
     runCommandForced(
         "--mode=UPDATE",
@@ -234,7 +233,7 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
   @Test
   void testUpdate_clearAllTypes() throws Exception {
     Registrar registrar = loadRegistrar("NewRegistrar");
-    persistSimpleResource(
+    persistResource(
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
             .setName("John Doe")
@@ -254,25 +253,25 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
         "--mode=CREATE",
         "--name=Jim Doe",
         "--email=jim.doe@example.com",
-        "--registry_lock_email=jim.doe@external.com",
         "--contact_type=ADMIN,ABUSE",
-        "--visible_in_whois_as_admin=true",
-        "--visible_in_whois_as_tech=false",
-        "--visible_in_domain_whois_as_abuse=true",
+        "--visible_in_rdap_as_admin=true",
+        "--visible_in_rdap_as_tech=false",
+        "--visible_in_domain_rdap_as_abuse=true",
         "NewRegistrar");
     RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().get(1);
-    assertThat(registrarPoc)
-        .isEqualTo(
+    assertAboutImmutableObjects()
+        .that(registrarPoc)
+        .isEqualExceptFields(
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
                 .setName("Jim Doe")
                 .setEmailAddress("jim.doe@example.com")
-                .setRegistryLockEmailAddress("jim.doe@external.com")
                 .setTypes(ImmutableSet.of(ADMIN, ABUSE))
-                .setVisibleInWhoisAsAdmin(true)
-                .setVisibleInWhoisAsTech(false)
-                .setVisibleInDomainWhoisAsAbuse(true)
-                .build());
+                .setVisibleInRdapAsAdmin(true)
+                .setVisibleInRdapAsTech(false)
+                .setVisibleInDomainRdapAsAbuse(true)
+                .build(),
+            "id");
   }
 
   @Test
@@ -283,16 +282,16 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
   }
 
   @Test
-  void testDelete_failsOnDomainWhoisAbuseContact() {
+  void testDelete_failsOnDomainRdapAbuseContact() {
     RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().getFirst();
-    putInDb(registrarPoc.asBuilder().setVisibleInDomainWhoisAsAbuse(true).build());
+    persistResource(registrarPoc.asBuilder().setVisibleInDomainRdapAsAbuse(true).build());
     IllegalArgumentException thrown =
         assertThrows(
             IllegalArgumentException.class,
             () ->
                 runCommandForced(
                     "--mode=DELETE", "--email=janedoe@theregistrar.com", "NewRegistrar"));
-    assertThat(thrown).hasMessageThat().contains("Cannot delete the domain WHOIS abuse contact");
+    assertThat(thrown).hasMessageThat().contains("Cannot delete the domain RDAP abuse contact");
     assertThat(loadRegistrar("NewRegistrar").getContacts()).isNotEmpty();
   }
 
@@ -313,87 +312,6 @@ class RegistrarPocCommandTest extends CommandTestCase<RegistrarPocCommand> {
     runCommandForced(
         "--mode=CREATE", "--name=Jim Doe", "--email=jim.doe@example.com", "NewRegistrar");
     assertThat(loadRegistrar("NewRegistrar").getContactsRequireSyncing()).isTrue();
-  }
-
-  @Test
-  void testCreate_setAllowedToSetRegistryLockPassword() throws Exception {
-    runCommandForced(
-        "--mode=CREATE",
-        "--name=Jim Doe",
-        "--email=jim.doe@example.com",
-        "--registry_lock_email=jim.doe.registry.lock@example.com",
-        "--allowed_to_set_registry_lock_password=true",
-        "NewRegistrar");
-    RegistrarPoc registrarPoc = loadRegistrar("NewRegistrar").getContacts().asList().get(1);
-    assertThat(registrarPoc.isAllowedToSetRegistryLockPassword()).isTrue();
-    registrarPoc.asBuilder().setRegistryLockPassword("foo");
-  }
-
-  @Test
-  void testUpdate_setAllowedToSetRegistryLockPassword() throws Exception {
-    Registrar registrar = loadRegistrar("NewRegistrar");
-    RegistrarPoc registrarPoc =
-        persistSimpleResource(
-            new RegistrarPoc.Builder()
-                .setRegistrar(registrar)
-                .setName("Jim Doe")
-                .setEmailAddress("jim.doe@example.com")
-                .build());
-    assertThat(registrarPoc.isAllowedToSetRegistryLockPassword()).isFalse();
-
-    // First, try (and fail) to set the password directly
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> registrarPoc.asBuilder().setRegistryLockPassword("foo"));
-
-    // Next, try (and fail) to allow registry lock without a registry lock email
-    assertThat(
-            assertThrows(
-                IllegalArgumentException.class,
-                () ->
-                    runCommandForced(
-                        "--mode=UPDATE",
-                        "--email=jim.doe@example.com",
-                        "--allowed_to_set_registry_lock_password=true",
-                        "NewRegistrar")))
-        .hasMessageThat()
-        .isEqualTo("Registry lock email must not be null if allowing registry lock access");
-
-    // Next, include the email and it should succeed
-    runCommandForced(
-        "--mode=UPDATE",
-        "--email=jim.doe@example.com",
-        "--registry_lock_email=jim.doe.registry.lock@example.com",
-        "--allowed_to_set_registry_lock_password=true",
-        "NewRegistrar");
-    RegistrarPoc newContact = reloadResource(registrarPoc);
-    assertThat(newContact.isAllowedToSetRegistryLockPassword()).isTrue();
-    // should be allowed to set the password now
-    newContact.asBuilder().setRegistryLockPassword("foo");
-  }
-
-  @Test
-  void testUpdate_setAllowedToSetRegistryLockPassword_removesOldPassword() throws Exception {
-    Registrar registrar = loadRegistrar("NewRegistrar");
-    RegistrarPoc registrarPoc =
-        persistSimpleResource(
-            new RegistrarPoc.Builder()
-                .setRegistrar(registrar)
-                .setName("Jim Doe")
-                .setEmailAddress("jim.doe@example.com")
-                .setRegistryLockEmailAddress("jim.doe.registry.lock@example.com")
-                .setAllowedToSetRegistryLockPassword(true)
-                .setRegistryLockPassword("hi")
-                .build());
-    assertThat(registrarPoc.verifyRegistryLockPassword("hi")).isTrue();
-    assertThat(registrarPoc.verifyRegistryLockPassword("hello")).isFalse();
-    runCommandForced(
-        "--mode=UPDATE",
-        "--email=jim.doe@example.com",
-        "--allowed_to_set_registry_lock_password=true",
-        "NewRegistrar");
-    registrarPoc = reloadResource(registrarPoc);
-    assertThat(registrarPoc.verifyRegistryLockPassword("hi")).isFalse();
   }
 
   @Test

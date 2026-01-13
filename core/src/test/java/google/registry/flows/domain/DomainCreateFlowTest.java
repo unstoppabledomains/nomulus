@@ -25,6 +25,7 @@ import static google.registry.model.billing.BillingBase.Flag.SUNRISE;
 import static google.registry.model.billing.BillingBase.RenewalPriceBehavior.NONPREMIUM;
 import static google.registry.model.billing.BillingBase.RenewalPriceBehavior.SPECIFIED;
 import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
+import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_PROHIBITED;
 import static google.registry.model.common.FeatureFlag.FeatureStatus.ACTIVE;
 import static google.registry.model.common.FeatureFlag.FeatureStatus.INACTIVE;
 import static google.registry.model.domain.fee.Fee.FEE_EXTENSION_URIS;
@@ -132,7 +133,7 @@ import google.registry.flows.domain.DomainFlowUtils.NameserversNotAllowedForTldE
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedForTldWithNameserverAllowListException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.PremiumNameBlockedException;
-import google.registry.flows.domain.DomainFlowUtils.RegistrantNotAllowedException;
+import google.registry.flows.domain.DomainFlowUtils.RegistrantProhibitedException;
 import google.registry.flows.domain.DomainFlowUtils.RegistrarMustBeActiveForThisOperationException;
 import google.registry.flows.domain.DomainFlowUtils.TldDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyDsRecordsException;
@@ -145,8 +146,8 @@ import google.registry.flows.domain.token.AllocationTokenFlowUtils.AllocationTok
 import google.registry.flows.domain.token.AllocationTokenFlowUtils.AllocationTokenNotValidForRegistrarException;
 import google.registry.flows.domain.token.AllocationTokenFlowUtils.AlreadyRedeemedAllocationTokenException;
 import google.registry.flows.domain.token.AllocationTokenFlowUtils.NonexistentAllocationTokenException;
+import google.registry.flows.exceptions.ContactsProhibitedException;
 import google.registry.flows.exceptions.OnlyToolCanPassMetadataException;
-import google.registry.flows.exceptions.ResourceAlreadyExistsForThisClientException;
 import google.registry.flows.exceptions.ResourceCreateContentionException;
 import google.registry.model.billing.BillingBase;
 import google.registry.model.billing.BillingBase.Flag;
@@ -176,6 +177,7 @@ import google.registry.model.reporting.DomainTransactionRecord;
 import google.registry.model.reporting.DomainTransactionRecord.TransactionReportField;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.reporting.HistoryEntry.HistoryEntryId;
+import google.registry.model.smd.SignedMarkRevocationListDao;
 import google.registry.model.tld.Tld;
 import google.registry.model.tld.Tld.TldState;
 import google.registry.model.tld.Tld.TldType;
@@ -246,12 +248,6 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
                     "test-and-validate,NAME_COLLISION",
                     "badcrash,NAME_COLLISION"),
                 persistReservedList("global-list", "resdom,FULLY_BLOCKED"))
-            .build());
-    persistResource(
-        new FeatureFlag()
-            .asBuilder()
-            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .setStatusMap(ImmutableSortedMap.of(START_OF_TIME, INACTIVE))
             .build());
     persistClaimsList(ImmutableMap.of("example-one", CLAIMS_KEY, "test-validate", CLAIMS_KEY));
   }
@@ -1240,8 +1236,8 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   void testFailure_alreadyExists() throws Exception {
     persistContactsAndHosts();
     persistActiveDomain(getUniqueIdFromCommand());
-    ResourceAlreadyExistsForThisClientException thrown =
-        assertThrows(ResourceAlreadyExistsForThisClientException.class, this::runFlow);
+    ResourceCreateContentionException thrown =
+        assertThrows(ResourceCreateContentionException.class, this::runFlow);
     assertAboutEppExceptions()
         .that(thrown)
         .marshalsToXml()
@@ -2104,8 +2100,8 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   @Test
   void testSuccess_minimumDatasetPhase1_missingRegistrant() throws Exception {
     persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
             .setStatusMap(
                 ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
             .build());
@@ -2113,6 +2109,20 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
     persistContactsAndHosts();
     runFlowAssertResponse(
         loadFile("domain_create_response.xml", ImmutableMap.of("DOMAIN", "example.tld")));
+  }
+
+  @Test
+  void testFailure_minimumDatasetPhase2_noRegistrantButSomeOtherContactTypes() throws Exception {
+    persistResource(
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_PROHIBITED)
+            .setStatusMap(
+                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
+            .build());
+    setEppInput("domain_create_missing_registrant.xml");
+    persistContactsAndHosts();
+    EppException thrown = assertThrows(ContactsProhibitedException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
@@ -2126,8 +2136,8 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   @Test
   void testSuccess_minimumDatasetPhase1_missingAdmin() throws Exception {
     persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
             .setStatusMap(
                 ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
             .build());
@@ -2135,6 +2145,20 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
     persistContactsAndHosts();
     runFlowAssertResponse(
         loadFile("domain_create_response.xml", ImmutableMap.of("DOMAIN", "example.tld")));
+  }
+
+  @Test
+  void testFailure_minimumDatasetPhase2_registrantAndOtherContactsSent() throws Exception {
+    persistResource(
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_PROHIBITED)
+            .setStatusMap(
+                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
+            .build());
+    setEppInput("domain_create_missing_admin.xml");
+    persistContactsAndHosts();
+    EppException thrown = assertThrows(RegistrantProhibitedException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
@@ -2148,8 +2172,8 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   @Test
   void testSuccess_minimumDatasetPhase1_missingTech() throws Exception {
     persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
             .setStatusMap(
                 ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
             .build());
@@ -2170,12 +2194,40 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   @Test
   void testSuccess_minimumDatasetPhase1_missingNonRegistrantContacts() throws Exception {
     persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
             .setStatusMap(
                 ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
             .build());
     setEppInput("domain_create_missing_non_registrant_contacts.xml");
+    persistContactsAndHosts();
+    runFlowAssertResponse(
+        loadFile("domain_create_response.xml", ImmutableMap.of("DOMAIN", "example.tld")));
+  }
+
+  @Test
+  void testFailure_minimumDatasetPhase2_registrantNotPermitted() throws Exception {
+    persistResource(
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_PROHIBITED)
+            .setStatusMap(
+                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
+            .build());
+    setEppInput("domain_create_missing_non_registrant_contacts.xml");
+    persistContactsAndHosts();
+    EppException thrown = assertThrows(RegistrantProhibitedException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
+  }
+
+  @Test
+  void testSuccess_minimumDatasetPhase2_noContactsWhatsoever() throws Exception {
+    persistResource(
+        new FeatureFlag.Builder()
+            .setFeatureName(MINIMUM_DATASET_CONTACTS_PROHIBITED)
+            .setStatusMap(
+                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
+            .build());
+    setEppInput("domain_create_no_contacts.xml");
     persistContactsAndHosts();
     runFlowAssertResponse(
         loadFile("domain_create_response.xml", ImmutableMap.of("DOMAIN", "example.tld")));
@@ -2674,8 +2726,9 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFail_startDateSunriseRegistration_revokedSignedMark() throws Exception {
-    SmdrlCsvParser.parse(TmchTestData.loadFile("smd/smdrl.csv").lines().collect(toImmutableList()))
-        .save();
+    SignedMarkRevocationListDao.save(
+        SmdrlCsvParser.parse(
+            TmchTestData.loadFile("smd/smdrl.csv").lines().collect(toImmutableList())));
     createTld("tld", START_DATE_SUNRISE);
     clock.setTo(SMD_VALID_TIME);
     String revokedSmd =
@@ -2700,9 +2753,9 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
     if (labels.isEmpty()) {
       return;
     }
-    SmdrlCsvParser.parse(
-            TmchTestData.loadFile("idn/idn_smdrl.csv").lines().collect(toImmutableList()))
-        .save();
+    SignedMarkRevocationListDao.save(
+        SmdrlCsvParser.parse(
+            TmchTestData.loadFile("idn/idn_smdrl.csv").lines().collect(toImmutableList())));
     createTld("tld", START_DATE_SUNRISE);
     clock.setTo(SMD_VALID_TIME);
     String revokedSmd =
@@ -2786,20 +2839,6 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
   }
 
   @Test
-  void testFailure_registrantNotAllowListed() {
-    persistActiveContact("someone");
-    persistContactsAndHosts();
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("someone"))
-            .build());
-    RegistrantNotAllowedException thrown =
-        assertThrows(RegistrantNotAllowedException.class, this::runFlow);
-    assertThat(thrown).hasMessageThat().contains("jd1234");
-  }
-
-  @Test
   void testFailure_nameserverNotAllowListed() {
     persistContactsAndHosts();
     persistResource(
@@ -2825,19 +2864,6 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
         assertThrows(
             NameserversNotSpecifiedForTldWithNameserverAllowListException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testSuccess_nameserverAndRegistrantAllowListed() throws Exception {
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("jd1234"))
-            .setAllowedFullyQualifiedHostNames(
-                ImmutableSet.of("ns1.example.net", "ns2.example.net"))
-            .build());
-    persistContactsAndHosts();
-    doSuccessfulTest();
   }
 
   @Test

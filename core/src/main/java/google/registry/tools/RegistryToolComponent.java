@@ -23,10 +23,7 @@ import google.registry.config.CloudTasksUtilsModule;
 import google.registry.config.CredentialModule.LocalCredentialJson;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryConfig.ConfigModule;
-import google.registry.dns.writer.VoidDnsWriterModule;
-import google.registry.dns.writer.clouddns.CloudDnsWriterModule;
-import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
-import google.registry.dns.writer.powerdns.PowerDnsWriterModule;
+import google.registry.dns.writer.DnsWritersModule;
 import google.registry.keyring.KeyringModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.model.ModelModule;
@@ -40,7 +37,6 @@ import google.registry.request.Modules.GsonModule;
 import google.registry.request.Modules.UrlConnectionServiceModule;
 import google.registry.tools.AuthModule.LocalCredentialModule;
 import google.registry.util.UtilsModule;
-import google.registry.whois.NonCachingWhoisModule;
 import jakarta.inject.Singleton;
 import javax.annotation.Nullable;
 
@@ -57,10 +53,8 @@ import javax.annotation.Nullable;
       BatchModule.class,
       BigqueryModule.class,
       ConfigModule.class,
-      CloudDnsWriterModule.class,
       CloudTasksUtilsModule.class,
-      DnsUpdateWriterModule.class,
-      PowerDnsWriterModule.class,
+      DnsWritersModule.class,
       GsonModule.class,
       KeyModule.class,
       KeyringModule.class,
@@ -72,9 +66,7 @@ import javax.annotation.Nullable;
       RequestFactoryModule.class,
       SecretManagerModule.class,
       UrlConnectionServiceModule.class,
-      UtilsModule.class,
-      VoidDnsWriterModule.class,
-      NonCachingWhoisModule.class
+      UtilsModule.class
     })
 interface RegistryToolComponent {
   void inject(AckPollMessagesCommand command);
@@ -143,6 +135,8 @@ interface RegistryToolComponent {
 
   void inject(PendingEscrowCommand command);
 
+  void inject(RdapQueryCommand command);
+
   void inject(RenewDomainCommand command);
 
   void inject(SaveSqlCredentialCommand command);
@@ -169,8 +163,6 @@ interface RegistryToolComponent {
 
   void inject(ValidateLoginCredentialsCommand command);
 
-  void inject(WhoisQueryCommand command);
-
   ServiceConnection serviceConnection();
 
   @LocalCredentialJson
@@ -189,9 +181,6 @@ interface RegistryToolComponent {
 
     @BindsInstance
     Builder sqlAccessInfoFile(@Nullable @Config("sqlAccessInfoFile") String sqlAccessInfoFile);
-
-    @BindsInstance
-    Builder useGke(@Config("useGke") boolean useGke);
 
     @BindsInstance
     Builder useCanary(@Config("useCanary") boolean useCanary);

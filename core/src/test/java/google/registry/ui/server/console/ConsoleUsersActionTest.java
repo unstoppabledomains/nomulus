@@ -29,14 +29,11 @@ import com.google.api.services.directory.Directory.Users.Delete;
 import com.google.api.services.directory.Directory.Users.Insert;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.Gson;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.RegistrarRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.persistence.VKey;
-import google.registry.persistence.transaction.JpaTestExtensions;
-import google.registry.request.RequestModule;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.CloudTasksHelper;
 import google.registry.testing.ConsoleApiParamsUtils;
@@ -53,11 +50,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
-class ConsoleUsersActionTest {
-
-  private static final Gson GSON = RequestModule.provideGson();
+class ConsoleUsersActionTest extends ConsoleActionBaseTestCase {
 
   private final Directory directory = mock(Directory.class);
   private final Users users = mock(Users.class);
@@ -69,12 +63,6 @@ class ConsoleUsersActionTest {
 
   private StringGenerator passwordGenerator =
       new DeterministicStringGenerator("abcdefghijklmnopqrstuvwxyz");
-
-  private ConsoleApiParams consoleApiParams;
-
-  @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().buildIntegrationTestExtension();
 
   @BeforeEach
   void beforeEach() {
@@ -130,7 +118,6 @@ class ConsoleUsersActionTest {
             Optional.of("GET"),
             Optional.empty());
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getPayload())
         .isEqualTo(
             "[{\"emailAddress\":\"test1@test.com\",\"role\":\"PRIMARY_CONTACT\"},{\"emailAddress\":\"test2@test.com\",\"role\":\"PRIMARY_CONTACT\"}]");
@@ -155,7 +142,6 @@ class ConsoleUsersActionTest {
             Optional.of("GET"),
             Optional.empty());
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
   }
 
@@ -167,12 +153,11 @@ class ConsoleUsersActionTest {
         createAction(
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("POST"),
-            Optional.of(new UserData("a@d", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+            Optional.of(new UserData("a@d", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     when(directory.users()).thenReturn(users);
     when(users.insert(any(com.google.api.services.directory.model.User.class))).thenReturn(insert);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
     assertThat(response.getPayload()).contains("Email prefix is invalid");
   }
@@ -185,12 +170,30 @@ class ConsoleUsersActionTest {
         createAction(
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("POST"),
-            Optional.of(new UserData("lol", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+            Optional.of(new UserData("lol", null, RegistrarRole.TECH_CONTACT.name(), null)));
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     when(directory.users()).thenReturn(users);
     when(users.insert(any(com.google.api.services.directory.model.User.class))).thenReturn(insert);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
+    assertThat(response.getStatus()).isEqualTo(SC_CREATED);
+    assertThat(response.getPayload())
+        .contains(
+            "{\"emailAddress\":\"lol.TheRegistrar@email.com\",\"role\":\"TECH_CONTACT\",\"password\":\"abcdefghijklmnop\"}");
+  }
+
+  @Test
+  void testSuccess_roleEnforcementCreate() throws IOException {
+    User user = DatabaseHelper.createAdminUser("email@email.com");
+    AuthResult authResult = AuthResult.createUser(user);
+    ConsoleUsersAction action =
+        createAction(
+            Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
+            Optional.of("POST"),
+            Optional.of(new UserData("lol", null, RegistrarRole.PRIMARY_CONTACT.name(), null)));
+    action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
+    when(directory.users()).thenReturn(users);
+    when(users.insert(any(com.google.api.services.directory.model.User.class))).thenReturn(insert);
+    action.run();
     assertThat(response.getStatus()).isEqualTo(SC_CREATED);
     assertThat(response.getPayload())
         .contains(
@@ -211,11 +214,11 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("DELETE"),
             Optional.of(
-                new UserData("test3@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test3@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     when(directory.users()).thenReturn(users);
     when(users.delete(any(String.class))).thenReturn(delete);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
     assertThat(response.getPayload())
         .contains("Can't update user not associated with registrarId TheRegistrar");
@@ -230,11 +233,11 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("DELETE"),
             Optional.of(
-                new UserData("email-1@email.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "email-1@email.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     when(directory.users()).thenReturn(users);
     when(users.delete(any(String.class))).thenReturn(delete);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
     assertThat(response.getPayload()).contains("User email-1@email.com doesn't exist");
   }
@@ -253,12 +256,12 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("DELETE"),
             Optional.of(
-                new UserData("test2@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test2@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     when(directory.users()).thenReturn(users);
     when(users.delete(any(String.class))).thenReturn(delete);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     assertThat(DatabaseHelper.loadByKeyIfPresent(VKey.create(User.class, "test2@test.com")))
         .isEmpty();
@@ -293,13 +296,13 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("DELETE"),
             Optional.of(
-                new UserData("test4@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test4@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
 
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     when(directory.users()).thenReturn(users);
     when(users.delete(any(String.class))).thenReturn(delete);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     Optional<User> actualUser =
         DatabaseHelper.loadByKeyIfPresent(VKey.create(User.class, "test4@test.com"));
@@ -338,12 +341,12 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("POST"),
             Optional.of(
-                new UserData("test3@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test3@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     when(directory.users()).thenReturn(users);
     when(users.insert(any(com.google.api.services.directory.model.User.class))).thenReturn(insert);
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
     assertThat(response.getPayload()).contains("Total users amount per registrar is limited to 4");
   }
@@ -369,10 +372,10 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("PUT"),
             Optional.of(
-                new UserData("test2@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test2@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     action.cloudTasksUtils = cloudTasksHelper.getTestCloudTasksUtils();
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     assertThat(
             DatabaseHelper.loadByKey(VKey.create(User.class, "test2@test.com"))
@@ -396,9 +399,9 @@ class ConsoleUsersActionTest {
             Optional.of(ConsoleApiParamsUtils.createFake(authResult)),
             Optional.of("PUT"),
             Optional.of(
-                new UserData("test3@test.com", RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
+                new UserData(
+                    "test3@test.com", null, RegistrarRole.ACCOUNT_MANAGER.toString(), null)));
     action.run();
-    var response = ((FakeResponse) consoleApiParams.response());
     assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
     assertThat(response.getPayload())
         .contains("Can't update user not associated with registrarId TheRegistrar");
@@ -413,6 +416,7 @@ class ConsoleUsersActionTest {
         maybeConsoleApiParams.orElseGet(
             () -> ConsoleApiParamsUtils.createFake(AuthResult.NOT_AUTHENTICATED));
     when(consoleApiParams.request().getMethod()).thenReturn(method.orElse("GET"));
+    response = (FakeResponse) consoleApiParams.response();
     return new ConsoleUsersAction(
         consoleApiParams,
         directory,

@@ -1,0 +1,103 @@
+# This will create a docker image named gcr.io/[PROJECT_ID]/proxy:[TAG] locally.
+# The PROJECT_ID is the current project name that gcloud uses.
+#
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-proxy.yaml --substitutions TAG_NAME=[TAG] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+steps:
+# Check the out internal repo. 
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-secrets
+    if [ "${_NOMULUS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
+      cd nomulus-secrets
+      git checkout "${_NOMULUS_SECRETS_COMMIT_SHA}"
+      cd ..
+    fi
+- id: Merge-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    echo "=== Merge-Internal-Repo Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Contents of nomulus-secrets directory:"
+    ls -la nomulus-secrets/ || echo "nomulus-secrets directory not found"
+    shopt -s dotglob
+    echo "Removing .git directories..."
+    rm -rf .git && rm -rf nomulus-secrets/.git
+    echo "Copying files from nomulus-secrets..."
+    cp -rf nomulus-secrets/* .
+    echo "Files copied. Current directory contents:"
+    ls -la
+    echo "Removing nomulus-secrets directory..."
+    rm -rf nomulus-secrets
+    echo "=== Displaying nomulus-config file for ${_ENV} ==="
+    config_file="core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    if [ -f "$config_file" ]; then
+      echo "Found config file: $config_file"
+      cat "$config_file"
+      echo "---"
+    else
+      echo "No nomulus-config file found for ${_ENV}: $config_file"
+    fi
+    echo "=== End Merge-Internal-Repo Debug ==="
+# Deploy Nomulus services to GKE.
+- id: Deploy-Nomulus-Services
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ -z "${_BASE_DOMAIN}" ]; then
+      base_domain=$(grep baseDomain \
+        ./core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml | \
+        awk '{print $2}')
+    else
+      base_domain="${_BASE_DOMAIN}"
+    fi
+    ./deploy-nomulus-for-env.sh ${_ENV} ${base_domain}
+  dir: 'jetty'
+# Deploy Proxy to GKE.
+- id: Deploy-Proxy
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    ./deploy-proxy-for-env.sh ${_ENV}
+  dir: 'proxy'
+timeout: 3600s
+options:
+  pool: 
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+
+substitutions:
+  _ENV: crash
+  _BASE_DOMAIN: "BASE_DOMAIN_DEFAULT_FROM_CLOUDBUILD"
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-crash-nomulus-deploy-cloudbuild-logs"
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _NOMULUS_SECRETS_COMMIT_SHA: HEAD
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+    env: GITHUB_OAUTH_TOKEN

@@ -15,12 +15,10 @@
 package google.registry.model.contact;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
 import static google.registry.testing.ContactSubject.assertAboutContacts;
 import static google.registry.testing.DatabaseHelper.cloneAndSetAutoTimestamps;
 import static google.registry.testing.DatabaseHelper.createTld;
-import static google.registry.testing.DatabaseHelper.insertInDb;
 import static google.registry.testing.DatabaseHelper.loadByEntity;
 import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.testing.SqlHelper.assertThrowForeignKeyViolation;
@@ -30,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.EntityTestCase;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.contact.Disclose.PostalInfoChoice;
 import google.registry.model.contact.PostalInfo.Type;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
@@ -132,7 +131,7 @@ public class ContactTest extends EntityTestCase {
   void testCloudSqlPersistence_failWhenViolateForeignKeyConstraint() {
     assertThrowForeignKeyViolation(
         () ->
-            insertInDb(
+            persistResource(
                 originalContact
                     .asBuilder()
                     .setRepoId("2-FOOBAR")
@@ -159,14 +158,17 @@ public class ContactTest extends EntityTestCase {
 
   @Test
   void testPersistence() {
-    assertThat(loadByForeignKey(Contact.class, contact.getForeignKey(), fakeClock.nowUtc()))
+    assertThat(
+            ForeignKeyUtils.loadResource(
+                Contact.class, contact.getForeignKey(), fakeClock.nowUtc()))
         .hasValue(contact);
   }
 
   @Test
   void testSerializable() {
     Contact persisted =
-        loadByForeignKey(Contact.class, contact.getForeignKey(), fakeClock.nowUtc()).get();
+        ForeignKeyUtils.loadResource(Contact.class, contact.getForeignKey(), fakeClock.nowUtc())
+            .get();
     assertThat(SerializeUtils.serializeDeserialize(persisted)).isEqualTo(persisted);
   }
 

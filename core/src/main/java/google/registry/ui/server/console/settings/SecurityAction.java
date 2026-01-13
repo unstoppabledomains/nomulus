@@ -29,8 +29,7 @@ import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.request.auth.AuthenticatedRegistrarAccessor;
@@ -39,10 +38,10 @@ import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = SecurityAction.PATH,
     method = {POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
@@ -86,10 +85,15 @@ public class SecurityAction extends ConsoleApiAction {
 
   private void setResponse(Registrar savedRegistrar) {
     Registrar registrarParameter = registrar.get();
-    Registrar.Builder updatedRegistrarBuilder =
-        savedRegistrar
-            .asBuilder()
-            .setIpAddressAllowList(registrarParameter.getIpAddressAllowList());
+    Registrar.Builder updatedRegistrarBuilder = savedRegistrar.asBuilder();
+    StringJoiner updates = new StringJoiner(",");
+
+    if (!savedRegistrar
+        .getIpAddressAllowList()
+        .equals(registrarParameter.getIpAddressAllowList())) {
+      updatedRegistrarBuilder.setIpAddressAllowList(registrarParameter.getIpAddressAllowList());
+      updates.add("IP_CHANGE");
+    }
 
     try {
       if (!savedRegistrar
@@ -99,6 +103,7 @@ public class SecurityAction extends ConsoleApiAction {
           String newClientCert = registrarParameter.getClientCertificate().get();
           certificateChecker.validateCertificate(newClientCert);
           updatedRegistrarBuilder.setClientCertificate(newClientCert, tm().getTransactionTime());
+          updates.add("PRIMARY_SSL_CERT_CHANGE");
         }
       }
       if (!savedRegistrar
@@ -109,10 +114,11 @@ public class SecurityAction extends ConsoleApiAction {
           certificateChecker.validateCertificate(newFailoverCert);
           updatedRegistrarBuilder.setFailoverClientCertificate(
               newFailoverCert, tm().getTransactionTime());
+          updates.add("FAILOVER_SSL_CERT_CHANGE");
         }
       }
     } catch (InsecureCertificateException e) {
-      setFailedResponse("Invalid certificate in parameter", SC_BAD_REQUEST);
+      setFailedResponse(e.getMessage(), SC_BAD_REQUEST);
       return;
     }
 
@@ -121,7 +127,9 @@ public class SecurityAction extends ConsoleApiAction {
     finishAndPersistConsoleUpdateHistory(
         new ConsoleUpdateHistory.Builder()
             .setType(ConsoleUpdateHistory.Type.REGISTRAR_SECURITY_UPDATE)
-            .setDescription(registrarId));
+            .setDescription(
+                String.format(
+                    "%s%s%s", registrarId, ConsoleUpdateHistory.DESCRIPTION_SEPARATOR, updates)));
 
     sendExternalUpdatesIfNecessary(
         EmailInfo.create(savedRegistrar, updatedRegistrar, ImmutableSet.of(), ImmutableSet.of()));

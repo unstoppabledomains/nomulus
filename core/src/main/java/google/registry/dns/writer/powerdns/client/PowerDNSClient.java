@@ -93,8 +93,11 @@ public class PowerDNSClient {
 
   private String bodyToString(final RequestBody requestBody) throws IOException {
     try (Buffer buffer = new Buffer()) {
-      if (requestBody != null) requestBody.writeTo(buffer);
-      else return "";
+      if (requestBody != null) {
+        requestBody.writeTo(buffer);
+      } else {
+        return "";
+      }
       return buffer.readUtf8();
     }
   }

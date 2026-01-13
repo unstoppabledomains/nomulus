@@ -181,7 +181,7 @@ public final class DomainCheckFlow implements TransactionalFlow {
             .setAsOfDate(now)
             .build());
     ImmutableMap<String, VKey<Domain>> existingDomains =
-        ForeignKeyUtils.load(Domain.class, domainNames, now);
+        ForeignKeyUtils.loadKeys(Domain.class, domainNames, now);
     // Check block labels only when there are unregistered domains, since "In use" goes before
     // "Blocked by BSA".
     ImmutableSet<InternetDomainName> bsaBlockedDomainNames =
@@ -432,7 +432,7 @@ public final class DomainCheckFlow implements TransactionalFlow {
             .filter(existingDomains::containsKey)
             .collect(toImmutableMap(d -> d, existingDomains::get));
     ImmutableMap<VKey<? extends EppResource>, EppResource> loadedDomains =
-        EppResource.loadCached(ImmutableList.copyOf(existingDomainsToLoad.values()));
+        EppResource.loadByCacheIfEnabled(ImmutableList.copyOf(existingDomainsToLoad.values()));
     return ImmutableMap.copyOf(
         Maps.transformEntries(existingDomainsToLoad, (k, v) -> (Domain) loadedDomains.get(v)));
   }

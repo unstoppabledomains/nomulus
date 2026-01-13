@@ -1,0 +1,353 @@
+# To manually trigger a build on GCB, run:
+# gcloud builds submit --config cloudbuild-nomulus.yaml --substitutions TAG_NAME=[TAG] ..
+#
+# To trigger a build automatically, follow the instructions below and add a trigger:
+# https://cloud.google.com/cloud-build/docs/running-builds/automate-builds
+steps:
+# Check the out internal repo. 
+- id: Clone-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  secretEnv:
+    - GITHUB_OAUTH_TOKEN
+  args:
+  - -c
+  - |
+    set -e
+    git config --global credential.helper store
+    echo "https://oauth2:$$GITHUB_OAUTH_TOKEN@github.com" > ~/.git-credentials
+    git clone https://github.com/unstoppabledomains/nomulus-secrets.git nomulus-internal
+    if [ "${_NOMULUS_SECRETS_COMMIT_SHA}" != "HEAD" ]; then
+      cd nomulus-internal
+      git checkout "${_NOMULUS_SECRETS_COMMIT_SHA}"
+      cd ..
+    fi
+# Merge the repos. 
+- id: Merge-Internal-Repo
+  name: 'gcr.io/cloud-builders/git'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    echo "=== Merge-Internal-Repo Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Contents of nomulus-internal directory:"
+    ls -la nomulus-internal/ || echo "nomulus-internal directory not found"
+    shopt -s dotglob
+    echo "Removing .git directories..."
+    rm -rf .git && rm -rf nomulus-internal/.git
+    echo "Copying files from nomulus-internal..."
+    cp -rf nomulus-internal/* .
+    echo "Files copied. Current directory contents:"
+    ls -la
+    echo "Removing nomulus-internal directory..."
+    rm -rf nomulus-internal
+    echo "=== Displaying nomulus-config file for ${_ENV} ==="
+    config_file="core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml"
+    if [ -f "$config_file" ]; then
+      echo "Found config file: $config_file"
+      cat "$config_file"
+      echo "---"
+    else
+      echo "No nomulus-config file found for ${_ENV}: $config_file"
+    fi
+    echo "=== End Merge-Internal-Repo Debug ==="
+# Create a directory to store the artifacts
+- id: Create-Nomulus-Directory
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  args: ['mkdir', 'nomulus']
+# Run tests
+- id: Run-Tests
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  # Set home for Gradle caches. Must be consistent with last step below
+  # and ./build_nomulus_for_env.sh
+  # Optimized for e2-highcpu-32: 32 vCPU, 16 cores, 32 GB RAM
+  env: 
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'GRADLE_OPTS=-Xmx16g -XX:MaxMetaspaceSize=2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ParallelRefProcEnabled'
+    - '_UD_FAST_BUILD=${_UD_FAST_BUILD}'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ "$${_UD_FAST_BUILD}" = "true" ]; then
+      echo "Skipping tests (fast build mode enabled)"
+      exit 0
+    fi
+    ./gradlew test \
+      -PskipDockerIncompatibleTests=true \
+      -PmavenUrl=https://repo.maven.apache.org/maven2 \
+      -PpluginsUrl=https://plugins.gradle.org/m2 \
+      --max-workers=28
+# Replace secrets in config file
+- id: Replace-Config-Secrets
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    # Access secrets from Secret Manager
+    POWER_DNS_API_KEY=$(gcloud secrets versions access latest --secret="power-dns-api-key")
+    OAUTH_SECRET=$(gcloud secrets versions access latest --secret="oauth-client-secret-nomulus-${_ENV}-desktop")
+    CLOUD_SQL_INSTANCE_CONNECTION_NAME=$(gcloud secrets versions access latest --secret="keyring-sql-primary-conn-name")
+  
+    # Replace the placeholders in the config file
+    sed -i "s|{POWER_DNS_API_KEY}|$${POWER_DNS_API_KEY}|g" \
+      core/src/main/java/google/registry/config/files/power-dns/env-${_ENV}.yaml
+    sed -i "s|{CLOUD_SQL_INSTANCE_CONNECTION_NAME}|$${CLOUD_SQL_INSTANCE_CONNECTION_NAME}|g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+    sed -i "s/{OAUTH_CLIENT_SECRET}/$${OAUTH_SECRET}/g" \
+      core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml
+# Build and package the deployment files for each environment, and the tool
+# binary and image.
+- id: Build-Deployment-Files
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  # Set home for Gradle caches. Must be consistent with last step below
+  # and ./build_nomulus_for_env.sh
+  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    for _env in tool ${_ENV}
+    do
+      release/build_nomulus_for_env.sh $${_env} output
+    done
+# Save TAG_NAME in ./output/tag_name, to be uploaded later. This file is purely
+# informational. It makes it easier to tell the tag of the current 'live' release.
+- id: Save-Tag-Name
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args: [ '-c', 'echo ${COMMIT_SHA} > output/tag_name' ]
+# TODO: determine if we want to deploy cloud scheduler and tasks during the build, or should we do it during the ud-cloudbuild-deploy-gke.yaml ?
+# Create/Update cloud scheduler and cloud tasks based on a cloud-scheduler-tasks.xml
+- id: Create-Cloud-Scheduler-Tasks
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    if [ ${_ENV} == production ]; then
+      project_id="ud-registry"
+    elif [ ${_ENV} == sandbox ]; then
+      project_id="ud-registry-sandbox-gke"
+    else
+      project_id="ud-registry-${_ENV}"
+    fi
+    echo "Deploying Cloud Scheduler and Cloud Tasks"
+    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-${_ENV}.xml $project_id
+    deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/cloud-tasks-queue.xml $project_id
+## Build Nomulus, tool and proxy image, them upload them to GCR.
+- id: Build-Nomulus-Tool-Image-And-Push
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  # Set home for Gradle caches. Must be consistent with last step below
+  # and ./build_nomulus_for_env.sh
+  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    ./gradlew :jetty:buildNomulusImage :proxy:buildProxyImage :core:buildToolImage\
+      -PmavenUrl=https://repo.maven.apache.org/maven2 \
+      -PpluginsUrl=https://plugins.gradle.org/m2
+    docker tag nomulus $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}
+    docker tag nomulus $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:latest
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker tag proxy $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:latest
+    docker tag nomulus-tool $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:${COMMIT_SHA}
+    docker tag nomulus-tool $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:latest
+
+# TODO: we will sign and attest these, but need to determine if we want to enforce this on teh GKE cluster
+# When Binary Authorization is enabled on a GKE cluster, it checks for attestations before allowing pods to run. If an image lacks a valid attestation from build-attestor, the pod is blocked.
+# I think we can still run non-attested images in the GKE cluster by doing something like this in the deployment spec template:
+# metadata:
+  # labels:
+  #   image-policy.k8s.io/break-glass: "true"
+
+- id: sign-and-create-attestations
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    nomulus_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus \
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
+    proxy_digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy \
+    --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
+    gcloud --project=${PROJECT_ID} beta container binauthz attestations \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus@$nomulus_digest \
+      --attestor=build-attestor --attestor-project=${PROJECT_ID} \
+      --keyversion-project=${PROJECT_ID} --keyversion-location=global \
+      --keyversion-keyring=attestor-keys --keyversion-key=signing \
+      --keyversion=1
+    gcloud --project=${PROJECT_ID} beta container binauthz attestations \
+      sign-and-create --artifact-url=$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy@$proxy_digest \
+      --attestor=build-attestor --attestor-project=${PROJECT_ID} \
+      --keyversion-project=${PROJECT_ID} --keyversion-location=global \
+      --keyversion-keyring=attestor-keys --keyversion-key=signing \
+      --keyversion=1
+
+# Get the tool image digest and substitute in the digest in other GCB files.
+- id: Get-And-Replace-Tool-Digest
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    digest=$(gcloud container images list-tags $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool \
+      --format="get(digest)" --filter="tags = ${COMMIT_SHA}")
+    # schema-deploy and schema-verify scripts
+    sed -i s/nomulus-tool:latest/nomulus-tool@$digest/g release/cloudbuild-schema-*.yaml
+
+# Build and upload the prober_cert_updater image. This image extends from the `builder` and the
+# nomulus.jar built earlier.
+- id: Build-And-Push-Prober-Cert-Updater-Image
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    # The nomulus jar is not under the working dir. Must be copied over. 
+    cp ../../output/nomulus.jar .
+    docker build -t $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
+      --build-arg TAG_NAME=latest --build-arg PROJECT_ID=${PROJECT_ID} \
+      --build-arg GCR_HOSTNAME=$_GCR_HOSTNAME .
+    docker tag $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA} \
+      $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:latest
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA}
+    docker push $_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:latest
+  dir: 'release/prober-cert-updater/'
+
+
+# Build and stage Dataflow Flex templates.
+- id: Build-And-Push-Dataflow-Flex-Templates
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  # Set home for Gradle caches. Must be consistent with the previous steps above
+  # and ./build_nomulus_for_env.sh
+  env: 
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT_EMAIL}'
+    - 'LOGS_BUCKET=${_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD}'
+    - '_UD_FAST_BUILD=${_UD_FAST_BUILD}'
+  args:
+  - -c
+  - |
+    set -e
+    if [ "$${_UD_FAST_BUILD}" = "true" ]; then
+      echo "Skipping Dataflow Flex templates build (fast build mode enabled)"
+      exit 0
+    fi
+    ./release/ud_stage_beam_pipeline.sh \
+      beamPipelineCommon \
+      beam_pipeline_common \
+      ${COMMIT_SHA} \
+      ${PROJECT_ID} \
+      google.registry.beam.spec11.Spec11Pipeline \
+      google/registry/beam/spec11_pipeline_metadata.json \
+      google.registry.beam.billing.InvoicingPipeline \
+      google/registry/beam/invoicing_pipeline_metadata.json \
+      google.registry.beam.billing.ExpandBillingRecurrencesPipeline \
+      google/registry/beam/expand_billing_recurrences_pipeline_metadata.json \
+      google.registry.beam.rde.RdePipeline \
+      google/registry/beam/rde_pipeline_metadata.json \
+      google.registry.beam.resave.ResaveAllEppResourcesPipeline \
+      google/registry/beam/resave_all_epp_resources_pipeline_metadata.json \
+      google.registry.beam.wipeout.WipeOutContactHistoryPiiPipeline \
+      google/registry/beam/wipe_out_contact_history_pii_pipeline_metadata.json
+
+# Tentatively build and publish Cloud SQL schema jar here, before the schema release process is
+# finalized. Also publish nomulus:core jars that are needed for server/schema compatibility tests.
+- id: Build-And-Publish-Schema-Jar
+  name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  entrypoint: /bin/bash
+  # Set home for Gradle caches. Must be consistent with previous steps above
+  # and ./build_nomulus_for_env.sh
+  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  args:
+  - -c
+  - |
+    set -e
+    ./gradlew \
+      :db:publish \
+      -PmavenUrl=https://repo.maven.apache.org/maven2 \
+      -PpluginsUrl=https://plugins.gradle.org/m2 \
+      -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
+      -Pschema_version=${COMMIT_SHA}
+    ./gradlew \
+      :core:publish \
+      -PmavenUrl=https://repo.maven.apache.org/maven2 \
+      -PpluginsUrl=https://plugins.gradle.org/m2 \
+      -Ppublish_repo=gcs://${PROJECT_ID}-deployed-tags/maven \
+      -Pnomulus_version=${COMMIT_SHA}
+    # Upload schema jar for use by schema deployment.
+    # TODO(weiminyu): consider using the jar in maven repo during deployment and
+    # stop the  upload here.
+    cp db/build/libs/schema.jar output/
+    cp core/build/libs/nomulus-public.jar output/
+    cp core/build/libs/nomulus-tests-alldeps.jar output/
+# The tarballs and jars to upload to GCS.
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}-deploy/${COMMIT_SHA}'
+    paths:
+    - 'output/*.tar'
+    - 'output/tag_name'
+    - 'output/nomulus.jar'
+    - 'output/nomulus-public.jar'
+    - 'output/nomulus-tests-alldeps.jar'
+    - 'output/schema.jar'
+    - 'core/src/main/java/google/registry/config/files/nomulus-config-*.yaml'
+    - 'core/src/main/java/google/registry/config/files/cloud-tasks-queue.xml'
+    - 'core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-*.xml'
+    - 'core/src/main/java/google/registry/config/files/power-dns/env-*.yaml'
+    - 'release/cloudbuild-sync-and-tag.yaml'
+    - 'release/cloudbuild-deploy-*.yaml'
+    - 'release/cloudbuild-renew-prober-certs.yaml'
+    - 'release/cloudbuild-schema-deploy.yaml'
+    - 'release/cloudbuild-schema-verify.yaml'
+    - 'release/cloudbuild-restart-proxies.yaml'
+    - 'jetty/kubernetes/*.yaml'
+    - 'jetty/kubernetes/gateway/*.yaml'
+
+# The images are already uploaded, but we still need to include them there so that
+# the GCB pubsub message contains them (for Spinnaker to consume).
+images:
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/proxy:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/nomulus-tool:${COMMIT_SHA}'
+  - '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/prober_cert_updater:${COMMIT_SHA}'
+
+timeout: 7200s
+options:
+  pool:
+    name: 'projects/${PROJECT_ID}/locations/us-central1/workerPools/cloudbuild-default'
+
+
+substitutions:
+  _ENV: crash
+  _GCR_HOSTNAME: us-central1-docker.pkg.dev
+  _GCS_STORAGE_BUCKET_FOR_CLOUDBUILD: "ud-registry-sandbox-nomulus-deploy-cloudbuild-logs"
+  _GITHUB_TOKEN_SECRET_NAME: unstoppabledomains-org-github-oauthtoken-9b9658
+  _NOMULUS_SECRETS_COMMIT_SHA: HEAD
+  _UD_FAST_BUILD: 'false'
+
+logsBucket: "$_GCS_STORAGE_BUCKET_FOR_CLOUDBUILD"
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/${PROJECT_ID}/secrets/${_GITHUB_TOKEN_SECRET_NAME}/versions/latest
+    env: GITHUB_OAUTH_TOKEN
+

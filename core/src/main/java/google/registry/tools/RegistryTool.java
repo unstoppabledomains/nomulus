@@ -98,6 +98,7 @@ public final class RegistryTool {
           .put("login", LoginCommand.class)
           .put("logout", LogoutCommand.class)
           .put("pending_escrow", PendingEscrowCommand.class)
+          .put("rdap_query", RdapQueryCommand.class)
           .put("recreate_billing_recurrences", RecreateBillingRecurrencesCommand.class)
           .put("registrar_poc", RegistrarPocCommand.class)
           .put("renew_domain", RenewDomainCommand.class)
@@ -122,7 +123,6 @@ public final class RegistryTool {
           .put("validate_escrow_deposit", ValidateEscrowDepositCommand.class)
           .put("validate_login_credentials", ValidateLoginCredentialsCommand.class)
           .put("verify_ote", VerifyOteCommand.class)
-          .put("whois_query", WhoisQueryCommand.class)
           .build();
 
   public static void main(String[] args) throws Exception {

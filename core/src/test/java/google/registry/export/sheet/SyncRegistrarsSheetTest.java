@@ -23,7 +23,7 @@ import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.loadByKey;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.persistSimpleResources;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static org.joda.money.CurrencyUnit.JPY;
 import static org.joda.money.CurrencyUnit.USD;
 import static org.joda.time.DateTimeZone.UTC;
@@ -168,8 +168,8 @@ public class SyncRegistrarsSheetTest {
                 .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
                 // Purposely flip the internal/external admin/tech
                 // distinction to make sure we're not relying on it.  Sigh.
-                .setVisibleInWhoisAsAdmin(false)
-                .setVisibleInWhoisAsTech(true)
+                .setVisibleInRdapAsAdmin(false)
+                .setVisibleInRdapAsTech(true)
                 .build(),
             new RegistrarPoc.Builder()
                 .setRegistrar(registrar)
@@ -179,7 +179,7 @@ public class SyncRegistrarsSheetTest {
                 .build());
     // Use registrar key for contacts' parent.
     DateTime registrarCreationTime = persistResource(registrar).getCreationTime();
-    persistSimpleResources(contacts);
+    persistResources(contacts);
 
     clock.advanceBy(standardMinutes(1));
     newSyncRegistrarsSheet().run("foobar");
@@ -201,9 +201,9 @@ public class SyncRegistrarsSheetTest {
             contact@example.com
             Tel: +1.1234567890
             Types: [ADMIN, BILLING]
-            Visible in registrar WHOIS query as Admin contact: No
-            Visible in registrar WHOIS query as Technical contact: No
-            Phone number and email visible in domain WHOIS query as Registrar Abuse contact\
+            Visible in registrar RDAP query as Admin contact: No
+            Visible in registrar RDAP query as Technical contact: No
+            Phone number and email visible in domain RDAP query as Registrar Abuse contact\
              info: No
 
             John Doe
@@ -211,9 +211,9 @@ public class SyncRegistrarsSheetTest {
             Tel: +1.1234567890
             Fax: +1.1234567891
             Types: [ADMIN]
-            Visible in registrar WHOIS query as Admin contact: No
-            Visible in registrar WHOIS query as Technical contact: Yes
-            Phone number and email visible in domain WHOIS query as Registrar Abuse contact\
+            Visible in registrar RDAP query as Admin contact: No
+            Visible in registrar RDAP query as Technical contact: Yes
+            Phone number and email visible in domain RDAP query as Registrar Abuse contact\
              info: No
             """);
     assertThat(row)
@@ -223,9 +223,9 @@ public class SyncRegistrarsSheetTest {
             Jane Smith
             pride@example.net
             Types: [TECH]
-            Visible in registrar WHOIS query as Admin contact: No
-            Visible in registrar WHOIS query as Technical contact: No
-            Phone number and email visible in domain WHOIS query as Registrar Abuse contact\
+            Visible in registrar RDAP query as Admin contact: No
+            Visible in registrar RDAP query as Technical contact: No
+            Phone number and email visible in domain RDAP query as Registrar Abuse contact\
              info: No
             """);
     assertThat(row).containsEntry("marketingContacts", "");
@@ -240,9 +240,9 @@ public class SyncRegistrarsSheetTest {
             contact@example.com
             Tel: +1.1234567890
             Types: [ADMIN, BILLING]
-            Visible in registrar WHOIS query as Admin contact: No
-            Visible in registrar WHOIS query as Technical contact: No
-            Phone number and email visible in domain WHOIS query as Registrar Abuse contact\
+            Visible in registrar RDAP query as Admin contact: No
+            Visible in registrar RDAP query as Technical contact: No
+            Phone number and email visible in domain RDAP query as Registrar Abuse contact\
              info: No
             """);
     assertThat(row).containsEntry("contactsMarkedAsWhoisAdmin", "");
@@ -255,9 +255,9 @@ public class SyncRegistrarsSheetTest {
             Tel: +1.1234567890
             Fax: +1.1234567891
             Types: [ADMIN]
-            Visible in registrar WHOIS query as Admin contact: No
-            Visible in registrar WHOIS query as Technical contact: Yes
-            Phone number and email visible in domain WHOIS query as Registrar Abuse contact\
+            Visible in registrar RDAP query as Admin contact: No
+            Visible in registrar RDAP query as Technical contact: Yes
+            Phone number and email visible in domain RDAP query as Registrar Abuse contact\
              info: No
             """);
     assertThat(row).containsEntry("emailAddress", "nowhere@example.org");

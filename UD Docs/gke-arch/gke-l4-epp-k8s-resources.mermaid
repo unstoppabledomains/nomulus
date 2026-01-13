@@ -1,0 +1,29 @@
+graph TD
+    EPP_SVC["Kubernetes Service<br/>Name: epp<br/>Namespace: default<br/>Type: LoadBalancer<br/><br/>Annotations:<br/>- cloud.google.com/l4-rbs: enabled<br/>- networking.gke.io/load-balancer-ip-addresses:<br/>  EPP-ipv6-main,EPP-ipv4-main<br/>- networking.gke.io/weighted-load-balancing:<br/>  pods-per-node<br/><br/>Spec:<br/>- externalTrafficPolicy: Local<br/>- ipFamilies: [IPv4, IPv6]<br/>- ipFamilyPolicy: RequireDualStack<br/>- ports: [{port: 700, targetPort: epp}]<br/>- selector: {service: frontend}"]
+    
+    EPP_DEPLOY["Kubernetes Deployment<br/>Name: frontend<br/>Namespace: default<br/>Labels: {service: frontend}"]
+    
+    EPP_PODS["Kubernetes Pods<br/>Labels: {service: frontend}<br/><br/>Containers:<br/>- frontend (port 8080/http)<br/>- EPP (port 30002/epp)"]
+    
+    EPP_HPA["HorizontalPodAutoscaler<br/>Name: frontend"]
+    
+    EPP_SA["ServiceAccount<br/>Name: nomulus"]
+    
+    EPP_EXPORT["ServiceExport<br/>Name: frontend<br/>(for multi-cluster)"]
+    
+    EPP_SVC --> EPP_DEPLOY
+    EPP_DEPLOY --> EPP_PODS
+    EPP_DEPLOY --> EPP_HPA
+    EPP_DEPLOY --> EPP_SA
+    EPP_SVC --> EPP_EXPORT
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient
+    classDef service fill:#B080FF,stroke:#8E5CFF,stroke-width:2px,color:#ffffff
+    classDef deployment fill:#2DD4BF,stroke:#14B8A6,stroke-width:2px,color:#ffffff
+    classDef pod fill:#6B4DFF,stroke:#4A7FFF,stroke-width:2px,color:#ffffff
+    classDef policy fill:#37B2E3,stroke:#2A9FD4,stroke-width:2px,color:#ffffff
+    
+    class EPP_SVC service
+    class EPP_DEPLOY deployment
+    class EPP_PODS pod
+    class EPP_HPA,EPP_SA,EPP_EXPORT policy

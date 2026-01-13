@@ -23,7 +23,8 @@
 # arguments.
 ARG PROJECT_ID
 ARG TAG_NAME
-FROM gcr.io/${PROJECT_ID}/builder:${TAG_NAME}
+ARG GCR_HOSTNAME
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${TAG_NAME}
 
 COPY verify_deployed_sql_schema.sh /usr/local/bin/
 COPY allowed_diffs.txt /
