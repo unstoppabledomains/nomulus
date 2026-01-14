@@ -17,11 +17,13 @@ package google.registry.flows.host;
 import static google.registry.flows.domain.DomainFlowUtils.validateFirstLabel;
 import static google.registry.model.EppResourceUtils.isActive;
 import static google.registry.model.tld.Tlds.findTldForName;
+import static google.registry.model.tld.Tlds.getTlds;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.base.Ascii;
 import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
 import google.registry.flows.EppException;
@@ -36,11 +38,22 @@ import google.registry.model.domain.Domain;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.util.Idn;
 import java.net.InetAddress;
+import java.util.List;
 import java.util.Optional;
 import org.joda.time.DateTime;
 
 /** Static utility functions for host flows. */
 public class HostFlowUtils {
+
+  // START OF UD CUSTOM CODE EPP-11
+  /**
+   * ThreadLocal to pass the original hostname string from validateHostName to
+   * lookupSuperordinateDomain. This is needed because zz-- TLDs (ICANN RSP testing format) cannot
+   * be represented in Guava's InternetDomainName due to RFC 5891 HYPHEN_3_4 rules, but we need the
+   * original hostname to properly look up the superordinate domain.
+   */
+  private static final ThreadLocal<String> originalHostNameHolder = new ThreadLocal<>();
+  // END OF UD CUSTOM CODE EPP-11
 
   /** Validator for ASCII lowercase letters, digits, and "-_", allowing "." as a separator */
   private static final CharMatcher HOST_NAME_ALLOWED_CHARS =
@@ -56,26 +69,54 @@ public class HostFlowUtils {
     if (!name.equals(hostNameLowerCase)) {
       throw new HostNameNotLowerCaseException(hostNameLowerCase);
     }
+    // START OF UD CUSTOM CODE EPP-11
     // Check for zz-- TLDs (ICANN RSP testing format) which have hyphens at positions 3-4.
     // These TLDs violate RFC 5891 HYPHEN_3_4 rules but are mandated by ICANN for RSP testing.
     // See: https://www.icann.org/en/contracted-parties/registry-operators/registry-system-testing
     boolean isZzTld = name.contains(".zz--");
+    if (isZzTld) {
+      // Store the original hostname for lookupSuperordinateDomain to use later
+      originalHostNameHolder.set(name);
+    }
+    // END OF UD CUSTOM CODE EPP-11
     try {
+      // START OF UD CUSTOM CODE EPP-11
       String hostNamePunyCoded = isZzTld ? name : Idn.toASCII(name);
+      // END OF UD CUSTOM CODE EPP-11
       if (!name.equals(hostNamePunyCoded)) {
         throw new HostNameNotPunyCodedException(hostNamePunyCoded);
       }
       if (!HOST_NAME_ALLOWED_CHARS.matchesAllOf(name)) {
         throw new BadHostNameCharacterException();
       }
-      // For zz-- TLDs, we cannot use InternetDomainName.from() as Guava enforces RFC 5891
-      // which prohibits hyphens at positions 3-4 in labels. Instead, we manually construct
-      // the InternetDomainName by parsing the parts.
-      InternetDomainName hostName =
-          isZzTld
-              ? InternetDomainName.from(name.substring(0, name.indexOf(".zz--")))
-                  .child(name.substring(name.indexOf(".zz--") + 1))
-              : InternetDomainName.from(name);
+
+      // START OF UD CUSTOM CODE EPP-11
+      if (isZzTld) {
+        // For zz-- TLDs, we cannot use InternetDomainName.from() as Guava enforces RFC 5891
+        // which prohibits hyphens at positions 3-4 in labels. We do manual validation instead.
+        List<String> parts = Splitter.on('.').splitToList(name);
+        // Find the zz-- TLD part (should be the last part)
+        String zzTld = parts.get(parts.size() - 1);
+        if (!zzTld.startsWith("zz--")) {
+          throw new InvalidHostNameException();
+        }
+        // Verify the zz-- TLD is registered in Nomulus
+        if (!getTlds().contains(zzTld)) {
+          throw new InvalidHostNameException();
+        }
+        // Check depth: need at least 2 parts beyond the TLD (e.g., ns1.example.zz--tld)
+        if (parts.size() < 3) {
+          throw new HostNameTooShallowException();
+        }
+        // Validate the first label (leftmost part)
+        validateFirstLabel(parts.get(0));
+        // Return InternetDomainName for the non-TLD portion (everything except the zz-- TLD)
+        String nonTldPortion = parts.subList(0, parts.size() - 1).stream().collect(joining("."));
+        return InternetDomainName.from(nonTldPortion);
+      }
+      // END OF UD CUSTOM CODE EPP-11
+
+      InternetDomainName hostName = InternetDomainName.from(name);
       if (!name.equals(hostName.toString())) {
         throw new HostNameNotNormalizedException(hostName.toString());
       }
@@ -103,6 +144,33 @@ public class HostFlowUtils {
   /** Return the {@link Domain} this host is subordinate to, or null for external hosts. */
   public static Optional<Domain> lookupSuperordinateDomain(
       InternetDomainName hostName, DateTime now) throws EppException {
+    // START OF UD CUSTOM CODE EPP-11
+    // Check if we have a zz-- TLD hostname stored from validateHostName
+    String originalHostName = originalHostNameHolder.get();
+    if (originalHostName != null && originalHostName.contains(".zz--")) {
+      try {
+        // Handle zz-- TLD lookup manually since InternetDomainName can't represent it
+        List<String> parts = Splitter.on('.').splitToList(originalHostName);
+        String zzTld = parts.get(parts.size() - 1);
+        // Check if the zz-- TLD is registered
+        if (!getTlds().contains(zzTld)) {
+          return Optional.empty();
+        }
+        // Domain is the label immediately before the TLD + the TLD
+        String domainName = parts.get(parts.size() - 2) + "." + zzTld;
+        Optional<Domain> superordinateDomain =
+            ForeignKeyUtils.loadResource(Domain.class, domainName, now);
+        if (superordinateDomain.isEmpty() || !isActive(superordinateDomain.get(), now)) {
+          throw new SuperordinateDomainDoesNotExistException(domainName);
+        }
+        return superordinateDomain;
+      } finally {
+        // Clear the ThreadLocal to prevent memory leaks
+        originalHostNameHolder.remove();
+      }
+    }
+    // END OF UD CUSTOM CODE EPP-11
+
     Optional<InternetDomainName> tld = findTldForName(hostName);
     if (tld.isEmpty()) {
       // This is an host on a TLD we don't run, therefore obviously external, so we are done.
