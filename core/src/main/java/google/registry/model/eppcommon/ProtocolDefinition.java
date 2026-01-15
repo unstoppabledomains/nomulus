@@ -62,22 +62,26 @@ public class ProtocolDefinition {
     LAUNCH_EXTENSION_1_0(LaunchCreateExtension.class, null, ServiceExtensionVisibility.ALL),
     REDEMPTION_GRACE_PERIOD_1_0(RgpUpdateExtension.class, null, ServiceExtensionVisibility.ALL),
     SECURE_DNS_1_1(SecDnsCreateExtension.class, null, ServiceExtensionVisibility.ALL),
+    // START OF UD CUSTOM CODE UPDATES
+    // epp-02: Only advertise IANA-registered fee-1.0 extension in greeting,
+    // hide draft fee extensions (0.6, 0.11, 0.12) that cause IANA registry warnings
     FEE_0_6(
         FeeCheckCommandExtensionV06.class,
         FeeCheckResponseExtensionV06.class,
-        ServiceExtensionVisibility.ALL),
+        ServiceExtensionVisibility.NONE),
     FEE_0_11(
         FeeCheckCommandExtensionV11.class,
         FeeCheckResponseExtensionV11.class,
-        ServiceExtensionVisibility.ALL),
+        ServiceExtensionVisibility.NONE),
     FEE_0_12(
         FeeCheckCommandExtensionV12.class,
         FeeCheckResponseExtensionV12.class,
-        ServiceExtensionVisibility.ALL),
+        ServiceExtensionVisibility.NONE),
     FEE_1_00(
         FeeCheckCommandExtensionStdV1.class,
         FeeCheckResponseExtensionStdV1.class,
-        ServiceExtensionVisibility.ONLY_IN_NON_PRODUCTION),
+        ServiceExtensionVisibility.ALL),
+    // END OF UD CUSTOM CODE UPDATES
     METADATA_1_0(MetadataExtension.class, null, ServiceExtensionVisibility.NONE);
 
     private final Class<? extends CommandExtension> commandExtensionClass;
