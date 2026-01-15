@@ -144,30 +144,28 @@ public class HostFlowUtils {
   /** Return the {@link Domain} this host is subordinate to, or null for external hosts. */
   public static Optional<Domain> lookupSuperordinateDomain(
       InternetDomainName hostName, DateTime now) throws EppException {
-    // START OF UD CUSTOM CODE EPP-11
+    // START OF UD CUSTOM CODE EPP-11 (epp-12/epp-20 fix: clear ThreadLocal immediately)
     // Check if we have a zz-- TLD hostname stored from validateHostName
     String originalHostName = originalHostNameHolder.get();
+    // Always clear ThreadLocal immediately after reading to prevent stale values from
+    // leaking to subsequent requests on the same thread (fixes epp-12/epp-20 failures)
+    originalHostNameHolder.remove();
     if (originalHostName != null && originalHostName.contains(".zz--")) {
-      try {
-        // Handle zz-- TLD lookup manually since InternetDomainName can't represent it
-        List<String> parts = Splitter.on('.').splitToList(originalHostName);
-        String zzTld = parts.get(parts.size() - 1);
-        // Check if the zz-- TLD is registered
-        if (!getTlds().contains(zzTld)) {
-          return Optional.empty();
-        }
-        // Domain is the label immediately before the TLD + the TLD
-        String domainName = parts.get(parts.size() - 2) + "." + zzTld;
-        Optional<Domain> superordinateDomain =
-            ForeignKeyUtils.loadResource(Domain.class, domainName, now);
-        if (superordinateDomain.isEmpty() || !isActive(superordinateDomain.get(), now)) {
-          throw new SuperordinateDomainDoesNotExistException(domainName);
-        }
-        return superordinateDomain;
-      } finally {
-        // Clear the ThreadLocal to prevent memory leaks
-        originalHostNameHolder.remove();
+      // Handle zz-- TLD lookup manually since InternetDomainName can't represent it
+      List<String> parts = Splitter.on('.').splitToList(originalHostName);
+      String zzTld = parts.get(parts.size() - 1);
+      // Check if the zz-- TLD is registered
+      if (!getTlds().contains(zzTld)) {
+        return Optional.empty();
       }
+      // Domain is the label immediately before the TLD + the TLD
+      String domainName = parts.get(parts.size() - 2) + "." + zzTld;
+      Optional<Domain> superordinateDomain =
+          ForeignKeyUtils.loadResource(Domain.class, domainName, now);
+      if (superordinateDomain.isEmpty() || !isActive(superordinateDomain.get(), now)) {
+        throw new SuperordinateDomainDoesNotExistException(domainName);
+      }
+      return superordinateDomain;
     }
     // END OF UD CUSTOM CODE EPP-11
 
