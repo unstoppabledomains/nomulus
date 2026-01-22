@@ -79,6 +79,7 @@ while (( "$#" > 0 )); do
     --jar \"./core/build/libs/${uberjar_name}.jar\" \
     --env FLEX_TEMPLATE_JAVA_MAIN_CLASS=\"${main_class}\" \
     --additional-experiments=disable_runner_v2 \
+    --service-account-email=\"nomulus-service-account@${dev_project}.iam.gserviceaccount.com\" \
     --project \"${dev_project}\""
   
   # Add Cloud Build service account if SERVICE_ACCOUNT_EMAIL is set
