@@ -246,10 +246,6 @@ steps:
   - -c
   - |
     set -e
-    if [ "$${_UD_FAST_BUILD}" = "true" ]; then
-      echo "Skipping Dataflow Flex templates build (fast build mode enabled)"
-      exit 0
-    fi
     ./release/ud_stage_beam_pipeline.sh \
       beamPipelineCommon \
       beam_pipeline_common \
