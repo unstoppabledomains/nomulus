@@ -80,6 +80,8 @@ while (( "$#" > 0 )); do
     --env FLEX_TEMPLATE_JAVA_MAIN_CLASS=\"${main_class}\" \
     --additional-experiments=disable_runner_v2 \
     --service-account-email=\"nomulus-service-account@${dev_project}.iam.gserviceaccount.com\" \
+    --network=\"nomulus-vpc\" \
+    --subnetwork=\"regions/us-central1/subnetworks/nomulus-gke-subnet\" \
     --project \"${dev_project}\""
   
   # Add Cloud Build service account if SERVICE_ACCOUNT_EMAIL is set
