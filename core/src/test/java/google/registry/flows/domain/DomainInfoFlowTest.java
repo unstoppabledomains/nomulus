@@ -586,6 +586,115 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
+  @Test
+  void testIcannActivityReportField_getsLogged() throws Exception {
+    persistTestEntities(false);
+    runFlow();
+    assertIcannReportingActivityFieldLogged("srs-dom-info");
+    assertTldsFieldLogged("tld");
+  }
+
+  @Test
+  void testBulkInfoExtension_returnsBulkInfo() throws Exception {
+    persistTestEntities(false);
+    AllocationToken token =
+        persistResource(
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
+                .build());
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_bulk.xml", false);
+  }
+
+  @Test
+  void testBulkInfoExtension_returnsBulkInfoForSuperUser() throws Exception {
+    persistTestEntities(false);
+    AllocationToken token =
+        persistResource(
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
+                .build());
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    sessionMetadata.setRegistrarId("TheRegistrar");
+    setEppInput("domain_info_bulk.xml");
+    EppOutput output = runFlowAsSuperuser();
+    String expectedOutput =
+        loadFile(
+            "domain_info_response_superuser_bulk.xml",
+            updateSubstitutions(ImmutableMap.of(), "ROID", "2FF-TLD"));
+    assertXmlEquals(expectedOutput, new String(marshal(output, ValidationMode.LENIENT), UTF_8));
+  }
+
+  @Test
+  void testBulkInfoExtension_nameNotInBulkPackage() throws Exception {
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_empty_bulk_package.xml");
+  }
+
+  @Test
+  void testBulkInfoExtension_notCurrentSponsorRegistrar() throws Exception {
+    persistTestEntities(false);
+    AllocationToken token =
+        persistResource(
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
+                .build());
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    sessionMetadata.setRegistrarId("TheRegistrar");
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_unauthorized.xml", false);
+  }
+
+  // The fee extension is no longer supported in domain:info commands as of version 1.0.
+  // For now, we still support old versions.
+  @Test
+  void testFeeExtension_restoreCommand_pendingDelete_withRenewal() throws Exception {
+    createTld("example");
+    setEppInput(
+        "domain_info_fee.xml",
+        updateSubstitutions(
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "restore", "PERIOD", "1"));
+    persistTestEntities("rich.example", false);
+    setUpBillingEventForExistingDomain();
+    persistResource(
+        domain
+            .asBuilder()
+            .setDeletionTime(clock.nowUtc().plusDays(25))
+            .setRegistrationExpirationTime(clock.nowUtc().minusDays(1))
+            .setStatusValues(ImmutableSet.of(StatusValue.PENDING_DELETE))
+            .build());
+    doSuccessfulTest(
+        "domain_info_fee_restore_response_with_renewal.xml", false, ImmutableMap.of(), true);
+  }
+
   /**
    * Test create command. Fee extension version 6 is the only one which supports fee extensions on
    * info commands and responses, so we don't need to test the other versions.
@@ -672,26 +781,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
             .build());
     doSuccessfulTest(
         "domain_info_fee_restore_response_no_renewal.xml", false, ImmutableMap.of(), true);
-  }
-
-  @Test
-  void testFeeExtension_restoreCommand_pendingDelete_withRenewal() throws Exception {
-    createTld("example");
-    setEppInput(
-        "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "restore", "PERIOD", "1"));
-    persistTestEntities("rich.example", false);
-    setUpBillingEventForExistingDomain();
-    persistResource(
-        domain
-            .asBuilder()
-            .setDeletionTime(clock.nowUtc().plusDays(25))
-            .setRegistrationExpirationTime(clock.nowUtc().minusDays(1))
-            .setStatusValues(ImmutableSet.of(StatusValue.PENDING_DELETE))
-            .build());
-    doSuccessfulTest(
-        "domain_info_fee_restore_response_with_renewal.xml", false, ImmutableMap.of(), true);
   }
 
   /** Test create command on a premium label. */
@@ -867,16 +956,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
-  @Test
-  void testFeeExtension_unknownCurrency() {
-    setEppInput(
-        "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE, "COMMAND", "create", "CURRENCY", "BAD", "PERIOD", "1"));
-    EppException thrown = assertThrows(UnknownCurrencyEppException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
   /** Test requesting a period that isn't in years. */
   @Test
   void testFeeExtension_periodNotInYears() {
@@ -934,89 +1013,12 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   }
 
   @Test
-  void testIcannActivityReportField_getsLogged() throws Exception {
-    persistTestEntities(false);
-    runFlow();
-    assertIcannReportingActivityFieldLogged("srs-dom-info");
-    assertTldsFieldLogged("tld");
-  }
-
-  @Test
-  void testBulkInfoExtension_returnsBulkInfo() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_bulk.xml", false);
-  }
-
-  @Test
-  void testBulkInfoExtension_returnsBulkInfoForSuperUser() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    sessionMetadata.setRegistrarId("TheRegistrar");
-    setEppInput("domain_info_bulk.xml");
-    EppOutput output = runFlowAsSuperuser();
-    String expectedOutput =
-        loadFile(
-            "domain_info_response_superuser_bulk.xml",
-            updateSubstitutions(ImmutableMap.of(), "ROID", "2FF-TLD"));
-    assertXmlEquals(expectedOutput, new String(marshal(output, ValidationMode.LENIENT), UTF_8));
-  }
-
-  @Test
-  void testBulkInfoExtension_nameNotInBulkPackage() throws Exception {
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_empty_bulk_package.xml");
-  }
-
-  @Test
-  void testBulkInfoExtension_notCurrentSponsorRegistrar() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    sessionMetadata.setRegistrarId("TheRegistrar");
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_unauthorized.xml", false);
+  void testFeeExtension_unknownCurrency() {
+    setEppInput(
+        "domain_info_fee.xml",
+        updateSubstitutions(
+            SUBSTITUTION_BASE, "COMMAND", "create", "CURRENCY", "BAD", "PERIOD", "1"));
+    EppException thrown = assertThrows(UnknownCurrencyEppException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 }

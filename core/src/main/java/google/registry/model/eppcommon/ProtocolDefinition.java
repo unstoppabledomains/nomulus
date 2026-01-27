@@ -17,6 +17,7 @@ package google.registry.model.eppcommon;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.uniqueIndex;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.domain.fee06.FeeCheckCommandExtensionV06;
@@ -33,6 +34,7 @@ import google.registry.model.domain.rgp.RgpUpdateExtension;
 import google.registry.model.domain.secdns.SecDnsCreateExtension;
 import google.registry.model.eppinput.EppInput.CommandExtension;
 import google.registry.model.eppoutput.EppResponse.ResponseExtension;
+import google.registry.util.NonFinalForTesting;
 import google.registry.util.RegistryEnvironment;
 import jakarta.xml.bind.annotation.XmlSchema;
 import java.util.EnumSet;
@@ -52,7 +54,6 @@ public class ProtocolDefinition {
   /** Enum representing which environments should have which service extensions enabled. */
   private enum ServiceExtensionVisibility {
     ALL,
-    ONLY_IN_PRODUCTION,
     ONLY_IN_NON_PRODUCTION,
     NONE
   }
@@ -116,10 +117,9 @@ public class ProtocolDefinition {
       return clazz.getPackage().getAnnotation(XmlSchema.class).namespace();
     }
 
-    private boolean isVisible() {
+    public boolean isVisible() {
       return switch (visibility) {
         case ALL -> true;
-        case ONLY_IN_PRODUCTION -> RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
         case ONLY_IN_NON_PRODUCTION ->
             !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
         case NONE -> false;
@@ -141,14 +141,25 @@ public class ProtocolDefinition {
   }
 
   /** A set of all the visible extension URIs. */
-  private static final ImmutableSet<String> visibleServiceExtensionUris =
-      EnumSet.allOf(ServiceExtension.class).stream()
-          .filter(ServiceExtension::isVisible)
-          .map(ServiceExtension::getUri)
-          .collect(toImmutableSet());
+  // TODO(gbrodman): make this final when we can actually remove the old fee extensions and aren't
+  // relying on switching by environment
+  @NonFinalForTesting private static ImmutableSet<String> visibleServiceExtensionUris;
+
+  static {
+    reloadServiceExtensionUris();
+  }
 
   /** Return the set of all visible service extension URIs. */
   public static ImmutableSet<String> getVisibleServiceExtensionUris() {
     return visibleServiceExtensionUris;
+  }
+
+  @VisibleForTesting
+  public static void reloadServiceExtensionUris() {
+    visibleServiceExtensionUris =
+        EnumSet.allOf(ServiceExtension.class).stream()
+            .filter(ServiceExtension::isVisible)
+            .map(ServiceExtension::getUri)
+            .collect(toImmutableSet());
   }
 }
