@@ -18,13 +18,12 @@ import static google.registry.persistence.transaction.TransactionManagerFactory.
 import static jakarta.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
-import google.registry.model.EppResourceUtils;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.User;
 import google.registry.model.domain.Domain;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import jakarta.inject.Inject;
@@ -32,8 +31,7 @@ import java.util.Optional;
 
 /** Returns a JSON representation of a domain to the registrar console. */
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = ConsoleDomainGetAction.PATH,
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
 public class ConsoleDomainGetAction extends ConsoleApiAction {
@@ -55,7 +53,7 @@ public class ConsoleDomainGetAction extends ConsoleApiAction {
     Optional<Domain> possibleDomain =
         tm().transact(
                 () ->
-                    EppResourceUtils.loadByForeignKeyCached(
+                    ForeignKeyUtils.loadResourceByCacheIfEnabled(
                         Domain.class, paramDomain, tm().getTransactionTime()));
     if (possibleDomain.isEmpty()) {
       consoleApiParams.response().setStatus(SC_NOT_FOUND);

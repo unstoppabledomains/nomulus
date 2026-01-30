@@ -18,10 +18,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.union;
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
-import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
-import static google.registry.model.common.FeatureFlag.FeatureStatus.ACTIVE;
-import static google.registry.model.common.FeatureFlag.FeatureStatus.INACTIVE;
+import static google.registry.model.ForeignKeyUtils.loadResource;
 import static google.registry.model.eppcommon.StatusValue.CLIENT_DELETE_PROHIBITED;
 import static google.registry.model.eppcommon.StatusValue.CLIENT_HOLD;
 import static google.registry.model.eppcommon.StatusValue.CLIENT_RENEW_PROHIBITED;
@@ -44,7 +41,6 @@ import static google.registry.testing.DatabaseHelper.assertPollMessagesForResour
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.getOnlyHistoryEntryOfType;
 import static google.registry.testing.DatabaseHelper.getPollMessages;
-import static google.registry.testing.DatabaseHelper.loadByKey;
 import static google.registry.testing.DatabaseHelper.loadRegistrar;
 import static google.registry.testing.DatabaseHelper.persistActiveContact;
 import static google.registry.testing.DatabaseHelper.persistActiveDomain;
@@ -69,37 +65,33 @@ import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppRequestSource;
 import google.registry.flows.FlowUtils.NotLoggedInException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.AddExistingValueException;
 import google.registry.flows.ResourceFlowUtils.AddRemoveSameValueException;
+import google.registry.flows.ResourceFlowUtils.RemoveNonexistentValueException;
 import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceFlowUtils.StatusNotClientSettableException;
-import google.registry.flows.domain.DomainFlowUtils.DuplicateContactForRoleException;
 import google.registry.flows.domain.DomainFlowUtils.EmptySecDnsUpdateException;
-import google.registry.flows.domain.DomainFlowUtils.FeesMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.FeesRequiredForNonFreeOperationException;
 import google.registry.flows.domain.DomainFlowUtils.InvalidDsRecordException;
 import google.registry.flows.domain.DomainFlowUtils.LinkedResourceInPendingDeleteProhibitsOperationException;
 import google.registry.flows.domain.DomainFlowUtils.LinkedResourcesDoNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.MaxSigLifeChangeNotSupportedException;
-import google.registry.flows.domain.DomainFlowUtils.MissingAdminContactException;
-import google.registry.flows.domain.DomainFlowUtils.MissingContactTypeException;
-import google.registry.flows.domain.DomainFlowUtils.MissingRegistrantException;
-import google.registry.flows.domain.DomainFlowUtils.MissingTechnicalContactException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotAllowedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedForTldWithNameserverAllowListException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
-import google.registry.flows.domain.DomainFlowUtils.RegistrantNotAllowedException;
+import google.registry.flows.domain.DomainFlowUtils.RegistrantProhibitedException;
 import google.registry.flows.domain.DomainFlowUtils.SecDnsAllUsageException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyDsRecordsException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyNameserversException;
 import google.registry.flows.domain.DomainFlowUtils.UrgentAttributeNotSupportedException;
+import google.registry.flows.exceptions.ContactsProhibitedException;
 import google.registry.flows.exceptions.OnlyToolCanPassMetadataException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
 import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
-import google.registry.model.common.FeatureFlag;
 import google.registry.model.contact.Contact;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DesignatedContact.Type;
@@ -146,12 +138,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     createTld("tld");
     // Note that "domain_update.xml" tests adding and removing the same contact type.
     setEppInput("domain_update.xml");
-    persistResource(
-        new FeatureFlag()
-            .asBuilder()
-            .setFeatureName(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .setStatusMap(ImmutableSortedMap.of(START_OF_TIME, INACTIVE))
-            .build());
   }
 
   private void persistReferencedEntities() {
@@ -164,7 +150,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   private void persistDomainWithRegistrant() throws Exception {
-    Host host = loadByForeignKey(Host.class, "ns1.example.foo", clock.nowUtc()).get();
+    Host host = loadResource(Host.class, "ns1.example.foo", clock.nowUtc()).get();
     Domain domain =
         persistResource(
             DatabaseHelper.newDomain(getUniqueIdFromCommand())
@@ -188,7 +174,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   private Domain persistDomain() throws Exception {
-    Host host = loadByForeignKey(Host.class, "ns1.example.foo", clock.nowUtc()).get();
+    Host host = loadResource(Host.class, "ns1.example.foo", clock.nowUtc()).get();
     Domain domain =
         persistResource(
             DatabaseHelper.newDomain(getUniqueIdFromCommand())
@@ -324,28 +310,15 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testFailure_emptyRegistrant() throws Exception {
+  void testFailure_minimumDataset_whenAddingNewContacts() throws Exception {
+    // This EPP adds a new technical contact mak21 that wasn't already present.
     setEppInput("domain_update_empty_registrant.xml");
     persistReferencedEntities();
     persistDomain();
-    MissingRegistrantException thrown =
-        assertThrows(MissingRegistrantException.class, this::runFlow);
+    // Fails because the update adds some new contacts, although the registrant has been removed.
+    ContactsProhibitedException thrown =
+        assertThrows(ContactsProhibitedException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testSuccess_minimumDatasetPhase1_emptyRegistrant() throws Exception {
-    persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
-            .setStatusMap(
-                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
-            .build());
-    setEppInput("domain_update_empty_registrant.xml");
-    persistReferencedEntities();
-    persistDomain();
-    runFlowAssertResponse(loadFile("generic_success_response.xml"));
-    assertThat(reloadResourceByForeignKey().getRegistrant()).isEmpty();
   }
 
   private void modifyDomainToHave13Nameservers() throws Exception {
@@ -353,7 +326,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     for (int i = 1; i < 15; i++) {
       if (i != 2) { // Skip 2 since that's the one that the tests will add.
         nameservers.add(
-            loadByForeignKey(Host.class, String.format("ns%d.example.foo", i), clock.nowUtc())
+            loadResource(Host.class, String.format("ns%d.example.foo", i), clock.nowUtc())
                 .get()
                 .createVKey());
       }
@@ -372,7 +345,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testSuccess_addAndRemoveLargeNumberOfNameserversAndContacts() throws Exception {
+  void testSuccess_addAndRemoveLargeNumberOfNameservers() throws Exception {
     persistReferencedEntities();
     persistDomain();
     setEppInput("domain_update_max_everything.xml");
@@ -384,30 +357,14 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
         nameservers.add(host.createVKey());
       }
     }
-    ImmutableList.Builder<DesignatedContact> contactsBuilder = new ImmutableList.Builder<>();
-    for (int i = 0; i < 8; i++) {
-      contactsBuilder.add(
-          DesignatedContact.create(
-              DesignatedContact.Type.values()[i % 4],
-              persistActiveContact(String.format("max_test_%d", i)).createVKey()));
-    }
-    ImmutableList<DesignatedContact> contacts = contactsBuilder.build();
     persistResource(
-        reloadResourceByForeignKey()
-            .asBuilder()
-            .setNameservers(nameservers.build())
-            .setContacts(ImmutableSet.copyOf(contacts.subList(0, 3)))
-            .setRegistrant(Optional.of(contacts.get(3).getContactKey()))
-            .build());
+        reloadResourceByForeignKey().asBuilder().setNameservers(nameservers.build()).build());
     clock.advanceOneMilli();
     assertMutatingFlow(true);
     runFlowAssertResponse(loadFile("generic_success_response.xml"));
     Domain domain = reloadResourceByForeignKey();
     assertAboutDomains().that(domain).hasOneHistoryEntryEachOfTypes(DOMAIN_CREATE, DOMAIN_UPDATE);
     assertThat(domain.getNameservers()).hasSize(13);
-    // getContacts does not return contacts of type REGISTRANT, so check these separately.
-    assertThat(domain.getContacts()).hasSize(3);
-    assertThat(loadByKey(domain.getRegistrant().get()).getContactId()).isEqualTo("max_test_7");
     assertNoBillingEvents();
     assertDomainDnsRequests("example.tld");
   }
@@ -461,9 +418,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
             .addSubordinateHost("ns2.example.tld")
             .setNameservers(
                 ImmutableSet.of(
-                    loadByForeignKey(Host.class, "ns1.example.tld", clock.nowUtc())
-                        .get()
-                        .createVKey()))
+                    loadResource(Host.class, "ns1.example.tld", clock.nowUtc()).get().createVKey()))
             .build());
     clock.advanceOneMilli();
     assertMutatingFlow(true);
@@ -471,8 +426,8 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     domain = reloadResourceByForeignKey();
     assertThat(domain.getNameservers()).containsExactly(addedHost.createVKey());
     assertThat(domain.getSubordinateHosts()).containsExactly("ns1.example.tld", "ns2.example.tld");
-    Host existingHost = loadByForeignKey(Host.class, "ns1.example.tld", clock.nowUtc()).get();
-    addedHost = loadByForeignKey(Host.class, "ns2.example.tld", clock.nowUtc()).get();
+    Host existingHost = loadResource(Host.class, "ns1.example.tld", clock.nowUtc()).get();
+    addedHost = loadResource(Host.class, "ns2.example.tld", clock.nowUtc()).get();
     assertThat(existingHost.getSuperordinateDomain()).isEqualTo(domain.createVKey());
     assertThat(addedHost.getSuperordinateDomain()).isEqualTo(domain.createVKey());
   }
@@ -481,7 +436,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   void testSuccess_registrantMovedToTechContact() throws Exception {
     setEppInput("domain_update_registrant_to_tech.xml");
     persistReferencedEntities();
-    Contact sh8013 = loadByForeignKey(Contact.class, "sh8013", clock.nowUtc()).get();
+    Contact sh8013 = loadResource(Contact.class, "sh8013", clock.nowUtc()).get();
     persistResource(
         DatabaseHelper.newDomain(getUniqueIdFromCommand())
             .asBuilder()
@@ -492,27 +447,8 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testSuccess_multipleReferencesToSameContactRemoved() throws Exception {
-    setEppInput("domain_update_remove_multiple_contacts.xml");
-    persistReferencedEntities();
-    Contact sh8013 = loadByForeignKey(Contact.class, "sh8013", clock.nowUtc()).get();
-    VKey<Contact> sh8013Key = sh8013.createVKey();
-    persistResource(
-        DatabaseHelper.newDomain(getUniqueIdFromCommand())
-            .asBuilder()
-            .setRegistrant(Optional.of(sh8013Key))
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, sh8013Key),
-                    DesignatedContact.create(Type.BILLING, sh8013Key),
-                    DesignatedContact.create(Type.TECH, sh8013Key)))
-            .build());
-    clock.advanceOneMilli();
-    runFlowAssertResponse(loadFile("generic_success_response.xml"));
-  }
-
-  @Test
   void testSuccess_removeClientUpdateProhibited() throws Exception {
+    setEppInput("domain_update_remove_client_update_prohibited.xml");
     persistReferencedEntities();
     persistResource(
         persistDomain()
@@ -608,21 +544,26 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testSuccess_secDnsAddSameDoesNothing() throws Exception {
-    doSecDnsSuccessfulTest(
-        "domain_update_dsdata_add.xml",
-        ImmutableSet.of(SOME_DSDATA),
-        ImmutableSet.of(SOME_DSDATA),
-        ImmutableMap.of(
-            "KEY_TAG",
-            "1",
-            "ALG",
-            "2",
-            "DIGEST_TYPE",
-            "2",
-            "DIGEST",
-            "9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"),
-        false);
+  void testFailure_secDnsAddSame_throwsException() throws Exception {
+    EppException thrown =
+        assertThrows(
+            AddExistingValueException.class,
+            () ->
+                doSecDnsSuccessfulTest(
+                    "domain_update_dsdata_add.xml",
+                    ImmutableSet.of(SOME_DSDATA),
+                    ImmutableSet.of(SOME_DSDATA),
+                    ImmutableMap.of(
+                        "KEY_TAG",
+                        "1",
+                        "ALG",
+                        "2",
+                        "DIGEST_TYPE",
+                        "2",
+                        "DIGEST",
+                        "9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"),
+                    false));
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
@@ -740,7 +681,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
                 2,
                 2,
                 base16()
-                    .decode("9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"))),
+                    .decode("0F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"))),
         ImmutableMap.of(
             "KEY_TAG",
             "1",
@@ -749,8 +690,8 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
             "DIGEST_TYPE",
             "2",
             "DIGEST",
-            "9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"),
-        false);
+            "0F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"),
+        true);
   }
 
   @Test
@@ -858,29 +799,43 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testSuccess_secDnsAddRemoveSame() throws Exception {
-    // Adding and removing the same dsData is a no-op because removes are processed first.
-    doSecDnsSuccessfulTest(
-        "domain_update_dsdata_add_rem_same.xml",
-        ImmutableSet.of(
-            SOME_DSDATA,
-            DomainDsData.create(
-                12345, 3, 1, base16().decode("A94A8FE5CCB19BA61C4C0873D391E987982FBBD3"))),
-        ImmutableSet.of(
-            SOME_DSDATA,
-            DomainDsData.create(
-                12345, 3, 1, base16().decode("A94A8FE5CCB19BA61C4C0873D391E987982FBBD3"))),
-        false);
+  void testFailure_secDnsAddRemoveSame_throwsException() throws Exception {
+    EppException thrown =
+        assertThrows(
+            AddRemoveSameValueException.class,
+            () ->
+                doSecDnsSuccessfulTest(
+                    "domain_update_dsdata_add_rem_same.xml",
+                    ImmutableSet.of(
+                        SOME_DSDATA,
+                        DomainDsData.create(
+                            12345,
+                            3,
+                            1,
+                            base16().decode("A94A8FE5CCB19BA61C4C0873D391E987982FBBD3"))),
+                    ImmutableSet.of(
+                        SOME_DSDATA,
+                        DomainDsData.create(
+                            12345,
+                            3,
+                            1,
+                            base16().decode("A94A8FE5CCB19BA61C4C0873D391E987982FBBD3"))),
+                    false));
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
-  void testSuccess_secDnsRemoveAlreadyNotThere() throws Exception {
-    // Removing a dsData that isn't there is a no-op.
-    doSecDnsSuccessfulTest(
-        "domain_update_dsdata_rem.xml",
-        ImmutableSet.of(SOME_DSDATA),
-        ImmutableSet.of(SOME_DSDATA),
-        false);
+  void testFailure_secDnsRemoveAlreadyNotThere_throwsException() throws Exception {
+    EppException thrown =
+        assertThrows(
+            RemoveNonexistentValueException.class,
+            () ->
+                doSecDnsSuccessfulTest(
+                    "domain_update_dsdata_rem.xml",
+                    ImmutableSet.of(SOME_DSDATA),
+                    ImmutableSet.of(SOME_DSDATA),
+                    false));
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   void doServerStatusBillingTest(String xmlFilename, boolean isBillable) throws Exception {
@@ -913,14 +868,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     persistReferencedEntities();
     persistDomain();
     doServerStatusBillingTest("domain_update_add_server_status.xml", true);
-  }
-
-  @Test
-  void testSuccess_noBillingOnPreExistingServerStatus() throws Exception {
-    eppRequestSource = EppRequestSource.TOOL;
-    Domain addStatusDomain = persistActiveDomain(getUniqueIdFromCommand());
-    persistResource(addStatusDomain.asBuilder().addStatusValue(SERVER_RENEW_PROHIBITED).build());
-    doServerStatusBillingTest("domain_update_add_server_status.xml", false);
   }
 
   @Test
@@ -1169,40 +1116,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testFailure_missingContact() throws Exception {
-    persistActiveHost("ns1.example.foo");
-    persistActiveHost("ns2.example.foo");
-    persistActiveContact("mak21");
-    persistActiveDomain(getUniqueIdFromCommand());
-    LinkedResourcesDoNotExistException thrown =
-        assertThrows(LinkedResourcesDoNotExistException.class, this::runFlow);
-    assertThat(thrown).hasMessageThat().contains("(sh8013)");
-  }
-
-  @Test
-  void testFailure_addingDuplicateContact() throws Exception {
-    persistReferencedEntities();
-    persistActiveContact("foo");
-    persistDomain();
-    // Add a tech contact to the persisted entity, which should cause the flow to fail when it tries
-    // to add "mak21" as a second tech contact.
-    persistResource(
-        reloadResourceByForeignKey()
-            .asBuilder()
-            .setContacts(
-                DesignatedContact.create(
-                    Type.TECH,
-                    loadByForeignKey(Contact.class, "foo", clock.nowUtc()).get().createVKey()))
-            .build());
-    EppException thrown = assertThrows(DuplicateContactForRoleException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-    assertThat(thrown.getResult().getMsg())
-        .isEqualTo(
-            "More than one contact for a given role is not allowed: "
-                + "role [tech] has contacts [foo, mak21]");
-  }
-
-  @Test
   void testFailure_statusValueNotClientSettable() throws Exception {
     setEppInput("domain_update_prohibited_status.xml");
     persistReferencedEntities();
@@ -1414,40 +1327,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testFailure_duplicateContactInCommand() throws Exception {
-    setEppInput("domain_update_duplicate_contact.xml");
-    persistReferencedEntities();
-    persistDomain();
-    EppException thrown = assertThrows(DuplicateContactForRoleException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testFailure_multipleDuplicateContactInCommand() throws Exception {
-    setEppInput("domain_update_multiple_duplicate_contacts.xml");
-    persistReferencedEntities();
-    persistDomain();
-    EppException thrown = assertThrows(DuplicateContactForRoleException.class, this::runFlow);
-    assertThat(thrown)
-        .hasMessageThat()
-        .isEqualTo(
-            "More than one contact for a given role is not allowed: "
-                + "role [billing] has contacts [mak21, sh8013], "
-                + "role [tech] has contacts [mak21, sh8013]");
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testFailure_missingContactType() throws Exception {
-    // We need to test for missing type, but not for invalid - the schema enforces that for us.
-    setEppInput("domain_update_missing_contact_type.xml");
-    persistReferencedEntities();
-    persistDomain();
-    EppException thrown = assertThrows(MissingContactTypeException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
   void testFailure_unauthorizedClient() throws Exception {
     sessionMetadata.setRegistrarId("NewRegistrar");
     persistReferencedEntities();
@@ -1496,34 +1375,60 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
             .asBuilder()
             .setNameservers(
                 ImmutableSet.of(
-                    loadByForeignKey(Host.class, "ns1.example.foo", clock.nowUtc())
-                        .get()
-                        .createVKey()))
-            .build());
-    EppException thrown = assertThrows(AddRemoveSameValueException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  // Contacts mismatch.
-  @Test
-  void testFailure_sameContactAddedAndRemoved() throws Exception {
-    setEppInput("domain_update_add_remove_same_contact.xml");
-    persistReferencedEntities();
-    persistResource(
-        DatabaseHelper.newDomain(getUniqueIdFromCommand())
-            .asBuilder()
-            .setContacts(
-                DesignatedContact.create(
-                    Type.TECH,
-                    loadByForeignKey(Contact.class, "sh8013", clock.nowUtc()).get().createVKey()))
+                    loadResource(Host.class, "ns1.example.foo", clock.nowUtc()).get().createVKey()))
             .build());
     EppException thrown = assertThrows(AddRemoveSameValueException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
-  void testFailure_removeAdmin() throws Exception {
-    setEppInput("domain_update_remove_admin.xml");
+  void testFailure_addExistingNameserver() throws Exception {
+    Host host = persistActiveHost("ns2.example.foo");
+    persistResource(
+        DatabaseHelper.newDomain(getUniqueIdFromCommand())
+            .asBuilder()
+            .setNameservers(ImmutableSet.of(host.createVKey()))
+            .build());
+    setEppInput("domain_update_add_nameserver.xml");
+    assertAboutEppExceptions()
+        .that(assertThrows(AddExistingValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_addExistingStatusValue() throws Exception {
+    persistResource(
+        DatabaseHelper.newDomain(getUniqueIdFromCommand())
+            .asBuilder()
+            .setStatusValues(ImmutableSet.of(CLIENT_RENEW_PROHIBITED))
+            .build());
+    setEppInput("domain_update_add_non_server_status.xml");
+    assertAboutEppExceptions()
+        .that(assertThrows(AddExistingValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_removeNonexistentNameserver() throws Exception {
+    persistActiveDomain(getUniqueIdFromCommand());
+    persistActiveHost("ns1.example.foo");
+    setEppInput("domain_update_remove_nameserver.xml");
+    assertAboutEppExceptions()
+        .that(assertThrows(RemoveNonexistentValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_removeNonexistentStatusValue() throws Exception {
+    persistActiveDomain(getUniqueIdFromCommand());
+    setEppInput("domain_update_remove_client_update_prohibited.xml");
+    assertAboutEppExceptions()
+        .that(assertThrows(RemoveNonexistentValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_minimumDataset_addingNewRegistrantFails() throws Exception {
     persistReferencedEntities();
     persistResource(
         DatabaseHelper.newDomain(getUniqueIdFromCommand())
@@ -1532,83 +1437,13 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
                 ImmutableSet.of(
                     DesignatedContact.create(Type.ADMIN, sh8013Contact.createVKey()),
                     DesignatedContact.create(Type.TECH, sh8013Contact.createVKey())))
+            .setRegistrant(Optional.empty())
             .build());
-    EppException thrown = assertThrows(MissingAdminContactException.class, this::runFlow);
+    // This EPP sets the registrant to sh8013, whereas in our test setup it is absent.
+    setEppInput("domain_update_registrant.xml");
+    RegistrantProhibitedException thrown =
+        assertThrows(RegistrantProhibitedException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testSuccess_minimumDatasetPhase1_removeAdmin() throws Exception {
-    persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
-            .setStatusMap(
-                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
-            .build());
-    setEppInput("domain_update_remove_admin.xml");
-    persistReferencedEntities();
-    persistResource(
-        DatabaseHelper.newDomain(getUniqueIdFromCommand())
-            .asBuilder()
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, sh8013Contact.createVKey()),
-                    DesignatedContact.create(Type.TECH, sh8013Contact.createVKey())))
-            .build());
-    runFlowAssertResponse(loadFile("generic_success_response.xml"));
-  }
-
-  @Test
-  void testFailure_removeTech() throws Exception {
-    setEppInput("domain_update_remove_tech.xml");
-    persistReferencedEntities();
-    persistResource(
-        DatabaseHelper.newDomain(getUniqueIdFromCommand())
-            .asBuilder()
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, sh8013Contact.createVKey()),
-                    DesignatedContact.create(Type.TECH, sh8013Contact.createVKey())))
-            .build());
-    EppException thrown = assertThrows(MissingTechnicalContactException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testSuccess_minimumDatasetPhase1_removeTech() throws Exception {
-    persistResource(
-        FeatureFlag.get(MINIMUM_DATASET_CONTACTS_OPTIONAL)
-            .asBuilder()
-            .setStatusMap(
-                ImmutableSortedMap.of(START_OF_TIME, INACTIVE, clock.nowUtc().minusDays(5), ACTIVE))
-            .build());
-    setEppInput("domain_update_remove_tech.xml");
-    persistReferencedEntities();
-    persistResource(
-        DatabaseHelper.newDomain(getUniqueIdFromCommand())
-            .asBuilder()
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, sh8013Contact.createVKey()),
-                    DesignatedContact.create(Type.TECH, sh8013Contact.createVKey())))
-            .build());
-    runFlowAssertResponse(loadFile("generic_success_response.xml"));
-  }
-
-  @Test
-  void testFailure_addPendingDeleteContact() throws Exception {
-    persistReferencedEntities();
-    persistDomain();
-    persistResource(
-        loadByForeignKey(Contact.class, "mak21", clock.nowUtc())
-            .get()
-            .asBuilder()
-            .addStatusValue(PENDING_DELETE)
-            .build());
-    clock.advanceOneMilli();
-    LinkedResourceInPendingDeleteProhibitsOperationException thrown =
-        assertThrows(LinkedResourceInPendingDeleteProhibitsOperationException.class, this::runFlow);
-    assertThat(thrown).hasMessageThat().contains("mak21");
   }
 
   @Test
@@ -1616,7 +1451,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     persistReferencedEntities();
     persistDomain();
     persistResource(
-        loadByForeignKey(Host.class, "ns2.example.foo", clock.nowUtc())
+        loadResource(Host.class, "ns2.example.foo", clock.nowUtc())
             .get()
             .asBuilder()
             .addStatusValue(PENDING_DELETE)
@@ -1625,20 +1460,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     LinkedResourceInPendingDeleteProhibitsOperationException thrown =
         assertThrows(LinkedResourceInPendingDeleteProhibitsOperationException.class, this::runFlow);
     assertThat(thrown).hasMessageThat().contains("ns2.example.foo");
-  }
-
-  @Test
-  void testFailure_newRegistrantNotAllowListed() throws Exception {
-    persistReferencedEntities();
-    persistDomain();
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("contact1234"))
-            .build());
-    clock.advanceOneMilli();
-    EppException thrown = assertThrows(RegistrantNotAllowedException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
@@ -1657,83 +1478,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
   }
 
   @Test
-  void testSuccess_newNameserverAllowListed() throws Exception {
-    setEppInput("domain_update_add_nameserver.xml");
-    persistReferencedEntities();
-    persistDomain();
-    // No registrant is given but both nameserver and registrant allow list exist.
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("sh8013"))
-            .setAllowedFullyQualifiedHostNames(
-                ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
-            .build());
-    assertThat(reloadResourceByForeignKey().getNameservers())
-        .doesNotContain(
-            loadByForeignKey(Host.class, "ns2.example.foo", clock.nowUtc()).get().createVKey());
-    runFlow();
-    assertThat(reloadResourceByForeignKey().getNameservers())
-        .contains(
-            loadByForeignKey(Host.class, "ns2.example.foo", clock.nowUtc()).get().createVKey());
-  }
-
-  @Test
-  void testSuccess_changeRegistrantAllowListed() throws Exception {
-    setEppInput("domain_update_registrant.xml");
-    persistReferencedEntities();
-    persistDomain();
-    // Only changes registrant, with both nameserver and registrant allow list on the TLD.
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("sh8013"))
-            .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns1.example.foo"))
-            .build());
-    runFlow();
-    assertThat(loadByKey(reloadResourceByForeignKey().getRegistrant().get()).getContactId())
-        .isEqualTo("sh8013");
-  }
-
-  @Test
-  void testSuccess_changeContactsAndRegistrant() throws Exception {
-    setEppInput("domain_update_contacts_and_registrant.xml");
-    persistReferencedEntities();
-    persistDomainWithRegistrant();
-
-    reloadResourceByForeignKey()
-        .getContacts()
-        .forEach(
-            contact ->
-                assertThat(loadByKey(contact.getContactKey()).getContactId()).isEqualTo("mak21"));
-    assertThat(loadByKey(reloadResourceByForeignKey().getRegistrant().get()).getContactId())
-        .isEqualTo("mak21");
-
-    runFlow();
-
-    reloadResourceByForeignKey()
-        .getContacts()
-        .forEach(
-            contact ->
-                assertThat(loadByKey(contact.getContactKey()).getContactId()).isEqualTo("sh8013"));
-    assertThat(loadByKey(reloadResourceByForeignKey().getRegistrant().get()).getContactId())
-        .isEqualTo("sh8013");
-  }
-
-  @Test
-  void testSuccess_nameserverAndRegistrantAllowListed() throws Exception {
-    persistReferencedEntities();
-    persistDomain();
-    persistResource(
-        Tld.get("tld")
-            .asBuilder()
-            .setAllowedRegistrantContactIds(ImmutableSet.of("sh8013"))
-            .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns2.example.foo"))
-            .build());
-    doSuccessfulTest();
-  }
-
-  @Test
   void testSuccess_tldWithNameserverAllowList_removeNameserver() throws Exception {
     setEppInput("domain_update_remove_nameserver.xml");
     persistReferencedEntities();
@@ -1742,7 +1486,7 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
         reloadResourceByForeignKey()
             .asBuilder()
             .addNameserver(
-                loadByForeignKey(Host.class, "ns2.example.foo", clock.nowUtc()).get().createVKey())
+                loadResource(Host.class, "ns2.example.foo", clock.nowUtc()).get().createVKey())
             .build());
     persistResource(
         Tld.get("tld")
@@ -1751,13 +1495,12 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
                 ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
             .build());
     assertThat(reloadResourceByForeignKey().getNameservers())
-        .contains(
-            loadByForeignKey(Host.class, "ns1.example.foo", clock.nowUtc()).get().createVKey());
+        .contains(loadResource(Host.class, "ns1.example.foo", clock.nowUtc()).get().createVKey());
     clock.advanceOneMilli();
     runFlow();
     assertThat(reloadResourceByForeignKey().getNameservers())
         .doesNotContain(
-            loadByForeignKey(Host.class, "ns1.example.foo", clock.nowUtc())
+            loadResource(Host.class, "ns1.example.foo", clock.nowUtc())
                 .map(ImmutableObject::createVKey)
                 .get());
   }
@@ -1785,15 +1528,6 @@ class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow, Domain
     persistDomain();
     doSuccessfulTest();
     assertAboutDomains().that(reloadResourceByForeignKey()).hasExactlyStatusValues(CLIENT_HOLD);
-  }
-
-  @Test
-  void testFailure_freePremium_wrongFee() throws Exception {
-    setEppInput("domain_update_fee.xml", ImmutableMap.of("FEE_VERSION", "0.11"));
-    persistReferencedEntities();
-    persistDomain();
-    EppException thrown = assertThrows(FeesMismatchException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   // This test should throw an exception, because the fee extension is required when the fee is not

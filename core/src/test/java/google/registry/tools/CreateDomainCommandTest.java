@@ -110,13 +110,10 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
   }
 
   @Test
-  void testSuccess_minimal() throws Exception {
+  void testSuccess_minimumDataset_noContacts() throws Exception {
     // Test that each optional field can be omitted. Also tests the auto-gen password.
     runCommandForced(
         "--client=NewRegistrar",
-        "--registrant=crr-admin",
-        "--admins=crr-admin",
-        "--techs=crr-tech",
         "example.tld");
     eppVerifier.verifySent("domain_create_minimal.xml");
   }
@@ -131,7 +128,9 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
         "--techs=crr-tech",
         "example.tld",
         "example.abc");
-    eppVerifier.verifySent("domain_create_minimal.xml").verifySent("domain_create_minimal_abc.xml");
+    eppVerifier
+        .verifySent("domain_create_contacts.xml")
+        .verifySent("domain_create_contacts_abc.xml");
   }
 
   @Test
@@ -152,8 +151,8 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
         "example.tld",
         "example.abc");
     eppVerifier
-        .verifySent("domain_create_minimal.xml")
-        .verifySent("domain_create_minimal_abc.xml");
+        .verifySent("domain_create_contacts.xml")
+        .verifySent("domain_create_contacts_abc.xml");
   }
 
   @Test
@@ -192,9 +191,9 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
         "palladium.tld",
         "example.abc");
     eppVerifier
-        .verifySent("domain_create_minimal.xml")
+        .verifySent("domain_create_contacts.xml")
         .verifySent("domain_create_palladium.xml")
-        .verifySent("domain_create_minimal_abc.xml");
+        .verifySent("domain_create_contacts_abc.xml");
     assertInStdout(
         "palladium.tld is premium at USD 877.00 per year; "
             + "sending total cost for 1 year(s) of USD 877.00.");
@@ -225,6 +224,19 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
         "--allocation_token=abc123",
         "example.tld");
     eppVerifier.verifySent("domain_create_token.xml");
+  }
+
+  @Test
+  void testSuccess_contactsStillRequired() throws Exception {
+    // Verify that if contacts are still required, the minimum+contacts request is sent
+    createTld("tld");
+    runCommandForced(
+        "--client=NewRegistrar",
+        "--registrant=crr-admin",
+        "--admins=crr-admin",
+        "--techs=crr-tech",
+        "example.tld");
+    eppVerifier.verifySent("domain_create_contacts.xml");
   }
 
   @Test
@@ -269,48 +281,6 @@ class CreateDomainCommandTest extends EppToolCommandTestCase<CreateDomainCommand
                     "--registrant=crr-admin",
                     "example.tld"));
     assertThat(thrown).hasMessageThat().contains("--client");
-  }
-
-  @Test
-  void testFailure_missingRegistrant() {
-    IllegalArgumentException thrown =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                runCommandForced(
-                    "--client=NewRegistrar",
-                    "--admins=crr-admin",
-                    "--techs=crr-tech",
-                    "example.tld"));
-    assertThat(thrown).hasMessageThat().contains("Registrant must be specified");
-  }
-
-  @Test
-  void testFailure_missingAdmins() {
-    IllegalArgumentException thrown =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                runCommandForced(
-                    "--client=NewRegistrar",
-                    "--registrant=crr-admin",
-                    "--techs=crr-tech",
-                    "example.tld"));
-    assertThat(thrown).hasMessageThat().contains("At least one admin must be specified");
-  }
-
-  @Test
-  void testFailure_missingTechs() {
-    IllegalArgumentException thrown =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                runCommandForced(
-                    "--client=NewRegistrar",
-                    "--registrant=crr-admin",
-                    "--admins=crr-admin",
-                    "example.tld"));
-    assertThat(thrown).hasMessageThat().contains("At least one tech must be specified");
   }
 
   @Test

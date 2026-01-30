@@ -36,6 +36,7 @@ import google.registry.flows.EppTestComponent.FakesAndMocksModule;
 import google.registry.flows.picker.FlowPicker;
 import google.registry.model.billing.BillingBase;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.eppcommon.EppXmlTransformer;
 import google.registry.model.eppcommon.ProtocolDefinition;
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.EppOutput;
@@ -110,6 +111,10 @@ public abstract class FlowTestCase<F extends Flow> {
 
   protected void setEppInput(String inputFilename, Map<String, String> substitutions) {
     eppLoader = new EppLoader(this, inputFilename, substitutions);
+  }
+
+  protected void setEppInputXml(String eppXml) {
+    eppLoader = new EppLoader(eppXml);
   }
 
   /** Returns the EPP data loaded by a previous call to setEppInput. */
@@ -263,6 +268,8 @@ public abstract class FlowTestCase<F extends Flow> {
     if (output.isResponse()) {
       assertThat(output.isSuccess()).isTrue();
     }
+    // Verify that expected xml is syntatically correct.
+    EppXmlTransformer.validateOutput(xml);
     try {
       assertXmlEquals(
           xml, new String(marshal(output, ValidationMode.STRICT), UTF_8), ignoredPathsPlusTrid);

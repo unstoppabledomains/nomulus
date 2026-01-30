@@ -33,16 +33,12 @@ import google.registry.proxy.EppProtocolModule.EppProtocol;
 import google.registry.proxy.HealthCheckProtocolModule.HealthCheckProtocol;
 import google.registry.proxy.HttpsRelayProtocolModule.HttpsRelayProtocol;
 import google.registry.proxy.ProxyConfig.Environment;
-import google.registry.proxy.WebWhoisProtocolsModule.HttpWhoisProtocol;
-import google.registry.proxy.WhoisProtocolModule.WhoisProtocol;
 import google.registry.proxy.handler.BackendMetricsHandler;
 import google.registry.proxy.handler.FrontendMetricsHandler;
 import google.registry.proxy.handler.ProxyProtocolHandler;
 import google.registry.proxy.handler.QuotaHandler.EppQuotaHandler;
-import google.registry.proxy.handler.QuotaHandler.WhoisQuotaHandler;
 import google.registry.proxy.handler.RelayHandler.FullHttpRequestRelayHandler;
 import google.registry.proxy.handler.RelayHandler.FullHttpResponseRelayHandler;
-import google.registry.proxy.handler.WebWhoisRedirectHandler;
 import google.registry.testing.FakeClock;
 import google.registry.util.Clock;
 import io.netty.channel.Channel;
@@ -56,6 +52,7 @@ import jakarta.inject.Named;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 import java.time.Duration;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -101,18 +98,12 @@ public abstract class ProtocolModuleTest {
           // tested separately in their respective unit tests.
           FullHttpRequestRelayHandler.class,
           FullHttpResponseRelayHandler.class,
-          // This handler is tested in its own unit tests. It is installed in web whois redirect
-          // protocols. The end-to-end tests for the rest of the handlers in its pipeline need to
-          // be able to emit incoming requests out of the channel for assertions. Therefore, this
-          // handler is removed from the pipeline.
-          WebWhoisRedirectHandler.class,
           // The rest are not part of business logic and do not need to be tested, obviously.
           LoggingHandler.class,
           // Metrics instrumentation is tested separately.
           BackendMetricsHandler.class,
           FrontendMetricsHandler.class,
           // Quota management is tested separately.
-          WhoisQuotaHandler.class,
           EppQuotaHandler.class,
           ReadTimeoutHandler.class);
 
@@ -189,16 +180,11 @@ public abstract class ProtocolModuleTest {
       modules = {
         TestModule.class,
         CertificateSupplierModule.class,
-        WhoisProtocolModule.class,
-        WebWhoisProtocolsModule.class,
         EppProtocolModule.class,
         HealthCheckProtocolModule.class,
         HttpsRelayProtocolModule.class
       })
   interface TestComponent {
-
-    @WhoisProtocol
-    ImmutableList<Provider<? extends ChannelHandler>> whoisHandlers();
 
     @EppProtocol
     ImmutableList<Provider<? extends ChannelHandler>> eppHandlers();
@@ -208,9 +194,6 @@ public abstract class ProtocolModuleTest {
 
     @HttpsRelayProtocol
     ImmutableList<Provider<? extends ChannelHandler>> httpsRelayHandlers();
-
-    @HttpWhoisProtocol
-    ImmutableList<Provider<? extends ChannelHandler>> httpWhoisHandlers();
   }
 
   /**
@@ -310,6 +293,26 @@ public abstract class ProtocolModuleTest {
     static Duration provideCertCachingDuration() {
       // Not used.
       return Duration.ofHours(1);
+    }
+
+    @Singleton
+    @Provides
+    @Named("frontendMetricsRatio")
+    static double provideFrontendMetricsRatio() {
+      return 1.0;
+    }
+
+    @Singleton
+    @Provides
+    @Named("backendMetricsRatio")
+    static double providebackendMetricsRatio() {
+      return 1.0;
+    }
+
+    @Singleton
+    @Provides
+    static Random provideRandom() {
+      return new Random();
     }
 
     // This method is only here to satisfy Dagger binding, but is never used. In test environment,

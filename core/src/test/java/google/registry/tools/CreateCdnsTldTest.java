@@ -55,7 +55,7 @@ class CreateCdnsTldTest extends CommandTestCase<CreateCdnsTld> {
         .setDnsName(dnsName)
         .setDescription(description)
         .setName(name)
-        .setDnssecConfig(new ManagedZoneDnsSecConfig().setState("ON").setNonExistence("NSEC"));
+        .setDnssecConfig(new ManagedZoneDnsSecConfig().setState("on").setNonExistence("nsec"));
   }
 
   @Test
@@ -71,16 +71,77 @@ class CreateCdnsTldTest extends CommandTestCase<CreateCdnsTld> {
   void testNameDefault() throws Exception {
     runCommand("--dns_name=tld.", "--description=test run", "--force");
     ManagedZone zone = requestBody.getValue();
-    assertThat(zone).isEqualTo(createZone("cloud-dns-registry-test", "test run", "tld.", "tld."));
+    assertThat(zone).isEqualTo(createZone("cloud-dns-registry-test", "test run", "tld.", "tld"));
   }
 
   @Test
   @MockitoSettings(strictness = Strictness.LENIENT)
-  void testSandboxTldRestrictions() {
+  void testSandboxTldRestrictions_Disallowed() {
     IllegalArgumentException thrown =
         assertThrows(
             IllegalArgumentException.class,
-            () -> runCommandInEnvironment(RegistryToolEnvironment.SANDBOX, "--dns_name=foobar."));
-    assertThat(thrown).hasMessageThat().contains("Sandbox TLDs must be of the form \"*.test.\"");
+            () ->
+                runCommandInEnvironment(
+                    RegistryToolEnvironment.SANDBOX,
+                    "--dns_name=foobar.",
+                    "--description=test run",
+                    "--force"));
+    assertThat(thrown)
+        .hasMessageThat()
+        .contains("Sandbox TLDs must be approved or in the form \"*.test.\"");
+  }
+
+  @Test
+  void testSandboxTldRestrictions_tldCheckSkipped() throws Exception {
+    runCommandInEnvironment(
+        RegistryToolEnvironment.SANDBOX,
+        "--dns_name=foobar.",
+        "--description=test run",
+        "--force",
+        "--skip_sandbox_tld_check");
+  }
+
+  @Test
+  void testSandboxTldRestrictions_testTld() throws Exception {
+    runCommandInEnvironment(
+        RegistryToolEnvironment.SANDBOX,
+        "--dns_name=abc.test.",
+        "--description=test run",
+        "--force");
+  }
+
+  @Test
+  void testSandbox_defaultNameServer() throws Exception {
+    runCommandInEnvironment(
+        RegistryToolEnvironment.SANDBOX,
+        "--dns_name=abc.test.",
+        "--description=test run",
+        "--force");
+    ManagedZone zone = requestBody.getValue();
+    assertThat(zone.getNameServerSet()).isEqualTo("cloud-dns-registry-test");
+  }
+
+  @Test
+  void testSandbox_useProdNameServer() throws Exception {
+    runCommandInEnvironment(
+        RegistryToolEnvironment.SANDBOX,
+        "--use_prod_name_servers_in_sandbox",
+        "--dns_name=abc.test.",
+        "--description=test run",
+        "--force");
+    ManagedZone zone = requestBody.getValue();
+    assertThat(zone.getNameServerSet()).isEqualTo("cloud-dns-registry");
+  }
+
+  @Test
+  void testProdNameServerFlag_ignoredIfNotSandbox() throws Exception {
+    runCommandInEnvironment(
+        RegistryToolEnvironment.QA,
+        "--use_prod_name_servers_in_sandbox",
+        "--dns_name=abc.test.",
+        "--description=test run",
+        "--force");
+    ManagedZone zone = requestBody.getValue();
+    assertThat(zone.getNameServerSet()).isEqualTo("cloud-dns-registry-test");
   }
 }

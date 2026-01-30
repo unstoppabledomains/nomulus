@@ -52,17 +52,8 @@ public enum RegistryEnvironment {
   /** System property for configuring which environment we should use. */
   private static final String PROPERTY = "google.registry.environment";
 
-  /**
-   * System property for if Nomulus is running on top of a self-hosted Jetty server (i.e., not in
-   * App Engine).
-   */
-  private static final String JETTY_PROPERTY = "google.registry.jetty";
-
   /** Name of the environmental variable of the container name. */
   private static final String CONTAINER_ENV = "CONTAINER_NAME";
-
-  private static final boolean ON_JETTY =
-      Boolean.parseBoolean(System.getProperty(JETTY_PROPERTY, "false"));
 
   private static final boolean IS_CANARY =
       System.getenv().getOrDefault(CONTAINER_ENV, "").endsWith("-canary");
@@ -98,10 +89,6 @@ public enum RegistryEnvironment {
   /** Returns environment configured by system property {@value #PROPERTY}. */
   public static RegistryEnvironment get() {
     return valueOf(Ascii.toUpperCase(System.getProperty(PROPERTY, UNITTEST.name())));
-  }
-
-  public static boolean isOnJetty() {
-    return ON_JETTY;
   }
 
   public static boolean isCanary() {

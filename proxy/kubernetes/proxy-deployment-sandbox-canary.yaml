@@ -33,6 +33,13 @@ spec:
             port: health-check
           initialDelaySeconds: 15
           periodSeconds: 20
+        resources:
+          requests:
+            cpu: "300m"
+            memory: "350Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         imagePullPolicy: Always
         args: ["--env", "sandbox_canary", "--log"]
         env:

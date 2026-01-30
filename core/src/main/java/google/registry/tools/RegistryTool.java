@@ -30,6 +30,7 @@ public final class RegistryTool {
   public static final ImmutableMap<String, Class<? extends Command>> COMMAND_MAP =
       new ImmutableMap.Builder<String, Class<? extends Command>>()
           .put("ack_poll_messages", AckPollMessagesCommand.class)
+          .put("bulk_domain_transfer", BulkDomainTransferCommand.class)
           .put("canonicalize_labels", CanonicalizeLabelsCommand.class)
           .put("check_domain", CheckDomainCommand.class)
           .put("check_domain_claims", CheckDomainClaimsCommand.class)
@@ -54,6 +55,7 @@ public final class RegistryTool {
           .put("curl", CurlCommand.class)
           .put("delete_allocation_tokens", DeleteAllocationTokensCommand.class)
           .put("delete_domain", DeleteDomainCommand.class)
+          .put("delete_feature_flag", DeleteFeatureFlagCommand.class)
           .put("delete_host", DeleteHostCommand.class)
           .put("delete_premium_list", DeletePremiumListCommand.class)
           .put("delete_reserved_list", DeleteReservedListCommand.class)
@@ -98,6 +100,7 @@ public final class RegistryTool {
           .put("login", LoginCommand.class)
           .put("logout", LogoutCommand.class)
           .put("pending_escrow", PendingEscrowCommand.class)
+          .put("rdap_query", RdapQueryCommand.class)
           .put("recreate_billing_recurrences", RecreateBillingRecurrencesCommand.class)
           .put("registrar_poc", RegistrarPocCommand.class)
           .put("renew_domain", RenewDomainCommand.class)
@@ -122,7 +125,6 @@ public final class RegistryTool {
           .put("validate_escrow_deposit", ValidateEscrowDepositCommand.class)
           .put("validate_login_credentials", ValidateLoginCredentialsCommand.class)
           .put("verify_ote", VerifyOteCommand.class)
-          .put("whois_query", WhoisQueryCommand.class)
           .build();
 
   public static void main(String[] args) throws Exception {

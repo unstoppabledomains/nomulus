@@ -30,7 +30,6 @@ def screenshotsForGoldensDir = "${project.buildDir}/screenshots_for_goldens"
 def newGoldensDir = "${project.buildDir}/new_golden_images"
 def goldensDir =
   "${javaTestDir}/google/registry/webdriver/goldens/chrome-linux"
-def jsDir = "${project.projectDir}/src/main/javascript"
 
 // Tests that fail when running Gradle in a docker container, e. g. when
 // building the release artifacts in Google Cloud Build.
@@ -55,12 +54,12 @@ def dockerIncompatibleTestPatterns = [
 // objects retained by frameworks.
 // TODO(weiminyu): identify cause and fix offending tests.
 def fragileTestPatterns = [
-    // Changes cache timeouts and for some reason appears to have contention
-    // with other tests.
-    "google/registry/whois/WhoisCommandFactoryTest.*",
+    // Breaks random other tests when running with standardTests.
+    "google/registry/bsa/UploadBsaUnavailableDomainsActionTest.*",
     // Currently changes a global configuration parameter that for some reason
     // results in timestamp inversions for other tests.  TODO(mmuller): fix.
     "google/registry/flows/host/HostInfoFlowTest.*",
+    "google/registry/beam/common/RegistryPipelineWorkerInitializerTest.*",
 ] + dockerIncompatibleTestPatterns
 
 sourceSets {
@@ -111,7 +110,7 @@ configurations {
   // for details.
   nomulus_test
 
-  // Exclude non-canonical servlet-api jars. Our AppEngine deployment uses
+  // Exclude non-canonical servlet-api jars. Our deployment uses
   // javax.servlet:servlet-api:2.5
   // For reasons we do not understand, marking the following dependencies as
   // compileOnly instead of compile does not exclude them from runtimeClasspath.
@@ -271,7 +270,6 @@ dependencies {
   testImplementation deps['org.hamcrest:hamcrest']
   testImplementation deps['org.hamcrest:hamcrest-core']
   testImplementation deps['org.hamcrest:hamcrest-library']
-  testImplementation deps['junit:junit']
   testImplementation deps['org.junit.jupiter:junit-jupiter-api']
   testImplementation deps['org.junit.jupiter:junit-jupiter-engine']
   testImplementation deps['org.junit.jupiter:junit-jupiter-migrationsupport']
@@ -646,23 +644,6 @@ tasks.testUberJar {
 artifacts {
   nomulus_test nomulusFossJar
   nomulus_test testUberJar
-}
-
-publishing {
-  repositories {
-    maven {
-      url project.publish_repo
-    }
-  }
-  publications {
-    nomulusTestsPublication(MavenPublication) {
-      groupId 'google.registry'
-      artifactId 'nomulus_test'
-      version project.nomulus_version
-      artifact nomulusFossJar
-      artifact testUberJar
-    }
-  }
 }
 
 task buildToolImage(dependsOn: nomulus, type: Exec) {

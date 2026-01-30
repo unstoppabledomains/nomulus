@@ -139,7 +139,7 @@
         description text,
         method text not null,
         modification_time timestamp(6) with time zone not null,
-        type text not null check (type in ('DOMAIN_DELETE','DOMAIN_SUSPEND','DOMAIN_UNSUSPEND','EPP_PASSWORD_UPDATE','REGISTRAR_CREATE','REGISTRAR_SECURITY_UPDATE','REGISTRAR_UPDATE','USER_CREATE','USER_DELETE','USER_UPDATE')),
+        type text not null check (type in ('DUM_DOWNLOAD','DOMAIN_DELETE','DOMAIN_SUSPEND','DOMAIN_UNSUSPEND','EPP_PASSWORD_UPDATE','REGISTRAR_CREATE','REGISTRAR_CONTACTS_UPDATE','REGISTRAR_SECURITY_UPDATE','REGISTRAR_UPDATE','REGISTRY_LOCK','REGISTRY_UNLOCK','USER_CREATE','USER_DELETE','USER_UPDATE')),
         url text not null,
         acting_user text not null,
         primary key (revision_id)
@@ -562,6 +562,17 @@
         primary key (package_promotion_id)
     );
 
+    create table "PasswordResetRequest" (
+        verification_code text not null,
+        destination_email text not null,
+        fulfillment_time timestamp(6) with time zone,
+        registrar_id text not null,
+        request_time timestamp(6) with time zone not null,
+        requester text not null,
+        type text not null check (type in ('EPP','REGISTRY_LOCK')),
+        primary key (verification_code)
+    );
+
     create table "PollMessage" (
         type text not null,
         poll_message_id bigint not null,
@@ -672,13 +683,10 @@
     create table "RegistrarPoc" (
         email_address text not null,
         registrar_id text not null,
-        allowed_to_set_registry_lock_password boolean not null,
         fax_number text,
+        id bigint,
         name text,
         phone_number text,
-        registry_lock_email_address text,
-        registry_lock_password_hash text,
-        registry_lock_password_salt text,
         types text[],
         visible_in_domain_whois_as_abuse boolean not null,
         visible_in_whois_as_admin boolean not null,
@@ -754,7 +762,6 @@
         tld_name text not null,
         add_grace_period_length interval not null,
         allowed_fully_qualified_host_names text[],
-        allowed_registrant_contact_ids text[],
         anchor_tenant_add_grace_period_length interval not null,
         auto_renew_grace_period_length interval not null,
         automatic_transfer_length interval not null,

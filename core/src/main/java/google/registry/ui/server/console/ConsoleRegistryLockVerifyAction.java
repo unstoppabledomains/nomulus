@@ -14,15 +14,16 @@
 
 package google.registry.ui.server.console;
 
+import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.request.Action.Method.GET;
 
 import com.google.common.base.Ascii;
 import com.google.gson.annotations.Expose;
+import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.User;
 import google.registry.model.domain.RegistryLock;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.tools.DomainLockUtils;
@@ -31,8 +32,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /** Handler for verifying registry lock requests, a form of 2FA. */
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = ConsoleRegistryLockVerifyAction.PATH,
     method = {GET},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
@@ -64,6 +64,21 @@ public class ConsoleRegistryLockVerifyAction extends ConsoleApiAction {
     RegistryLockVerificationResponse lockResponse =
         new RegistryLockVerificationResponse(
             Ascii.toLowerCase(action.toString()), lock.getDomainName(), lock.getRegistrarId());
+    tm().transact(
+            () -> {
+              finishAndPersistConsoleUpdateHistory(
+                  new ConsoleUpdateHistory.Builder()
+                      .setType(
+                          action == RegistryLockAction.LOCKED
+                              ? ConsoleUpdateHistory.Type.REGISTRY_LOCK
+                              : ConsoleUpdateHistory.Type.REGISTRY_UNLOCK)
+                      .setDescription(
+                          String.format(
+                              "%s%s%s",
+                              lock.getRegistrarId(),
+                              ConsoleUpdateHistory.DESCRIPTION_SEPARATOR,
+                              lockResponse)));
+            });
     consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(lockResponse));
     consoleApiParams.response().setStatus(HttpServletResponse.SC_OK);
   }

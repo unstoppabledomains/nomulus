@@ -23,7 +23,6 @@ import static google.registry.model.eppcommon.EppXmlTransformer.marshal;
 import static google.registry.model.tld.Tld.TldState.QUIET_PERIOD;
 import static google.registry.testing.DatabaseHelper.assertNoBillingEvents;
 import static google.registry.testing.DatabaseHelper.createTld;
-import static google.registry.testing.DatabaseHelper.persistActiveContact;
 import static google.registry.testing.DatabaseHelper.persistActiveHost;
 import static google.registry.testing.DatabaseHelper.persistBillingRecurrenceForDomain;
 import static google.registry.testing.DatabaseHelper.persistPremiumList;
@@ -55,10 +54,6 @@ import google.registry.model.billing.BillingBase.Flag;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingBase.RenewalPriceBehavior;
 import google.registry.model.billing.BillingRecurrence;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactAuthInfo;
-import google.registry.model.domain.DesignatedContact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainHistory;
@@ -103,8 +98,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   private static final Pattern OK_PATTERN = Pattern.compile("\"ok\"");
 
-  private Contact registrant;
-  private Contact contact;
   private Host host1;
   private Host host2;
   private Host host3;
@@ -124,8 +117,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   }
 
   private void persistTestEntities(String domainName, boolean inactive) {
-    registrant = persistActiveContact("jd1234");
-    contact = persistActiveContact("sh8013");
     host1 = persistActiveHost("ns1.example.tld");
     host2 = persistActiveHost("ns1.example.net");
     domain =
@@ -140,11 +131,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
                 .setLastEppUpdateTime(DateTime.parse("1999-12-03T09:00:00.0Z"))
                 .setLastTransferTime(DateTime.parse("2000-04-08T09:00:00.0Z"))
                 .setRegistrationExpirationTime(DateTime.parse("2005-04-03T22:00:00.0Z"))
-                .setRegistrant(Optional.of(registrant.createVKey()))
-                .setContacts(
-                    ImmutableSet.of(
-                        DesignatedContact.create(Type.ADMIN, contact.createVKey()),
-                        DesignatedContact.create(Type.TECH, contact.createVKey())))
                 .setNameservers(
                     inactive ? null : ImmutableSet.of(host1.createVKey(), host2.createVKey()))
                 .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("2fooBAR")))
@@ -179,7 +165,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
       ImmutableMap<String, String> substitutions,
       boolean expectHistoryAndBilling)
       throws Exception {
-    assertMutatingFlow(false);
+    assertMutatingFlow(true);
     String expected =
         loadFile(expectedXmlFilename, updateSubstitutions(substitutions, "ROID", "2FF-TLD"));
     if (inactive) {
@@ -321,24 +307,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput("domain_info_with_auth.xml");
     sessionMetadata.setRegistrarId("ClientZ");
     doSuccessfulTest("domain_info_response.xml");
-  }
-
-  @Test
-  void testSuccess_differentRegistrarWithRegistrantAuthInfo() throws Exception {
-    persistTestEntities(false);
-    setEppInput("domain_info_with_contact_auth.xml");
-    eppLoader.replaceAll("JD1234-REP", registrant.getRepoId());
-    sessionMetadata.setRegistrarId("ClientZ");
-    doSuccessfulTest("domain_info_response.xml", false);
-  }
-
-  @Test
-  void testSuccess_differentRegistrarWithContactAuthInfo() throws Exception {
-    persistTestEntities(false);
-    setEppInput("domain_info_with_contact_auth.xml");
-    eppLoader.replaceAll("JD1234-REP", registrant.getRepoId());
-    sessionMetadata.setRegistrarId("ClientZ");
-    doSuccessfulTest("domain_info_response.xml", false);
   }
 
   @Test
@@ -619,96 +587,112 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   }
 
   @Test
-  void testFailure_differentRegistrarWrongRegistrantAuthInfo() {
+  void testIcannActivityReportField_getsLogged() throws Exception {
     persistTestEntities(false);
-    // Change the password of the registrant so that it does not match the file.
-    registrant =
+    runFlow();
+    assertIcannReportingActivityFieldLogged("srs-dom-info");
+    assertTldsFieldLogged("tld");
+  }
+
+  @Test
+  void testBulkInfoExtension_returnsBulkInfo() throws Exception {
+    persistTestEntities(false);
+    AllocationToken token =
         persistResource(
-            registrant
-                .asBuilder()
-                .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("diffpw")))
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
                 .build());
-    sessionMetadata.setRegistrarId("ClientZ");
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our registrant.
-    eppLoader.replaceAll("JD1234-REP", registrant.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_bulk.xml", false);
   }
 
   @Test
-  void testFailure_wrongRegistrantAuthInfo() {
+  void testBulkInfoExtension_returnsBulkInfoForSuperUser() throws Exception {
     persistTestEntities(false);
-    // Change the password of the registrant so that it does not match the file.
-    registrant =
+    AllocationToken token =
         persistResource(
-            registrant
-                .asBuilder()
-                .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("diffpw")))
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
                 .build());
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our registrant.
-    eppLoader.replaceAll("JD1234-REP", registrant.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    sessionMetadata.setRegistrarId("TheRegistrar");
+    setEppInput("domain_info_bulk.xml");
+    EppOutput output = runFlowAsSuperuser();
+    String expectedOutput =
+        loadFile(
+            "domain_info_response_superuser_bulk.xml",
+            updateSubstitutions(ImmutableMap.of(), "ROID", "2FF-TLD"));
+    assertXmlEquals(expectedOutput, new String(marshal(output, ValidationMode.LENIENT), UTF_8));
   }
 
   @Test
-  void testFailure_differentRegistrarWrongContactAuthInfo() {
+  void testBulkInfoExtension_nameNotInBulkPackage() throws Exception {
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_empty_bulk_package.xml");
+  }
+
+  @Test
+  void testBulkInfoExtension_notCurrentSponsorRegistrar() throws Exception {
     persistTestEntities(false);
-    // Change the password of the contact so that it does not match the file.
-    contact =
+    AllocationToken token =
         persistResource(
-            contact
-                .asBuilder()
-                .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("diffpw")))
+            new AllocationToken.Builder()
+                .setToken("abc123")
+                .setTokenType(TokenType.BULK_PRICING)
+                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
+                .setAllowedTlds(ImmutableSet.of("foo"))
+                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
+                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
+                .setRenewalPrice(Money.of(USD, 0))
+                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
+                .setDiscountFraction(1.0)
                 .build());
-    sessionMetadata.setRegistrarId("ClientZ");
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our contact.
-    eppLoader.replaceAll("JD1234-REP", contact.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
+    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
+    persistResource(domain);
+    sessionMetadata.setRegistrarId("TheRegistrar");
+    setEppInput("domain_info_bulk.xml");
+    doSuccessfulTest("domain_info_response_unauthorized.xml", false);
   }
 
+  // The fee extension is no longer supported in domain:info commands as of version 1.0.
+  // For now, we still support old versions.
   @Test
-  void testFailure_wrongContactAuthInfo() {
-    persistTestEntities(false);
-    // Change the password of the contact so that it does not match the file.
-    contact =
-        persistResource(
-            contact
-                .asBuilder()
-                .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("diffpw")))
-                .build());
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our contact.
-    eppLoader.replaceAll("JD1234-REP", contact.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testFailure_differentRegistrarUnrelatedContactAuthInfo() {
-    persistTestEntities(false);
-    Contact unrelatedContact = persistActiveContact("foo1234");
-    sessionMetadata.setRegistrarId("ClientZ");
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our unrelated contact.
-    eppLoader.replaceAll("JD1234-REP", unrelatedContact.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testFailure_unrelatedContactAuthInfo() {
-    persistTestEntities(false);
-    Contact unrelatedContact = persistActiveContact("foo1234");
-    setEppInput("domain_info_with_contact_auth.xml");
-    // Replace the ROID in the xml file with the one for our unrelated contact.
-    eppLoader.replaceAll("JD1234-REP", unrelatedContact.getRepoId());
-    EppException thrown = assertThrows(BadAuthInfoForResourceException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
+  void testFeeExtension_restoreCommand_pendingDelete_withRenewal() throws Exception {
+    createTld("example");
+    setEppInput(
+        "domain_info_fee.xml",
+        updateSubstitutions(
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "restore", "PERIOD", "1"));
+    persistTestEntities("rich.example", false);
+    setUpBillingEventForExistingDomain();
+    persistResource(
+        domain
+            .asBuilder()
+            .setDeletionTime(clock.nowUtc().plusDays(25))
+            .setRegistrationExpirationTime(clock.nowUtc().minusDays(1))
+            .setStatusValues(ImmutableSet.of(StatusValue.PENDING_DELETE))
+            .build());
+    doSuccessfulTest(
+        "domain_info_fee_restore_response_with_renewal.xml", false, ImmutableMap.of(), true);
   }
 
   /**
@@ -719,10 +703,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_createCommand() throws Exception {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "create",
-            "PERIOD", "2"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "create", "PERIOD", "2"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -741,10 +722,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_renewCommand() throws Exception {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "renew",
-            "PERIOD", "2"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "renew", "PERIOD", "2"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -763,10 +741,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_transferCommand() throws Exception {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "transfer",
-            "PERIOD", "1"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "transfer", "PERIOD", "1"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -785,10 +760,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_restoreCommand() throws Exception {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "restore",
-            "PERIOD", "1"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "restore", "PERIOD", "1"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest("domain_info_fee_restore_response.xml", false, ImmutableMap.of(), true);
@@ -811,26 +783,6 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
         "domain_info_fee_restore_response_no_renewal.xml", false, ImmutableMap.of(), true);
   }
 
-  @Test
-  void testFeeExtension_restoreCommand_pendingDelete_withRenewal() throws Exception {
-    createTld("example");
-    setEppInput(
-        "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "restore", "PERIOD", "1"));
-    persistTestEntities("rich.example", false);
-    setUpBillingEventForExistingDomain();
-    persistResource(
-        domain
-            .asBuilder()
-            .setDeletionTime(clock.nowUtc().plusDays(25))
-            .setRegistrationExpirationTime(clock.nowUtc().minusDays(1))
-            .setStatusValues(ImmutableSet.of(StatusValue.PENDING_DELETE))
-            .build());
-    doSuccessfulTest(
-        "domain_info_fee_restore_response_with_renewal.xml", false, ImmutableMap.of(), true);
-  }
-
   /** Test create command on a premium label. */
   @Test
   void testFeeExtension_createCommandPremium() throws Exception {
@@ -838,10 +790,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "NAME", "rich.example",
-            "COMMAND", "create",
-            "PERIOD", "1"));
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "create", "PERIOD", "1"));
     persistTestEntities("rich.example", false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -858,10 +807,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "NAME", "rich.example",
-            "COMMAND", "renew",
-            "PERIOD", "1"));
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "renew", "PERIOD", "1"));
     persistTestEntities("rich.example", false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -973,10 +919,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "NAME", "rich.example",
-            "COMMAND", "transfer",
-            "PERIOD", "1"));
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "transfer", "PERIOD", "1"));
     persistTestEntities("rich.example", false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -993,10 +936,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "NAME", "rich.example",
-            "COMMAND", "restore",
-            "PERIOD", "1"));
+            SUBSTITUTION_BASE, "NAME", "rich.example", "COMMAND", "restore", "PERIOD", "1"));
     persistTestEntities("rich.example", false);
     setUpBillingEventForExistingDomain();
     doSuccessfulTest(
@@ -1009,26 +949,10 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "create",
-            "CURRENCY", "EUR",
-            "PERIOD", "1"));
+            SUBSTITUTION_BASE, "COMMAND", "create", "CURRENCY", "EUR", "PERIOD", "1"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     EppException thrown = assertThrows(CurrencyUnitMismatchException.class, this::runFlow);
-    assertAboutEppExceptions().that(thrown).marshalsToXml();
-  }
-
-  @Test
-  void testFeeExtension_unknownCurrency() {
-    setEppInput(
-        "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "create",
-            "CURRENCY", "BAD",
-            "PERIOD", "1"));
-    EppException thrown = assertThrows(UnknownCurrencyEppException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
@@ -1037,11 +961,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_periodNotInYears() {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "create",
-            "PERIOD", "2",
-            "UNIT", "m"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "create", "PERIOD", "2", "UNIT", "m"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     EppException thrown = assertThrows(BadPeriodUnitException.class, this::runFlow);
@@ -1073,10 +993,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_multiyearRestore() {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "restore",
-            "PERIOD", "2"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "restore", "PERIOD", "2"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     EppException thrown = assertThrows(RestoresAreAlwaysForOneYearException.class, this::runFlow);
@@ -1088,10 +1005,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   void testFeeExtension_multiyearTransfer() {
     setEppInput(
         "domain_info_fee.xml",
-        updateSubstitutions(
-            SUBSTITUTION_BASE,
-            "COMMAND", "transfer",
-            "PERIOD", "2"));
+        updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "transfer", "PERIOD", "2"));
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
     EppException thrown = assertThrows(TransfersAreAlwaysForOneYearException.class, this::runFlow);
@@ -1099,89 +1013,12 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   }
 
   @Test
-  void testIcannActivityReportField_getsLogged() throws Exception {
-    persistTestEntities(false);
-    runFlow();
-    assertIcannReportingActivityFieldLogged("srs-dom-info");
-    assertTldsFieldLogged("tld");
-  }
-
-  @Test
-  void testBulkInfoExtension_returnsBulkInfo() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_bulk.xml", false);
-  }
-
-  @Test
-  void testBulkInfoExtension_returnsBulkInfoForSuperUser() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    sessionMetadata.setRegistrarId("TheRegistrar");
-    setEppInput("domain_info_bulk.xml");
-    EppOutput output = runFlowAsSuperuser();
-    String expectedOutput =
-        loadFile(
-            "domain_info_response_superuser_bulk.xml",
-            updateSubstitutions(ImmutableMap.of(), "ROID", "2FF-TLD"));
-    assertXmlEquals(expectedOutput, new String(marshal(output, ValidationMode.LENIENT), UTF_8));
-  }
-
-  @Test
-  void testBulkInfoExtension_nameNotInBulkPackage() throws Exception {
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_empty_bulk_package.xml");
-  }
-
-  @Test
-  void testBulkInfoExtension_notCurrentSponsorRegistrar() throws Exception {
-    persistTestEntities(false);
-    AllocationToken token =
-        persistResource(
-            new AllocationToken.Builder()
-                .setToken("abc123")
-                .setTokenType(TokenType.BULK_PRICING)
-                .setCreationTimeForTest(DateTime.parse("2010-11-12T05:00:00Z"))
-                .setAllowedTlds(ImmutableSet.of("foo"))
-                .setAllowedRegistrarIds(ImmutableSet.of("NewRegistrar"))
-                .setRenewalPriceBehavior(RenewalPriceBehavior.SPECIFIED)
-                .setRenewalPrice(Money.of(USD, 0))
-                .setAllowedEppActions(ImmutableSet.of(CommandName.CREATE))
-                .setDiscountFraction(1.0)
-                .build());
-    domain = domain.asBuilder().setCurrentBulkToken(token.createVKey()).build();
-    persistResource(domain);
-    sessionMetadata.setRegistrarId("TheRegistrar");
-    setEppInput("domain_info_bulk.xml");
-    doSuccessfulTest("domain_info_response_unauthorized.xml", false);
+  void testFeeExtension_unknownCurrency() {
+    setEppInput(
+        "domain_info_fee.xml",
+        updateSubstitutions(
+            SUBSTITUTION_BASE, "COMMAND", "create", "CURRENCY", "BAD", "PERIOD", "1"));
+    EppException thrown = assertThrows(UnknownCurrencyEppException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 }

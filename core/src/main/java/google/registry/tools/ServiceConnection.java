@@ -19,7 +19,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.net.HttpHeaders.X_REQUESTED_WITH;
 import static com.google.common.net.MediaType.JSON_UTF_8;
-import static google.registry.config.ConfigUtils.makeUrl;
 import static google.registry.config.RegistryConfig.CANARY_HEADER;
 import static google.registry.security.JsonHttp.JSON_SAFETY_PREFIX;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -35,10 +34,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import com.google.common.net.MediaType;
-import com.google.re2j.Pattern;
 import google.registry.config.RegistryConfig.Config;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
 import google.registry.request.Action.Service;
 import jakarta.inject.Inject;
 import java.io.IOException;
@@ -51,13 +47,10 @@ import org.json.simple.JSONValue;
 /**
  * An HTTP connection to a service.
  *
- * <p>By default - connects to the TOOLS service in GAE and the BACKEND service in GKE. To create a
- * Connection to another service, call the {@link #withService} function.
+ * <p>By default - connects the BACKEND service. To create a connection to another service, call the
+ * {@link #withService} function.
  */
 public class ServiceConnection {
-
-  /** Pattern to heuristically extract title tag contents in HTML responses. */
-  protected static final Pattern HTML_TITLE_TAG_PATTERN = Pattern.compile("<title>(.*?)</title>");
 
   private final Service service;
   private final boolean useCanary;
@@ -65,10 +58,9 @@ public class ServiceConnection {
 
   @Inject
   ServiceConnection(
-      @Config("useGke") boolean useGke,
       @Config("useCanary") boolean useCanary,
       HttpRequestFactory requestFactory) {
-    this(useGke ? GkeService.BACKEND : GaeService.TOOLS, requestFactory, useCanary);
+    this(Service.BACKEND, requestFactory, useCanary);
   }
 
   private ServiceConnection(Service service, HttpRequestFactory requestFactory, boolean useCanary) {
@@ -79,14 +71,6 @@ public class ServiceConnection {
 
   /** Returns a copy of this connection that talks to a different service endpoint. */
   public ServiceConnection withService(Service service, boolean useCanary) {
-    Class<? extends Service> oldServiceClazz = this.service.getClass();
-    Class<? extends Service> newServiceClazz = service.getClass();
-    if (oldServiceClazz != newServiceClazz) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Cannot switch from %s to %s",
-              oldServiceClazz.getSimpleName(), newServiceClazz.getSimpleName()));
-    }
     return new ServiceConnection(service, requestFactory, useCanary);
   }
 
@@ -140,12 +124,6 @@ public class ServiceConnection {
   URL getServer() {
     URL url = service.getServiceUrl();
     verify(!isNullOrEmpty(url.getHost()), "Null host in url");
-    if (useCanary && service instanceof GaeService) {
-      url =
-          makeUrl(
-              String.format(
-                  "%s://nomulus-dot-%s%s", url.getProtocol(), url.getHost(), url.getFile()));
-    }
     return url;
   }
 

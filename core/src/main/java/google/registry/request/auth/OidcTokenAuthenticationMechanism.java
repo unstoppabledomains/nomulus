@@ -30,6 +30,7 @@ import google.registry.request.auth.AuthModule.IapOidc;
 import google.registry.request.auth.AuthModule.RegularOidc;
 import google.registry.request.auth.AuthSettings.AuthLevel;
 import google.registry.util.RegistryEnvironment;
+import google.registry.util.StopwatchLogger;
 import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
@@ -77,19 +78,18 @@ public abstract class OidcTokenAuthenticationMechanism implements Authentication
       logger.atWarning().log("Using AuthResult %s for testing.", authResultForTesting);
       return authResultForTesting;
     }
+    final StopwatchLogger stopwatch = new StopwatchLogger();
     String rawIdToken = tokenExtractor.extract(request);
+    stopwatch.tick("OidcTokenAuthenticationMechanism tokenExtractor extracted");
     if (rawIdToken == null) {
       return AuthResult.NOT_AUTHENTICATED;
     }
     JsonWebSignature token = null;
     try {
-      String service = null;
-      if (RegistryEnvironment.isOnJetty()) {
-        String hostname = request.getServerName();
-        service = Splitter.on('.').split(hostname).iterator().next();
-        if (request.getHeader("canary") != null) {
-          service += "-canary";
-        }
+      String hostname = request.getServerName();
+      String service = Splitter.on('.').split(hostname).iterator().next();
+      if (request.getHeader("canary") != null) {
+        service += "-canary";
       }
       token = tokenVerifier.verify(service, rawIdToken);
     } catch (Exception e) {
@@ -99,7 +99,7 @@ public abstract class OidcTokenAuthenticationMechanism implements Authentication
               ? "Raw token redacted in prod"
               : rawIdToken);
     }
-
+    stopwatch.tick("OidcTokenAuthenticationMechanism token verified");
     if (token == null) {
       return AuthResult.NOT_AUTHENTICATED;
     }
@@ -109,16 +109,23 @@ public abstract class OidcTokenAuthenticationMechanism implements Authentication
       logger.atInfo().log("No email address from the OIDC token:\n%s", token.getPayload());
       return AuthResult.NOT_AUTHENTICATED;
     }
+
+    // Short-circuit the user lookup for known service accounts.
+    // This check bypasses the database lookup for high-volume
+    // traffic from trusted system accounts to reduce database load.
+
+    if (serviceAccountEmails.contains(email)) {
+      return AuthResult.createApp(email);
+    }
+    logger.atInfo().log("No service account found for email address %s, loading the User", email);
     Optional<User> maybeUser =
         tm().transact(() -> tm().loadByKeyIfPresent(VKey.create(User.class, email)));
+    stopwatch.tick("OidcTokenAuthenticationMechanism maybeUser loaded");
     if (maybeUser.isPresent()) {
       return AuthResult.createUser(maybeUser.get());
     }
     logger.atInfo().log("No end user found for email address %s", email);
-    if (serviceAccountEmails.stream().anyMatch(e -> e.equals(email))) {
-      return AuthResult.createApp(email);
-    }
-    logger.atInfo().log("No service account found for email address %s", email);
+
     logger.atWarning().log(
         "The email address %s is not tied to a principal with access to Nomulus", email);
     return AuthResult.NOT_AUTHENTICATED;

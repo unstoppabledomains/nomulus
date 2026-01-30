@@ -17,18 +17,19 @@ package google.registry.ui.server.console;
 import static com.google.common.base.Preconditions.checkArgument;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.request.Action.Method.POST;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static google.registry.util.PreconditionsUtils.checkArgumentPresent;
 import static org.apache.http.HttpStatus.SC_OK;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.flogger.FluentLogger;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
@@ -37,14 +38,16 @@ import google.registry.util.RegistryEnvironment;
 import jakarta.inject.Inject;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.joda.time.DateTime;
 
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = ConsoleUpdateRegistrarAction.PATH,
     method = {POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
 public class ConsoleUpdateRegistrarAction extends ConsoleApiAction {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+  private static final String CHANGE_LOG_ENTRY = "%s updated on %s, old -> %s, new -> %s";
   static final String PATH = "/console-api/registrar";
   private final Optional<Registrar> registrar;
 
@@ -74,37 +77,57 @@ public class ConsoleUpdateRegistrarAction extends ConsoleApiAction {
                   registrarParam.getRegistrarId());
 
               // Only allow modifying allowed TLDs if we're in a non-PRODUCTION environment, if the
-              // registrar is not REAL, or the registrar has a WHOIS abuse contact set.
+              // registrar is not REAL, or the registrar has a RDAP abuse contact set.
               if (!registrarParam.getAllowedTlds().isEmpty()) {
                 boolean isRealRegistrar =
                     Registrar.Type.REAL.equals(existingRegistrar.get().getType());
                 if (RegistryEnvironment.PRODUCTION.equals(RegistryEnvironment.get())
                     && isRealRegistrar) {
                   checkArgumentPresent(
-                      existingRegistrar.get().getWhoisAbuseContact(),
-                      "Cannot modify allowed TLDs if there is no WHOIS abuse contact set. Please"
+                      existingRegistrar.get().getRdapAbuseContact(),
+                      "Cannot modify allowed TLDs if there is no RDAP abuse contact set. Please"
                           + " use the \"nomulus registrar_contact\" command on this registrar to"
-                          + " set a WHOIS abuse contact.");
+                          + " set a RDAP abuse contact.");
                 }
               }
 
-              Registrar updatedRegistrar =
+              DateTime now = tm().getTransactionTime();
+              DateTime newLastPocVerificationDate =
+                  registrarParam.getLastPocVerificationDate() == null
+                      ? START_OF_TIME
+                      : registrarParam.getLastPocVerificationDate();
+
+              checkArgument(
+                  newLastPocVerificationDate.isBefore(now),
+                  "Invalid value of LastPocVerificationDate - value is in the future");
+
+              var updatedRegistrarBuilder =
                   existingRegistrar
                       .get()
                       .asBuilder()
-                      .setAllowedTlds(
-                          registrarParam.getAllowedTlds().stream()
-                              .map(DomainNameUtils::canonicalizeHostname)
-                              .collect(Collectors.toSet()))
-                      .setRegistryLockAllowed(registrarParam.isRegistryLockAllowed())
-                      .setLastPocVerificationDate(registrarParam.getLastPocVerificationDate())
-                      .build();
+                      .setLastPocVerificationDate(newLastPocVerificationDate);
 
+              if (user.getUserRoles()
+                  .hasGlobalPermission(ConsolePermission.EDIT_REGISTRAR_DETAILS)) {
+                updatedRegistrarBuilder =
+                    updatedRegistrarBuilder
+                        .setAllowedTlds(
+                            registrarParam.getAllowedTlds().stream()
+                                .map(DomainNameUtils::canonicalizeHostname)
+                                .collect(Collectors.toSet()))
+                        .setRegistryLockAllowed(registrarParam.isRegistryLockAllowed())
+                        .setLastPocVerificationDate(newLastPocVerificationDate);
+              }
+
+              var updatedRegistrar = updatedRegistrarBuilder.build();
               tm().put(updatedRegistrar);
               finishAndPersistConsoleUpdateHistory(
                   new ConsoleUpdateHistory.Builder()
                       .setType(ConsoleUpdateHistory.Type.REGISTRAR_UPDATE)
                       .setDescription(updatedRegistrar.getRegistrarId()));
+
+              logConsoleChangesIfNecessary(updatedRegistrar, existingRegistrar.get());
+
               sendExternalUpdatesIfNecessary(
                   EmailInfo.create(
                       existingRegistrar.get(),
@@ -114,5 +137,26 @@ public class ConsoleUpdateRegistrarAction extends ConsoleApiAction {
             });
 
     consoleApiParams.response().setStatus(SC_OK);
+  }
+
+  private void logConsoleChangesIfNecessary(
+      Registrar updatedRegistrar, Registrar existingRegistrar) {
+    if (!updatedRegistrar.getAllowedTlds().containsAll(existingRegistrar.getAllowedTlds())) {
+      logger.atInfo().log(
+          CHANGE_LOG_ENTRY,
+          "Allowed TLDs",
+          updatedRegistrar.getRegistrarId(),
+          existingRegistrar.getAllowedTlds(),
+          updatedRegistrar.getAllowedTlds());
+    }
+
+    if (updatedRegistrar.isRegistryLockAllowed() != existingRegistrar.isRegistryLockAllowed()) {
+      logger.atInfo().log(
+          CHANGE_LOG_ENTRY,
+          "Registry lock",
+          updatedRegistrar.getRegistrarId(),
+          existingRegistrar.isRegistryLockAllowed(),
+          updatedRegistrar.isRegistryLockAllowed());
+    }
   }
 }

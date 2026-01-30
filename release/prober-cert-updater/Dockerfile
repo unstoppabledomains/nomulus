@@ -17,9 +17,11 @@
 # needs the :core:nomulus jar in this directory, which is the caller's
 # responsibility to copy it here.
 
+# UD change: add GCR_HOSTNAME as an argument. upstream hard codes gcr.io -tpj
 ARG PROJECT_ID
 ARG TAG_NAME
-FROM gcr.io/${PROJECT_ID}/builder:${TAG_NAME}
+ARG GCR_HOSTNAME=us-central1-docker.pkg.dev
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${TAG_NAME}
 
 COPY nomulus.jar /
 COPY rotate_prober_certs.sh /usr/local/bin

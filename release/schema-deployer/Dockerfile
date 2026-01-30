@@ -25,7 +25,8 @@
 # as a GCP application we prefer to start with a GCP-approved base image.
 ARG PROJECT_ID
 ARG TAG_NAME
-FROM gcr.io/${PROJECT_ID}/builder:${TAG_NAME}
+ARG GCR_HOSTNAME
+FROM ${GCR_HOSTNAME}/${PROJECT_ID}/nomulus/builder:${TAG_NAME}
 
 COPY deploy_sql_schema.sh /usr/local/bin/
 RUN \

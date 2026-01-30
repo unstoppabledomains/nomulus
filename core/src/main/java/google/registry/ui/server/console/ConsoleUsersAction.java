@@ -17,6 +17,7 @@ package google.registry.ui.server.console;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static google.registry.model.console.RegistrarRole.ACCOUNT_MANAGER;
+import static google.registry.model.console.RegistrarRole.TECH_CONTACT;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.request.Action.Method.DELETE;
 import static google.registry.request.Action.Method.GET;
@@ -35,13 +36,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.gson.annotations.Expose;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.RegistrarRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.model.registrar.Registrar;
 import google.registry.persistence.VKey;
 import google.registry.request.Action;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
@@ -59,8 +61,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 @Action(
-    service = Action.GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = ConsoleUsersAction.PATH,
     method = {GET, POST, DELETE, PUT},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
@@ -118,6 +119,7 @@ public class ConsoleUsersAction extends ConsoleApiAction {
                 u ->
                     new UserData(
                         u.getEmailAddress(),
+                        u.getRegistryLockEmailAddress().orElse(null),
                         u.getUserRoles().getRegistrarRoles().get(registrarId).toString(),
                         null))
             .collect(Collectors.toList());
@@ -150,7 +152,7 @@ public class ConsoleUsersAction extends ConsoleApiAction {
     updateUserRegistrarRoles(
         this.userData.get().emailAddress,
         registrarId,
-        RegistrarRole.valueOf(this.userData.get().role));
+        requestRoleToAllowedRoles(this.userData.get().role));
 
     sendConfirmationEmail(registrarId, this.userData.get().emailAddress, "Added existing user");
     consoleApiParams.response().setStatus(SC_OK);
@@ -177,6 +179,12 @@ public class ConsoleUsersAction extends ConsoleApiAction {
       tm().delete(key);
       User.revokeIapPermission(email, maybeGroupEmailAddress, cloudTasksUtils, null, iamClient);
       sendConfirmationEmail(registrarId, email, "Deleted user");
+      finishAndPersistConsoleUpdateHistory(
+          new ConsoleUpdateHistory.Builder()
+              .setType(ConsoleUpdateHistory.Type.USER_DELETE)
+              .setDescription(
+                  String.format(
+                      "%s%s%s", registrarId, ConsoleUpdateHistory.DESCRIPTION_SEPARATOR, email)));
     }
 
     consoleApiParams.response().setStatus(SC_OK);
@@ -214,11 +222,9 @@ public class ConsoleUsersAction extends ConsoleApiAction {
       throw e;
     }
 
+    RegistrarRole newRole = requestRoleToAllowedRoles(userData.get().role);
     UserRoles userRoles =
-        new UserRoles.Builder()
-            .setRegistrarRoles(
-                ImmutableMap.of(registrarId, RegistrarRole.valueOf(userData.get().role)))
-            .build();
+        new UserRoles.Builder().setRegistrarRoles(ImmutableMap.of(registrarId, newRole)).build();
 
     User.Builder builder = new User.Builder().setUserRoles(userRoles).setEmailAddress(newEmail);
     tm().put(builder.build());
@@ -230,7 +236,13 @@ public class ConsoleUsersAction extends ConsoleApiAction {
         .setPayload(
             consoleApiParams
                 .gson()
-                .toJson(new UserData(newEmail, ACCOUNT_MANAGER.toString(), newUser.getPassword())));
+                .toJson(new UserData(newEmail, null, newRole.toString(), newUser.getPassword())));
+    finishAndPersistConsoleUpdateHistory(
+        new ConsoleUpdateHistory.Builder()
+            .setType(ConsoleUpdateHistory.Type.USER_CREATE)
+            .setDescription(
+                String.format(
+                    "%s%s%s", registrarId, ConsoleUpdateHistory.DESCRIPTION_SEPARATOR, newEmail)));
   }
 
   private void runUpdateInTransaction() {
@@ -241,10 +253,19 @@ public class ConsoleUsersAction extends ConsoleApiAction {
     updateUserRegistrarRoles(
         this.userData.get().emailAddress,
         registrarId,
-        RegistrarRole.valueOf(this.userData.get().role));
+        requestRoleToAllowedRoles(this.userData.get().role));
 
     sendConfirmationEmail(registrarId, this.userData.get().emailAddress, "Updated user");
     consoleApiParams.response().setStatus(SC_OK);
+    finishAndPersistConsoleUpdateHistory(
+        new ConsoleUpdateHistory.Builder()
+            .setType(ConsoleUpdateHistory.Type.USER_UPDATE)
+            .setDescription(
+                String.format(
+                    "%s%s%s",
+                    registrarId,
+                    ConsoleUpdateHistory.DESCRIPTION_SEPARATOR,
+                    this.userData.get().emailAddress)));
   }
 
   private boolean isModifyingRequestValid() {
@@ -308,6 +329,11 @@ public class ConsoleUsersAction extends ConsoleApiAction {
                     .collect(toImmutableList()));
   }
 
+  /** Maps a request role string to a RegistrarRole, using ACCOUNT_MANAGER as the default. */
+  private RegistrarRole requestRoleToAllowedRoles(String role) {
+    return TECH_CONTACT.name().equals(role) ? TECH_CONTACT : ACCOUNT_MANAGER;
+  }
+
   private boolean sendConfirmationEmail(String registrarId, String emailAddress, String operation) {
     Optional<Registrar> registrar = Registrar.loadByRegistrarId(registrarId);
     if (registrar.isEmpty()) { // Shouldn't happen, but worth checking
@@ -323,5 +349,8 @@ public class ConsoleUsersAction extends ConsoleApiAction {
   }
 
   public record UserData(
-      @Expose String emailAddress, @Expose String role, @Expose @Nullable String password) {}
+      @Expose String emailAddress,
+      @Expose String registryLockEmailAddress,
+      @Expose String role,
+      @Expose @Nullable String password) {}
 }

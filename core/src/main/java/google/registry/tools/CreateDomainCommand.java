@@ -17,7 +17,6 @@ package google.registry.tools;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
-import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 import static org.joda.time.DateTimeZone.UTC;
 
 import com.beust.jcommander.Parameter;
@@ -58,9 +57,6 @@ final class CreateDomainCommand extends CreateOrUpdateDomainCommand {
 
   @Override
   protected void initMutatingEppToolCommand() {
-    checkArgumentNotNull(registrant, "Registrant must be specified");
-    checkArgument(!admins.isEmpty(), "At least one admin must be specified");
-    checkArgument(!techs.isEmpty(), "At least one tech must be specified");
     if (isNullOrEmpty(password)) {
       password = passwordGenerator.createString(PASSWORD_LENGTH);
     }

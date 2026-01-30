@@ -28,21 +28,17 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.gson.Gson;
 import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarPoc;
-import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.Action;
 import google.registry.request.RequestModule;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.ConsoleApiParamsUtils;
-import google.registry.testing.FakeResponse;
 import google.registry.testing.SystemPropertyExtension;
-import google.registry.tools.GsonUtils;
 import google.registry.util.EmailMessage;
 import google.registry.util.RegistryEnvironment;
 import jakarta.mail.internet.AddressException;
@@ -51,17 +47,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Optional;
+import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Tests for {@link google.registry.ui.server.console.ConsoleUpdateRegistrarAction}. */
-class ConsoleUpdateRegistrarActionTest {
-  private static final Gson GSON = GsonUtils.provideGson();
-
-  private ConsoleApiParams consoleApiParams;
-  private FakeResponse response;
+class ConsoleUpdateRegistrarActionTest extends ConsoleActionBaseTestCase {
 
   private Registrar registrar;
 
@@ -92,12 +85,7 @@ class ConsoleUpdateRegistrarActionTest {
                 .setEmailAddress("user@registrarId.com")
                 .setUserRoles(new UserRoles.Builder().setGlobalRole(GlobalRole.FTE).build())
                 .build());
-    consoleApiParams = createParams();
   }
-
-  @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().buildIntegrationTestExtension();
 
   @Test
   void testSuccess_updatesRegistrar() throws IOException {
@@ -108,19 +96,46 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2025-01-01T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     Registrar newRegistrar = Registrar.loadByRegistrarId("TheRegistrar").get();
     assertThat(newRegistrar.getAllowedTlds()).containsExactly("app", "dev");
     assertThat(newRegistrar.isRegistryLockAllowed()).isFalse();
-    assertThat(((FakeResponse) consoleApiParams.response()).getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
     ConsoleUpdateHistory history = loadSingleton(ConsoleUpdateHistory.class).get();
     assertThat(history.getType()).isEqualTo(ConsoleUpdateHistory.Type.REGISTRAR_UPDATE);
     assertThat(history.getDescription()).hasValue("TheRegistrar");
   }
 
   @Test
-  void testFails_missingWhoisContact() throws IOException {
+  void testSuccess_updatesNullPocVerificationDate() throws IOException {
+    var action =
+        createAction(
+            String.format(registrarPostData, "TheRegistrar", "app, dev", false, "\"null\""));
+    action.run();
+    Registrar newRegistrar = Registrar.loadByRegistrarId("TheRegistrar").get();
+    assertThat(newRegistrar.getLastPocVerificationDate())
+        .isEqualTo(DateTime.parse("1970-01-01T00:00:00.000Z"));
+  }
+
+  @Test
+  void testFailure_pocVerificationInTheFuture() throws IOException {
+    var action =
+        createAction(
+            String.format(
+                registrarPostData,
+                "TheRegistrar",
+                "app, dev",
+                false,
+                "\"2025-02-01T00:00:00.000Z\""));
+    action.run();
+    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
+    assertThat((String) response.getPayload())
+        .contains("Invalid value of LastPocVerificationDate - value is in the future");
+  }
+
+  @Test
+  void testFails_missingRdapContact() throws IOException {
     RegistryEnvironment.PRODUCTION.setup(systemPropertyExtension);
     var action =
         createAction(
@@ -129,15 +144,15 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2025-01-01T00:00:00.000Z\""));
+                "\"2024-12-12T00:00:00.000Z\""));
     action.run();
-    assertThat(((FakeResponse) consoleApiParams.response()).getStatus()).isEqualTo(SC_BAD_REQUEST);
-    assertThat((String) ((FakeResponse) consoleApiParams.response()).getPayload())
-        .contains("Cannot modify allowed TLDs if there is no WHOIS abuse contact set");
+    assertThat(response.getStatus()).isEqualTo(SC_BAD_REQUEST);
+    assertThat((String) response.getPayload())
+        .contains("Cannot modify allowed TLDs if there is no RDAP abuse contact set");
   }
 
   @Test
-  void testSuccess_presentWhoisContact() throws IOException {
+  void testSuccess_presentRdapContact() throws IOException {
     RegistryEnvironment.PRODUCTION.setup(systemPropertyExtension);
     RegistrarPoc contact =
         new RegistrarPoc.Builder()
@@ -147,9 +162,9 @@ class ConsoleUpdateRegistrarActionTest {
             .setPhoneNumber("+1.9999999999")
             .setFaxNumber("+1.9999999991")
             .setTypes(ImmutableSet.of(WHOIS))
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(true)
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build();
     persistResource(contact);
     var action =
@@ -159,12 +174,12 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2025-01-01T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     Registrar newRegistrar = Registrar.loadByRegistrarId("TheRegistrar").get();
     assertThat(newRegistrar.getAllowedTlds()).containsExactly("app", "dev");
     assertThat(newRegistrar.isRegistryLockAllowed()).isFalse();
-    assertThat(((FakeResponse) consoleApiParams.response()).getStatus()).isEqualTo(SC_OK);
+    assertThat(response.getStatus()).isEqualTo(SC_OK);
   }
 
   @Test
@@ -176,7 +191,7 @@ class ConsoleUpdateRegistrarActionTest {
                 "TheRegistrar",
                 "app, dev",
                 false,
-                "\"2025-01-01T00:00:00.000Z\""));
+                "\"2023-12-12T00:00:00.000Z\""));
     action.run();
     verify(consoleApiParams.sendEmailUtils().gmailClient, times(1))
         .sendEmail(
@@ -186,11 +201,13 @@ class ConsoleUpdateRegistrarActionTest {
                         + " environment")
                 .setBody(
                     "The following changes were made in registry unittest environment to the"
-                        + " registrar TheRegistrar by user user@registrarId.com:\n"
+                        + " registrar TheRegistrar by admin fte@email.tld:\n"
                         + "\n"
-                        + "allowedTlds: null -> [app, dev]\n"
+                        + "allowedTlds:\n"
+                        + "    ADDED: [app, dev]\n"
+                        + "    FINAL CONTENTS: [app, dev]\n"
                         + "lastPocVerificationDate: 1970-01-01T00:00:00.000Z ->"
-                        + " 2025-01-01T00:00:00.000Z\n")
+                        + " 2023-12-12T00:00:00.000Z\n")
                 .setRecipients(ImmutableList.of(new InternetAddress("notification@test.example")))
                 .build());
   }
@@ -200,7 +217,7 @@ class ConsoleUpdateRegistrarActionTest {
     return ConsoleApiParamsUtils.createFake(authResult);
   }
 
-  ConsoleUpdateRegistrarAction createAction(String requestData) throws IOException {
+  private ConsoleUpdateRegistrarAction createAction(String requestData) throws IOException {
     when(consoleApiParams.request().getMethod()).thenReturn(Action.Method.POST.toString());
     doReturn(new BufferedReader(new StringReader(requestData)))
         .when(consoleApiParams.request())

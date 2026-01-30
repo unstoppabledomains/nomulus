@@ -843,6 +843,21 @@ ALTER SEQUENCE public."Package_promotion_id_seq" OWNED BY public."PackagePromoti
 
 
 --
+-- Name: PasswordResetRequest; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."PasswordResetRequest" (
+    type text NOT NULL,
+    request_time timestamp with time zone NOT NULL,
+    requester text NOT NULL,
+    fulfillment_time timestamp with time zone,
+    destination_email text NOT NULL,
+    verification_code text NOT NULL,
+    registrar_id text NOT NULL
+);
+
+
+--
 -- Name: PollMessage; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -994,7 +1009,7 @@ CREATE TABLE public."Registrar" (
 
 CREATE TABLE public."RegistrarPoc" (
     email_address text NOT NULL,
-    allowed_to_set_registry_lock_password boolean NOT NULL,
+    allowed_to_set_registry_lock_password boolean,
     fax_number text,
     name text,
     phone_number text,
@@ -1005,7 +1020,8 @@ CREATE TABLE public."RegistrarPoc" (
     visible_in_whois_as_admin boolean NOT NULL,
     visible_in_whois_as_tech boolean NOT NULL,
     registry_lock_email_address text,
-    registrar_id text NOT NULL
+    registrar_id text NOT NULL,
+    id bigint NOT NULL
 );
 
 
@@ -1036,6 +1052,25 @@ CREATE TABLE public."RegistrarPocUpdateHistory" (
     visible_in_whois_as_tech boolean NOT NULL,
     history_acting_user text NOT NULL
 );
+
+
+--
+-- Name: RegistrarPoc_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RegistrarPoc_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RegistrarPoc_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RegistrarPoc_id_seq" OWNED BY public."RegistrarPoc".id;
 
 
 --
@@ -1274,7 +1309,6 @@ CREATE TABLE public."Tld" (
     tld_name text NOT NULL,
     add_grace_period_length interval NOT NULL,
     allowed_fully_qualified_host_names text[],
-    allowed_registrant_contact_ids text[],
     anchor_tenant_add_grace_period_length interval NOT NULL,
     auto_renew_grace_period_length interval NOT NULL,
     automatic_transfer_length interval NOT NULL,
@@ -1314,7 +1348,8 @@ CREATE TABLE public."Tld" (
     idn_tables text[],
     breakglass_mode boolean DEFAULT false NOT NULL,
     bsa_enroll_start_time timestamp with time zone,
-    create_billing_cost_transitions public.hstore NOT NULL
+    create_billing_cost_transitions public.hstore NOT NULL,
+    expiry_access_period_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -1428,6 +1463,13 @@ ALTER TABLE ONLY public."PackagePromotion" ALTER COLUMN package_promotion_id SET
 --
 
 ALTER TABLE ONLY public."PremiumList" ALTER COLUMN revision_id SET DEFAULT nextval('public."PremiumList_revision_id_seq"'::regclass);
+
+
+--
+-- Name: RegistrarPoc id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistrarPoc" ALTER COLUMN id SET DEFAULT nextval('public."RegistrarPoc_id_seq"'::regclass);
 
 
 --
@@ -1683,6 +1725,14 @@ ALTER TABLE ONLY public."PackagePromotion"
 
 
 --
+-- Name: PasswordResetRequest PasswordResetRequest_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."PasswordResetRequest"
+    ADD CONSTRAINT "PasswordResetRequest_pkey" PRIMARY KEY (verification_code);
+
+
+--
 -- Name: PollMessage PollMessage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1874,6 +1924,62 @@ CREATE INDEX allocation_token_domain_name_idx ON public."AllocationToken" USING 
 
 
 --
+-- Name: allocationtoken_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX allocationtoken_token_hash ON public."AllocationToken" USING hash (token);
+
+
+--
+-- Name: billingcancellation_billing_cancellation_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billingcancellation_billing_cancellation_id_hash ON public."BillingCancellation" USING hash (billing_cancellation_id);
+
+
+--
+-- Name: billingevent_billing_event_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billingevent_billing_event_id_hash ON public."BillingEvent" USING hash (billing_event_id);
+
+
+--
+-- Name: billingrecurrence_billing_recurrence_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX billingrecurrence_billing_recurrence_id_hash ON public."BillingRecurrence" USING hash (billing_recurrence_id);
+
+
+--
+-- Name: delegationsignerdata_domain_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX delegationsignerdata_domain_repo_id_hash ON public."DelegationSignerData" USING hash (domain_repo_id);
+
+
+--
+-- Name: domain_current_package_token_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domain_current_package_token_idx ON public."Domain" USING hash (current_package_token);
+
+
+--
+-- Name: domain_domain_name_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domain_domain_name_hash ON public."Domain" USING hash (domain_name);
+
+
+--
+-- Name: domain_domain_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domain_domain_repo_id_hash ON public."Domain" USING hash (repo_id);
+
+
+--
 -- Name: domain_history_to_ds_data_history_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1885,6 +1991,111 @@ CREATE INDEX domain_history_to_ds_data_history_idx ON public."DomainDsDataHistor
 --
 
 CREATE INDEX domain_history_to_transaction_record_idx ON public."DomainTransactionRecord" USING btree (domain_repo_id, history_revision_id);
+
+
+--
+-- Name: domain_no_duplicate_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX domain_no_duplicate_active ON public."Domain" USING btree (domain_name) WHERE (deletion_time = '294247-01-10 04:00:54.775+00'::timestamp with time zone);
+
+
+--
+-- Name: domaindsdatahistory_domain_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domaindsdatahistory_domain_history_revision_id_hash ON public."DomainDsDataHistory" USING hash (domain_history_revision_id);
+
+
+--
+-- Name: domainhistory_current_package_token_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domainhistory_current_package_token_idx ON public."DomainHistory" USING hash (current_package_token);
+
+
+--
+-- Name: domainhistory_domain_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domainhistory_domain_repo_id_hash ON public."DomainHistory" USING hash (domain_repo_id);
+
+
+--
+-- Name: domainhistory_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domainhistory_history_revision_id_hash ON public."DomainHistory" USING hash (history_revision_id);
+
+
+--
+-- Name: domainhistoryhost_domain_history_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domainhistoryhost_domain_history_history_revision_id_hash ON public."DomainHistoryHost" USING hash (domain_history_history_revision_id);
+
+
+--
+-- Name: domainhost_domain_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domainhost_domain_repo_id_hash ON public."DomainHost" USING hash (domain_repo_id);
+
+
+--
+-- Name: domaintransactionrecord_domain_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domaintransactionrecord_domain_history_revision_id_hash ON public."DomainTransactionRecord" USING hash (history_revision_id);
+
+
+--
+-- Name: domaintransactionrecord_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX domaintransactionrecord_id_hash ON public."DomainTransactionRecord" USING hash (id);
+
+
+--
+-- Name: graceperiod_domain_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX graceperiod_domain_repo_id_hash ON public."GracePeriod" USING hash (domain_repo_id);
+
+
+--
+-- Name: graceperiod_grace_period_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX graceperiod_grace_period_id_hash ON public."GracePeriod" USING hash (grace_period_id);
+
+
+--
+-- Name: graceperiodhistory_domain_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX graceperiodhistory_domain_history_revision_id_hash ON public."GracePeriodHistory" USING hash (domain_history_revision_id);
+
+
+--
+-- Name: graceperiodhistory_grace_period_history_revision_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX graceperiodhistory_grace_period_history_revision_id_hash ON public."GracePeriodHistory" USING hash (grace_period_history_revision_id);
+
+
+--
+-- Name: host_host_name_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX host_host_name_hash ON public."Host" USING hash (host_name);
+
+
+--
+-- Name: host_repo_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX host_repo_id_hash ON public."Host" USING hash (repo_id);
 
 
 --
@@ -2567,6 +2778,13 @@ CREATE INDEX idxy98mebut8ix1v07fjxxdkqcx ON public."Host" USING btree (creation_
 
 
 --
+-- Name: pollmessage_poll_message_id_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pollmessage_poll_message_id_hash ON public."PollMessage" USING hash (poll_message_id);
+
+
+--
 -- Name: premiumlist_name_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2736,14 +2954,6 @@ ALTER TABLE ONLY public."ConsoleUpdateHistory"
 
 
 --
--- Name: ContactHistory fk_contact_history_contact_repo_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."ContactHistory"
-    ADD CONSTRAINT fk_contact_history_contact_repo_id FOREIGN KEY (contact_repo_id) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: ContactHistory fk_contact_history_registrar_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2765,22 +2975,6 @@ ALTER TABLE ONLY public."Contact"
 
 ALTER TABLE ONLY public."Contact"
     ADD CONSTRAINT fk_contact_transfer_losing_registrar_id FOREIGN KEY (transfer_losing_registrar_id) REFERENCES public."Registrar"(registrar_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: Domain fk_domain_admin_contact; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."Domain"
-    ADD CONSTRAINT fk_domain_admin_contact FOREIGN KEY (admin_contact) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: Domain fk_domain_billing_contact; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."Domain"
-    ADD CONSTRAINT fk_domain_billing_contact FOREIGN KEY (billing_contact) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -2821,22 +3015,6 @@ ALTER TABLE ONLY public."DomainHistory"
 
 ALTER TABLE ONLY public."DomainHistory"
     ADD CONSTRAINT fk_domain_history_registrar_id FOREIGN KEY (history_registrar_id) REFERENCES public."Registrar"(registrar_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: Domain fk_domain_registrant_contact; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."Domain"
-    ADD CONSTRAINT fk_domain_registrant_contact FOREIGN KEY (registrant_contact) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: Domain fk_domain_tech_contact; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."Domain"
-    ADD CONSTRAINT fk_domain_tech_contact FOREIGN KEY (tech_contact) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -2981,22 +3159,6 @@ ALTER TABLE ONLY public."Host"
 
 ALTER TABLE ONLY public."HostHistory"
     ADD CONSTRAINT fk_hosthistory_host FOREIGN KEY (host_repo_id) REFERENCES public."Host"(repo_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: PollMessage fk_poll_message_contact_history; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."PollMessage"
-    ADD CONSTRAINT fk_poll_message_contact_history FOREIGN KEY (contact_repo_id, contact_history_revision_id) REFERENCES public."ContactHistory"(contact_repo_id, history_revision_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: PollMessage fk_poll_message_contact_repo_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."PollMessage"
-    ADD CONSTRAINT fk_poll_message_contact_repo_id FOREIGN KEY (contact_repo_id) REFERENCES public."Contact"(repo_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --

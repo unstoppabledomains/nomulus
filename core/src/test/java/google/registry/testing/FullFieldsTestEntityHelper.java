@@ -48,7 +48,7 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 
-/** Test helper methods for the rdap and whois packages. */
+/** Test helper methods for the RDAP package. */
 public final class FullFieldsTestEntityHelper {
 
   public static Registrar makeRegistrar(
@@ -84,9 +84,7 @@ public final class FullFieldsTestEntityHelper {
         .setFaxNumber("+1.2125551213")
         .setEmailAddress("contact-us@example.com")
         .setWhoisServer("whois.example.com")
-        .setRdapBaseUrls(
-            ImmutableSet.of(
-                "https://rdap.example.com/withSlash/", "https://rdap.example.com/withoutSlash"))
+        .setRdapBaseUrls(ImmutableSet.of("https://rdap.example.com/withSlash/"))
         .setUrl("http://my.fake.url")
         .build();
   }
@@ -102,8 +100,8 @@ public final class FullFieldsTestEntityHelper {
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
             // Purposely flip the internal/external admin/tech
             // distinction to make sure we're not relying on it.  Sigh.
-            .setVisibleInWhoisAsAdmin(false)
-            .setVisibleInWhoisAsTech(true)
+            .setVisibleInRdapAsAdmin(false)
+            .setVisibleInRdapAsTech(true)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -114,8 +112,8 @@ public final class FullFieldsTestEntityHelper {
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH))
             // Purposely flip the internal/external admin/tech
             // distinction to make sure we're not relying on it.  Sigh.
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(false)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(false)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -123,7 +121,7 @@ public final class FullFieldsTestEntityHelper {
             .setEmailAddress("jakedoe@example.com")
             .setPhoneNumber("+1.2125551216")
             .setFaxNumber("+1.2125551216")
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
   }
 
@@ -137,10 +135,15 @@ public final class FullFieldsTestEntityHelper {
 
   public static Host makeHost(
       String fqhn, @Nullable String ip1, @Nullable String ip2, String registrarClientId) {
+    return makePunycodedHost(Idn.toASCII(fqhn), ip1, ip2, registrarClientId);
+  }
+
+  public static Host makePunycodedHost(
+      String fqhn, @Nullable String ip1, @Nullable String ip2, String registrarClientId) {
     Host.Builder builder =
         new Host.Builder()
             .setRepoId(generateNewContactHostRoid())
-            .setHostName(Idn.toASCII(fqhn))
+            .setHostName(fqhn)
             .setCreationTimeForTest(DateTime.parse("2000-10-08T00:45:00Z"))
             .setPersistedCurrentSponsorRegistrarId(registrarClientId);
     if ((ip1 != null) || (ip2 != null)) {

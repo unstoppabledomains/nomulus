@@ -15,7 +15,6 @@
 package google.registry.model.tmch;
 
 import static google.registry.config.RegistryConfig.getClaimsListCacheDuration;
-import static google.registry.persistence.transaction.QueryComposer.Comparator.EQ;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
@@ -23,6 +22,7 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import google.registry.model.CacheUtils;
+import google.registry.tmch.RstTmchUtils;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -49,15 +49,33 @@ public class ClaimsListDao {
     return CacheUtils.newCacheBuilder(expiry).build(ignored -> ClaimsListDao.getUncached());
   }
 
-  /** Saves the given {@link ClaimsList} to Cloud SQL. */
-  public static void save(ClaimsList claimsList) {
-    tm().transact(() -> tm().insert(claimsList));
-    CACHE.put(ClaimsListDao.class, claimsList);
+  /**
+   * Persists a {@link ClaimsList} instance and returns the persisted entity.
+   *
+   * <p>Note that the input parameter is untouched. Use the returned object if metadata fields like
+   * {@code revisionId} are needed.
+   */
+  public static ClaimsList save(ClaimsList claimsList) {
+    var persisted =
+        tm().transact(
+                () -> {
+                  var entity =
+                      ClaimsList.create(claimsList.tmdbGenerationTime, claimsList.labelsToKeys);
+                  tm().insert(entity);
+                  return entity;
+                });
+    CACHE.put(ClaimsListDao.class, persisted);
+    return persisted;
   }
 
   /** Returns the most recent revision of the {@link ClaimsList} from the cache. */
   public static ClaimsList get() {
     return CACHE.get(ClaimsListDao.class);
+  }
+
+  // TODO(b/412715713): remove the tld parameter when RST completes.
+  public static ClaimsList get(String tld) {
+    return RstTmchUtils.getClaimsList(tld).orElseGet(ClaimsListDao::get);
   }
 
   /**
@@ -66,14 +84,11 @@ public class ClaimsListDao {
    */
   private static ClaimsList getUncached() {
     return tm().reTransact(
-            () -> {
-              Long revisionId =
-                  tm().query("SELECT MAX(revisionId) FROM ClaimsList", Long.class)
-                      .getSingleResult();
-              return tm().createQueryComposer(ClaimsList.class)
-                  .where("revisionId", EQ, revisionId)
-                  .first();
-            })
+            () ->
+                tm().query("FROM ClaimsList ORDER BY revisionId DESC", ClaimsList.class)
+                    .setMaxResults(1)
+                    .getResultStream()
+                    .findFirst())
         .orElse(ClaimsList.create(START_OF_TIME, ImmutableMap.of()));
   }
 

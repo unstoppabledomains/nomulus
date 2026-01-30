@@ -15,7 +15,6 @@
 package google.registry.flows.host;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.testing.DatabaseHelper.assertHostDnsRequests;
 import static google.registry.testing.DatabaseHelper.assertNoBillingEvents;
 import static google.registry.testing.DatabaseHelper.assertNoDnsRequests;
@@ -40,14 +39,17 @@ import google.registry.flows.exceptions.ResourceAlreadyExistsForThisClientExcept
 import google.registry.flows.exceptions.ResourceCreateContentionException;
 import google.registry.flows.host.HostCreateFlow.SubordinateHostMustHaveIpException;
 import google.registry.flows.host.HostCreateFlow.UnexpectedExternalHostIpException;
+import google.registry.flows.host.HostFlowUtils.BadHostNameCharacterException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotLowerCaseException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotNormalizedException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotPunyCodedException;
 import google.registry.flows.host.HostFlowUtils.HostNameTooLongException;
 import google.registry.flows.host.HostFlowUtils.HostNameTooShallowException;
 import google.registry.flows.host.HostFlowUtils.InvalidHostNameException;
+import google.registry.flows.host.HostFlowUtils.LoopbackIpNotValidForHostException;
 import google.registry.flows.host.HostFlowUtils.SuperordinateDomainDoesNotExistException;
 import google.registry.flows.host.HostFlowUtils.SuperordinateDomainInPendingDeleteException;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.domain.Domain;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.Host;
@@ -69,9 +71,10 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
     setEppHostCreateInput(
         hostName,
         """
-            <host:addr ip="v4">192.0.2.2</host:addr>
-            <host:addr ip="v4">192.0.2.29</host:addr>
-            <host:addr ip="v6">1080:0:0:0:8:800:200C:417A</host:addr>""");
+        <host:addr ip="v4">192.0.2.2</host:addr>
+        <host:addr ip="v4">192.0.2.29</host:addr>
+        <host:addr ip="v6">1080:0:0:0:8:800:200C:417A</host:addr>\
+        """);
   }
 
   HostCreateFlowTest() {
@@ -80,9 +83,14 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
   }
 
   private void doSuccessfulTest() throws Exception {
+    doSuccessfulTest("host_create_response.xml", ImmutableMap.of());
+  }
+
+  private void doSuccessfulTest(String responseFile, ImmutableMap<String, String> substitutions)
+      throws Exception {
     clock.advanceOneMilli();
     assertMutatingFlow(true);
-    runFlowAssertResponse(loadFile("host_create_response.xml"));
+    runFlowAssertResponse(loadFile(responseFile, substitutions));
     Host host = reloadResourceByForeignKey();
     // Check that the host was created and persisted with a history entry.
     assertAboutHosts()
@@ -126,10 +134,32 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
     doSuccessfulInternalTest("tld");
     Host host = reloadResourceByForeignKey();
     Domain superordinateDomain =
-        loadByForeignKey(Domain.class, "example.tld", clock.nowUtc()).get();
+        ForeignKeyUtils.loadResource(Domain.class, "example.tld", clock.nowUtc()).get();
     assertAboutHosts().that(host).hasSuperordinateDomain(superordinateDomain.createVKey());
     assertThat(superordinateDomain.getSubordinateHosts()).containsExactly("ns1.example.tld");
     assertHostDnsRequests("ns1.example.tld");
+  }
+
+  @Test
+  void testSuccess_tldWithHyphenOn3And4() throws Exception {
+    setEppHostCreateInput("ns1.example.zz--main-2262", null);
+    doSuccessfulTest(
+        "host_create_response_wildcard.xml",
+        ImmutableMap.of("HOSTNAME", "ns1.example.zz--main-2262"));
+  }
+
+  @Test
+  void testFailure_domainWithHyphenOn3And4() throws Exception {
+    setEppHostCreateInput("ns1.zz--main-2262.tld", null);
+    EppException thrown = assertThrows(InvalidHostNameException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
+  }
+
+  @Test
+  void testFailure_hostnameWithHyphenOn3And4() throws Exception {
+    setEppHostCreateInput("zz--ns1.domain.tld", null);
+    EppException thrown = assertThrows(InvalidHostNameException.class, this::runFlow);
+    assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
 
   @Test
@@ -155,7 +185,7 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
     doSuccessfulInternalTest("tld");
     Host host = reloadResourceByForeignKey();
     Domain superordinateDomain =
-        loadByForeignKey(Domain.class, "example.tld", clock.nowUtc()).get();
+        ForeignKeyUtils.loadResource(Domain.class, "example.tld", clock.nowUtc()).get();
     assertAboutHosts().that(host).hasSuperordinateDomain(superordinateDomain.createVKey());
     assertThat(superordinateDomain.getSubordinateHosts()).containsExactly("ns1.example.tld");
     assertHostDnsRequests("ns1.example.tld");
@@ -269,9 +299,10 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
     setEppHostCreateInput(
         "ns1.example.tld",
         """
-            <host:addr ip="v4">192.0.2.2</host:addr>
-            <host:addr ip="v6">192.0.2.29</host:addr>
-            <host:addr ip="v6">1080:0:0:0:8:800:200C:417A</host:addr>""");
+        <host:addr ip="v4">192.0.2.2</host:addr>
+        <host:addr ip="v6">192.0.2.29</host:addr>
+        <host:addr ip="v6">1080:0:0:0:8:800:200C:417A</host:addr>\
+        """);
     EppException thrown = assertThrows(IpAddressVersionMismatchException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
   }
@@ -284,7 +315,7 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
 
   @Test
   void testFailure_badCharacter() {
-    doFailingHostNameTest("foo bar", InvalidHostNameException.class);
+    doFailingHostNameTest("foo bar", BadHostNameCharacterException.class);
   }
 
   @Test
@@ -318,6 +349,26 @@ class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Host> {
     setEppHostCreateInputWithIps("foo.co.uk");
     EppException thrown = assertThrows(HostNameTooShallowException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
+  }
+
+  @Test
+  void testFailure_localhostInetAddress_ipv4() {
+    createTld("tld");
+    persistActiveDomain("example.tld");
+    setEppHostCreateInput("ns1.example.tld", "<host:addr ip=\"v4\">127.0.0.1</host:addr>");
+    assertAboutEppExceptions()
+        .that(assertThrows(LoopbackIpNotValidForHostException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_localhostInetAddress_ipv6() {
+    createTld("tld");
+    persistActiveDomain("example.tld");
+    setEppHostCreateInput("ns1.example.tld", "<host:addr ip=\"v6\">::1</host:addr>");
+    assertAboutEppExceptions()
+        .that(assertThrows(LoopbackIpNotValidForHostException.class, this::runFlow))
+        .marshalsToXml();
   }
 
   @Test

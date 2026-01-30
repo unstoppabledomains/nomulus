@@ -521,11 +521,6 @@ public class Tld extends ImmutableObject implements Buildable, UnsafeSerializabl
   @Column(nullable = false)
   DateTime claimsPeriodEnd = END_OF_TIME;
 
-  /** An allowlist of clients allowed to be used on domains on this TLD (ignored if empty). */
-  @Nullable
-  @JsonSerialize(using = SortedSetSerializer.class)
-  Set<String> allowedRegistrantContactIds;
-
   /** An allowlist of hosts allowed to be used on domains on this TLD (ignored if empty). */
   @Nullable
   @JsonSerialize(using = SortedSetSerializer.class)
@@ -786,10 +781,6 @@ public class Tld extends ImmutableObject implements Buildable, UnsafeSerializabl
     return tldUnicode;
   }
 
-  public ImmutableSet<String> getAllowedRegistrantContactIds() {
-    return nullToEmptyImmutableCopy(allowedRegistrantContactIds);
-  }
-
   public ImmutableSet<String> getAllowedFullyQualifiedHostNames() {
     return nullToEmptyImmutableCopy(allowedFullyQualifiedHostNames);
   }
@@ -1043,12 +1034,13 @@ public class Tld extends ImmutableObject implements Buildable, UnsafeSerializabl
       return this;
     }
 
-    public static final Pattern ROID_SUFFIX_PATTERN = Pattern.compile("^[A-Z\\d_]{1,8}$");
+    public static final Pattern ROID_SUFFIX_PATTERN = Pattern.compile("^[A-Z\\d]{1,8}$");
 
     public Builder setRoidSuffix(String roidSuffix) {
       checkArgument(
           ROID_SUFFIX_PATTERN.matcher(roidSuffix).matches(),
-          "ROID suffix must be in format %s",
+          "ROID suffix %s must be in format %s",
+          roidSuffix,
           ROID_SUFFIX_PATTERN.pattern());
       getInstance().roidSuffix = roidSuffix;
       return this;
@@ -1074,12 +1066,6 @@ public class Tld extends ImmutableObject implements Buildable, UnsafeSerializabl
 
     public Builder setClaimsPeriodEnd(DateTime claimsPeriodEnd) {
       getInstance().claimsPeriodEnd = checkArgumentNotNull(claimsPeriodEnd);
-      return this;
-    }
-
-    public Builder setAllowedRegistrantContactIds(
-        ImmutableSet<String> allowedRegistrantContactIds) {
-      getInstance().allowedRegistrantContactIds = allowedRegistrantContactIds;
       return this;
     }
 

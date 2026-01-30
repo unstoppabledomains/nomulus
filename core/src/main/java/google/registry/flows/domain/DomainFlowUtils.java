@@ -24,8 +24,6 @@ import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.intersection;
 import static com.google.common.collect.Sets.union;
 import static google.registry.bsa.persistence.BsaLabelUtils.isLabelBlocked;
-import static google.registry.model.common.FeatureFlag.FeatureName.MINIMUM_DATASET_CONTACTS_OPTIONAL;
-import static google.registry.model.common.FeatureFlag.isActiveNow;
 import static google.registry.model.domain.Domain.MAX_REGISTRATION_YEARS;
 import static google.registry.model.domain.token.AllocationToken.TokenType.REGISTER_BSA;
 import static google.registry.model.tld.Tld.TldState.GENERAL_AVAILABILITY;
@@ -75,6 +73,7 @@ import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.EppException.UnimplementedOptionException;
+import google.registry.flows.exceptions.ContactsProhibitedException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
 import google.registry.model.EppResource;
 import google.registry.model.billing.BillingBase.Flag;
@@ -136,7 +135,6 @@ import google.registry.util.Idn;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -220,7 +218,7 @@ public class DomainFlowUtils {
     return domainName;
   }
 
-  private static void validateFirstLabel(String firstLabel) throws EppException {
+  public static void validateFirstLabel(String firstLabel) throws EppException {
     if (firstLabel.length() > MAX_LABEL_SIZE) {
       throw new DomainLabelTooLongException();
     }
@@ -417,7 +415,7 @@ public class DomainFlowUtils {
     contacts.stream().map(DesignatedContact::getContactKey).forEach(keysToLoad::add);
     registrant.ifPresent(keysToLoad::add);
     keysToLoad.addAll(nameservers);
-    verifyNotInPendingDelete(EppResource.loadCached(keysToLoad.build()).values());
+    verifyNotInPendingDelete(EppResource.loadByCacheIfEnabled(keysToLoad.build()).values());
   }
 
   private static void verifyNotInPendingDelete(Iterable<EppResource> resources)
@@ -478,38 +476,38 @@ public class DomainFlowUtils {
     }
   }
 
-  static void validateRequiredContactsPresentIfRequiredForDataset(
+  /**
+   * Enforces the presence/absence of contact data on domain creates depending on the minimum data
+   * set migration schedule.
+   */
+  static void validateCreateContactData(
       Optional<VKey<Contact>> registrant, Set<DesignatedContact> contacts)
-      throws RequiredParameterMissingException {
-    // TODO(b/353347632): Change this flag check to a registry config check.
-    if (isActiveNow(MINIMUM_DATASET_CONTACTS_OPTIONAL)) {
-      // Contacts are not required once we have begun the migration to the minimum dataset
-      return;
+      throws ParameterValuePolicyErrorException {
+    if (registrant.isPresent()) {
+      throw new RegistrantProhibitedException();
     }
-    if (registrant.isEmpty()) {
-      throw new MissingRegistrantException();
-    }
-
-    Set<Type> roles = new HashSet<>();
-    for (DesignatedContact contact : contacts) {
-      roles.add(contact.getType());
-    }
-    if (!roles.contains(Type.ADMIN)) {
-      throw new MissingAdminContactException();
-    }
-    if (!roles.contains(Type.TECH)) {
-      throw new MissingTechnicalContactException();
+    if (!contacts.isEmpty()) {
+      throw new ContactsProhibitedException();
     }
   }
 
-  static void validateRegistrantAllowedOnTld(String tld, Optional<String> registrantContactId)
-      throws RegistrantNotAllowedException {
-    ImmutableSet<String> allowedRegistrants = Tld.get(tld).getAllowedRegistrantContactIds();
-    // Empty allow list or null registrantContactId are ignored.
-    if (registrantContactId.isPresent()
-        && !allowedRegistrants.isEmpty()
-        && !allowedRegistrants.contains(registrantContactId.get())) {
-      throw new RegistrantNotAllowedException(registrantContactId.get());
+  /**
+   * Enforces the presence/absence of contact data on domain updates depending on the minimum data
+   * set migration schedule.
+   */
+  static void validateUpdateContactData(
+      Optional<VKey<Contact>> existingRegistrant,
+      Optional<VKey<Contact>> newRegistrant,
+      Set<DesignatedContact> existingContacts,
+      Set<DesignatedContact> newContacts)
+      throws ParameterValuePolicyErrorException {
+    // Throw if the update specifies a new registrant that is different from the existing one.
+    if (newRegistrant.isPresent() && !newRegistrant.equals(existingRegistrant)) {
+      throw new RegistrantProhibitedException();
+    }
+    // Throw if the update specifies any new contacts that weren't already present on the domain.
+    if (!Sets.difference(newContacts, existingContacts).isEmpty()) {
+      throw new ContactsProhibitedException();
     }
   }
 
@@ -660,7 +658,7 @@ public class DomainFlowUtils {
 
     BillingRecurrence newBillingRecurrence =
         existingBillingRecurrence.asBuilder().setRecurrenceEndTime(newEndTime).build();
-    tm().put(newBillingRecurrence);
+    tm().update(newBillingRecurrence);
     return newBillingRecurrence;
   }
 
@@ -978,23 +976,21 @@ public class DomainFlowUtils {
       throw new UrgentAttributeNotSupportedException();
     }
     // There must be at least one of add/rem/chg, and chg isn't actually supported.
-    if (secDnsUpdate.getChange() != null) {
+    if (secDnsUpdate.getChange().isPresent()) {
       // The only thing you can change is maxSigLife, and we don't support that at all.
       throw new MaxSigLifeChangeNotSupportedException();
     }
-    Add add = secDnsUpdate.getAdd();
-    Remove remove = secDnsUpdate.getRemove();
-    if (add == null && remove == null) {
+    Optional<Add> add = secDnsUpdate.getAdd();
+    Optional<Remove> remove = secDnsUpdate.getRemove();
+    if (add.isEmpty() && remove.isEmpty()) {
       throw new EmptySecDnsUpdateException();
     }
-    if (remove != null && Boolean.FALSE.equals(remove.getAll())) {
+    if (remove.isPresent() && Boolean.FALSE.equals(remove.get().getAll())) {
       throw new SecDnsAllUsageException(); // Explicit all=false is meaningless.
     }
-    Set<DomainDsData> toAdd = (add == null) ? ImmutableSet.of() : add.getDsData();
+    Set<DomainDsData> toAdd = add.map(Add::getDsData).orElse(ImmutableSet.of());
     Set<DomainDsData> toRemove =
-        (remove == null)
-            ? ImmutableSet.of()
-            : (remove.getAll() == null) ? remove.getDsData() : oldDsData;
+        remove.map(r -> (r.getAll() == null) ? r.getDsData() : oldDsData).orElse(ImmutableSet.of());
     // RFC 5910 specifies that removes are processed before adds.
     return ImmutableSet.copyOf(union(difference(oldDsData, toRemove), toAdd));
   }
@@ -1040,10 +1036,8 @@ public class DomainFlowUtils {
         command.getContacts(), command.getRegistrant(), command.getNameservers());
     validateContactsHaveTypes(command.getContacts());
     String tldStr = tld.getTldStr();
-    validateRegistrantAllowedOnTld(tldStr, command.getRegistrantContactId());
     validateNoDuplicateContacts(command.getContacts());
-    validateRequiredContactsPresentIfRequiredForDataset(
-        command.getRegistrant(), command.getContacts());
+    validateCreateContactData(command.getRegistrant(), command.getContacts());
     ImmutableSet<String> hostNames = command.getNameserverHostNames();
     validateNameserversCountForTld(tldStr, domainName, hostNames.size());
     validateNameserversAllowedOnTld(tldStr, hostNames);
@@ -1244,49 +1238,49 @@ public class DomainFlowUtils {
   }
 
   /** Domain names can only contain a-z, 0-9, '.' and '-'. */
-  static class BadDomainNameCharacterException extends ParameterValuePolicyErrorException {
+  static class BadDomainNameCharacterException extends ParameterValueSyntaxErrorException {
     public BadDomainNameCharacterException() {
       super("Domain names can only contain a-z, 0-9, '.' and '-'");
     }
   }
 
   /** Non-IDN domain names cannot contain hyphens in the third or fourth position. */
-  static class DashesInThirdAndFourthException extends ParameterValuePolicyErrorException {
+  static class DashesInThirdAndFourthException extends ParameterValueSyntaxErrorException {
     public DashesInThirdAndFourthException() {
       super("Non-IDN domain names cannot contain dashes in the third or fourth position");
     }
   }
 
   /** Domain labels cannot begin with a dash. */
-  static class LeadingDashException extends ParameterValuePolicyErrorException {
+  static class LeadingDashException extends ParameterValueSyntaxErrorException {
     public LeadingDashException() {
       super("Domain labels cannot begin with a dash");
     }
   }
 
   /** Domain labels cannot end with a dash. */
-  static class TrailingDashException extends ParameterValuePolicyErrorException {
+  static class TrailingDashException extends ParameterValueSyntaxErrorException {
     public TrailingDashException() {
       super("Domain labels cannot end with a dash");
     }
   }
 
   /** Domain labels cannot be longer than 63 characters. */
-  static class DomainLabelTooLongException extends ParameterValuePolicyErrorException {
+  static class DomainLabelTooLongException extends ParameterValueSyntaxErrorException {
     public DomainLabelTooLongException() {
       super("Domain labels cannot be longer than 63 characters");
     }
   }
 
   /** No part of a domain name can be empty. */
-  static class EmptyDomainNamePartException extends ParameterValuePolicyErrorException {
+  static class EmptyDomainNamePartException extends ParameterValueSyntaxErrorException {
     public EmptyDomainNamePartException() {
       super("No part of a domain name can be empty");
     }
   }
 
   /** Domain name starts with xn-- but is not a valid IDN. */
-  static class InvalidPunycodeException extends ParameterValuePolicyErrorException {
+  static class InvalidPunycodeException extends ParameterValueSyntaxErrorException {
     public InvalidPunycodeException() {
       super("Domain name starts with xn-- but is not a valid IDN");
     }
@@ -1347,7 +1341,7 @@ public class DomainFlowUtils {
   }
 
   /** Domain name is under tld which doesn't exist. */
-  static class TldDoesNotExistException extends ParameterValueRangeErrorException {
+  public static class TldDoesNotExistException extends ParameterValueRangeErrorException {
     public TldDoesNotExistException(String tld) {
       super(String.format("Domain name is under tld %s which doesn't exist", tld));
     }
@@ -1360,24 +1354,10 @@ public class DomainFlowUtils {
     }
   }
 
-  /** Registrant is required. */
-  static class MissingRegistrantException extends RequiredParameterMissingException {
-    public MissingRegistrantException() {
-      super("Registrant is required");
-    }
-  }
-
-  /** Admin contact is required. */
-  static class MissingAdminContactException extends RequiredParameterMissingException {
-    public MissingAdminContactException() {
-      super("Admin contact is required");
-    }
-  }
-
-  /** Technical contact is required. */
-  static class MissingTechnicalContactException extends RequiredParameterMissingException {
-    public MissingTechnicalContactException() {
-      super("Technical contact is required");
+  /** Having a registrant is prohibited by registry policy. */
+  static class RegistrantProhibitedException extends ParameterValuePolicyErrorException {
+    public RegistrantProhibitedException() {
+      super("Having a registrant is prohibited by registry policy");
     }
   }
 
@@ -1570,13 +1550,6 @@ public class DomainFlowUtils {
   public static class MissingBillingAccountMapException extends AuthorizationErrorException {
     public MissingBillingAccountMapException(CurrencyUnit currency) {
       super("Registrar is not fully onboarded for TLDs that bill in " + currency);
-    }
-  }
-
-  /** Registrant is not allow-listed for this TLD. */
-  public static class RegistrantNotAllowedException extends StatusProhibitsOperationException {
-    public RegistrantNotAllowedException(String contactId) {
-      super(String.format("Registrant with id %s is not allow-listed for this TLD", contactId));
     }
   }
 

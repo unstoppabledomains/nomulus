@@ -3,14 +3,15 @@
   [
     {
       "objectClassName" : "nameserver",
-      "handle" : "14-ROID",
+      "handle" : "11-ROID",
       "ldhName" : "nsx1.cat.lol",
       "links" :
       [
         {
           "rel" : "self",
           "type" : "application/rdap+json",
-          "href" : "https://example.tld/rdap/nameserver/nsx1.cat.lol"
+          "href" : "https://example.tld/rdap/nameserver/nsx1.cat.lol",
+          "value": "https://example.tld/rdap/nameservers"
         }
       ],
       "ipAddresses" :
@@ -35,14 +36,15 @@
     },
     {
       "objectClassName" : "nameserver",
-      "handle" : "15-ROID",
+      "handle" : "12-ROID",
       "ldhName" : "nsx2.cat.lol",
       "links" :
       [
         {
           "rel" : "self",
           "type" : "application/rdap+json",
-          "href" : "https://example.tld/rdap/nameserver/nsx2.cat.lol"
+          "href" : "https://example.tld/rdap/nameserver/nsx2.cat.lol",
+          "value": "https://example.tld/rdap/nameservers"
         }
       ],
       "ipAddresses" :
@@ -67,14 +69,15 @@
     },
     {
       "objectClassName" : "nameserver",
-      "handle" : "16-ROID",
+      "handle" : "13-ROID",
       "ldhName" : "nsx3.cat.lol",
       "links" :
       [
         {
           "rel" : "self",
           "type" : "application/rdap+json",
-          "href" : "https://example.tld/rdap/nameserver/nsx3.cat.lol"
+          "href" : "https://example.tld/rdap/nameserver/nsx3.cat.lol",
+          "value": "https://example.tld/rdap/nameservers"
         }
       ],
       "ipAddresses" :
@@ -99,14 +102,15 @@
     },
     {
       "objectClassName" : "nameserver",
-      "handle" : "17-ROID",
+      "handle" : "14-ROID",
       "ldhName" : "nsx4.cat.lol",
       "links" :
       [
         {
           "rel" : "self",
           "type" : "application/rdap+json",
-          "href" : "https://example.tld/rdap/nameserver/nsx4.cat.lol"
+          "href" : "https://example.tld/rdap/nameserver/nsx4.cat.lol",
+          "value": "https://example.tld/rdap/nameservers"
         }
       ],
       "ipAddresses" :
@@ -132,8 +136,8 @@
   ],
   "rdapConformance" : [
     "rdap_level_0",
-    "icann_rdap_response_profile_0",
-    "icann_rdap_technical_implementation_guide_0"
+    "icann_rdap_response_profile_1",
+    "icann_rdap_technical_implementation_guide_1"
   ],
   "notices" :
   [
@@ -157,19 +161,15 @@
         {
           "href": "https://example.tld/rdap/help/tos",
           "rel": "self",
-          "type": "application/rdap+json"
+          "type": "application/rdap+json",
+          "value": "https://example.tld/rdap/nameservers"
         },
         {
-          "href": "https://www.registry.tld/about/rdap/tos.html",
-          "rel": "alternate",
-          "type": "text/html"
+          "href": "https://www.example.tld/about/rdap/tos.html",
+          "rel": "terms-of-service",
+          "type": "text/html",
+          "value": "https://example.tld/rdap/nameservers"
         }
-      ]
-    },
-    {
-      "description" :
-      [
-        "This response conforms to the RDAP Operational Profile for gTLD Registries and Registrars version 1.0"
       ]
     }
   ]

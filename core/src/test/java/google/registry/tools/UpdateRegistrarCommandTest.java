@@ -108,7 +108,7 @@ class UpdateRegistrarCommandTest extends CommandTestCase<UpdateRegistrarCommand>
 
   @Test
   void testSuccess_allowedTlds() throws Exception {
-    persistWhoisAbuseContact();
+    persistRdapAbuseContact();
     createTlds("xn--q9jyb4c", "foobar");
     persistResource(
         loadRegistrar("NewRegistrar")
@@ -125,8 +125,26 @@ class UpdateRegistrarCommandTest extends CommandTestCase<UpdateRegistrarCommand>
   }
 
   @Test
+  void testSuccess_allowedTlds_tldNameWithHyphens() throws Exception {
+    persistRdapAbuseContact();
+    createTlds("zz--main-1611", "foobar");
+    persistResource(
+        loadRegistrar("NewRegistrar")
+            .asBuilder()
+            .setAllowedTlds(ImmutableSet.of("foobar"))
+            .build());
+    runCommandInEnvironment(
+        RegistryToolEnvironment.PRODUCTION,
+        "--allowed_tlds=zz--main-1611,foobar",
+        "--force",
+        "NewRegistrar");
+    assertThat(loadRegistrar("NewRegistrar").getAllowedTlds())
+        .containsExactly("zz--main-1611", "foobar");
+  }
+
+  @Test
   void testSuccess_addAllowedTlds() throws Exception {
-    persistWhoisAbuseContact();
+    persistRdapAbuseContact();
     createTlds("xn--q9jyb4c", "foo", "bar");
     persistResource(
         loadRegistrar("NewRegistrar")
@@ -143,8 +161,21 @@ class UpdateRegistrarCommandTest extends CommandTestCase<UpdateRegistrarCommand>
   }
 
   @Test
+  void testSuccess_addAllowedTlds_tldNameWithHyphens() throws Exception {
+    persistRdapAbuseContact();
+    createTlds("foo", "bar", "zz--main-1611");
+    runCommandInEnvironment(
+        RegistryToolEnvironment.PRODUCTION,
+        "--add_allowed_tlds=foo,bar",
+        "--force",
+        "NewRegistrar");
+    assertThat(loadRegistrar("NewRegistrar").getAllowedTlds())
+        .containsExactly("foo", "bar", "zz--main-1611");
+  }
+
+  @Test
   void testSuccess_addAllowedTldsWithDupes() throws Exception {
-    persistWhoisAbuseContact();
+    persistRdapAbuseContact();
     createTlds("xn--q9jyb4c", "foo", "bar");
     persistResource(
         loadRegistrar("NewRegistrar")
@@ -968,11 +999,11 @@ class UpdateRegistrarCommandTest extends CommandTestCase<UpdateRegistrarCommand>
         .isEqualTo("Provided email lolcat is not a valid email address");
   }
 
-  private void persistWhoisAbuseContact() {
+  private void persistRdapAbuseContact() {
     persistResource(
         JpaTransactionManagerExtension.makeRegistrarContact1()
             .asBuilder()
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
   }
 }

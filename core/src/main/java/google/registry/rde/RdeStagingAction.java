@@ -50,7 +50,6 @@ import google.registry.model.host.Host;
 import google.registry.model.rde.RdeMode;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
@@ -101,8 +100,8 @@ import org.joda.time.Duration;
  *
  * <h2>Logging</h2>
  *
- * <p>To identify the reduce worker request for a deposit in App Engine's log viewer, you can use
- * search text like {@code tld=soy}, {@code watermark=2015-01-01}, and {@code mode=FULL}.
+ * <p>To identify the reduce worker request for a deposit in the log viewer, you can use search text
+ * like {@code tld=soy}, {@code watermark=2015-01-01}, and {@code mode=FULL}.
  *
  * <h3>Error Handling</h3>
  *
@@ -205,7 +204,7 @@ import org.joda.time.Duration;
  *     Name Registration Data Objects Mapping</a>
  */
 @Action(
-    service = GaeService.BACKEND,
+    service = Action.Service.BACKEND,
     path = RdeStagingAction.PATH,
     method = {GET, POST},
     auth = Auth.AUTH_ADMIN)

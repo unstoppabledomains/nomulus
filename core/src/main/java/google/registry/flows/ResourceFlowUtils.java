@@ -16,7 +16,6 @@ package google.registry.flows;
 
 import static com.google.common.collect.Sets.intersection;
 import static google.registry.model.EppResourceUtils.isLinked;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.common.collect.ImmutableSet;
@@ -72,10 +71,9 @@ public final class ResourceFlowUtils {
    */
   public static <R extends EppResource> void checkLinkedDomains(
       final String targetId, final DateTime now, final Class<R> resourceClass) throws EppException {
-    VKey<R> key = ForeignKeyUtils.load(resourceClass, targetId, now);
-    if (key == null) {
-      throw new ResourceDoesNotExistException(resourceClass, targetId);
-    }
+    VKey<R> key =
+        ForeignKeyUtils.loadKey(resourceClass, targetId, now)
+            .orElseThrow(() -> new ResourceDoesNotExistException(resourceClass, targetId));
     if (isLinked(key, now)) {
       throw new ResourceToDeleteIsReferencedException();
     }
@@ -97,7 +95,7 @@ public final class ResourceFlowUtils {
 
   public static <R extends EppResource & ForeignKeyedEppResource> R loadAndVerifyExistence(
       Class<R> clazz, String targetId, DateTime now) throws ResourceDoesNotExistException {
-    return verifyExistence(clazz, targetId, loadByForeignKey(clazz, targetId, now));
+    return verifyExistence(clazz, targetId, ForeignKeyUtils.loadResource(clazz, targetId, now));
   }
 
   public static <R extends EppResource> R verifyExistence(
@@ -107,11 +105,10 @@ public final class ResourceFlowUtils {
 
   public static <R extends EppResource> void verifyResourceDoesNotExist(
       Class<R> clazz, String targetId, DateTime now, String registrarId) throws EppException {
-    VKey<R> key = ForeignKeyUtils.load(clazz, targetId, now);
-    if (key != null) {
-      R resource = tm().loadByKey(key);
+    Optional<R> resource = ForeignKeyUtils.loadResource(clazz, targetId, now);
+    if (resource.isPresent()) {
       // These are similar exceptions, but we can track them internally as log-based metrics.
-      if (Objects.equals(registrarId, resource.getPersistedCurrentSponsorRegistrarId())) {
+      if (Objects.equals(registrarId, resource.get().getPersistedCurrentSponsorRegistrarId())) {
         throw new ResourceAlreadyExistsForThisClientException(targetId);
       } else {
         throw new ResourceCreateContentionException(targetId);
@@ -197,12 +194,26 @@ public final class ResourceFlowUtils {
     }
   }
 
-  /** Check that the same values aren't being added and removed in an update command. */
-  public static void checkSameValuesNotAddedAndRemoved(
-      ImmutableSet<?> fieldsToAdd, ImmutableSet<?> fieldsToRemove)
-      throws AddRemoveSameValueException {
+  /**
+   * Verifies the adds and removes on a resource.
+   *
+   * <p>This throws an exception in three different situations: if the same value is being both
+   * added and removed, if a value is being added that is already present, or if a value is being
+   * removed that isn't present.
+   */
+  public static <T> void verifyAddsAndRemoves(
+      ImmutableSet<T> existingFields, ImmutableSet<T> fieldsToAdd, ImmutableSet<T> fieldsToRemove)
+      throws AddRemoveSameValueException,
+          AddExistingValueException,
+          RemoveNonexistentValueException {
     if (!intersection(fieldsToAdd, fieldsToRemove).isEmpty()) {
       throw new AddRemoveSameValueException();
+    }
+    if (!intersection(fieldsToAdd, existingFields).isEmpty()) {
+      throw new AddExistingValueException();
+    }
+    if (intersection(fieldsToRemove, existingFields).size() != fieldsToRemove.size()) {
+      throw new RemoveNonexistentValueException();
     }
   }
 
@@ -266,6 +277,20 @@ public final class ResourceFlowUtils {
   public static class AddRemoveSameValueException extends ParameterValuePolicyErrorException {
     public AddRemoveSameValueException() {
       super("Cannot add and remove the same value");
+    }
+  }
+
+  /** Cannot add a value that is already present. */
+  public static class AddExistingValueException extends ParameterValuePolicyErrorException {
+    public AddExistingValueException() {
+      super("Cannot add a value that is already present");
+    }
+  }
+
+  /** Cannot remove a value that does not exist. */
+  public static class RemoveNonexistentValueException extends ParameterValuePolicyErrorException {
+    public RemoveNonexistentValueException() {
+      super("Cannot remove a value that does not exist");
     }
   }
 

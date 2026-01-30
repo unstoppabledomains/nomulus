@@ -16,7 +16,6 @@ package google.registry.tools;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static google.registry.batch.AsyncTaskEnqueuer.QUEUE_ASYNC_ACTIONS;
-import static google.registry.model.EppResourceUtils.loadByForeignKeyCached;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.tools.LockOrUnlockDomainCommand.REGISTRY_LOCK_STATUSES;
 
@@ -26,6 +25,7 @@ import com.google.common.collect.Sets;
 import google.registry.batch.CloudTasksUtils;
 import google.registry.batch.RelockDomainAction;
 import google.registry.config.RegistryConfig.Config;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.domain.Domain;
@@ -74,11 +74,12 @@ public final class DomainLockUtils {
    * <p>The lock will not be applied until {@link #verifyVerificationCode} is called.
    */
   public RegistryLock saveNewRegistryLockRequest(
-      String domainName, String registrarId, @Nullable String registrarPocId, boolean isAdmin) {
+      String domainName, String registrarId, @Nullable String registryLockEmail, boolean isAdmin) {
     return tm().transact(
             () ->
                 RegistryLockDao.save(
-                    createLockBuilder(domainName, registrarId, registrarPocId, isAdmin).build()));
+                    createLockBuilder(domainName, registrarId, registryLockEmail, isAdmin)
+                        .build()));
   }
 
   /**
@@ -129,13 +130,13 @@ public final class DomainLockUtils {
    * the case of relocks, isAdmin is determined by the previous lock.
    */
   public RegistryLock administrativelyApplyLock(
-      String domainName, String registrarId, @Nullable String registrarPocId, boolean isAdmin) {
+      String domainName, String registrarId, @Nullable String registryLockEmail, boolean isAdmin) {
     return tm().transact(
             () -> {
               DateTime now = tm().getTransactionTime();
               RegistryLock newLock =
                   RegistryLockDao.save(
-                      createLockBuilder(domainName, registrarId, registrarPocId, isAdmin)
+                      createLockBuilder(domainName, registrarId, registryLockEmail, isAdmin)
                           .setLockCompletionTime(now)
                           .build());
               applyLockStatuses(newLock, now, isAdmin);
@@ -235,7 +236,7 @@ public final class DomainLockUtils {
   }
 
   private RegistryLock.Builder createLockBuilder(
-      String domainName, String registrarId, @Nullable String registrarPocId, boolean isAdmin) {
+      String domainName, String registrarId, @Nullable String registryLockEmail, boolean isAdmin) {
     DateTime now = tm().getTransactionTime();
     Domain domain = getDomain(domainName, registrarId, now);
     verifyDomainNotLocked(domain, isAdmin);
@@ -255,7 +256,7 @@ public final class DomainLockUtils {
         .setDomainName(domainName)
         .setRepoId(domain.getRepoId())
         .setRegistrarId(registrarId)
-        .setRegistrarPocId(registrarPocId)
+        .setRegistryLockEmail(registryLockEmail)
         .isSuperuser(isAdmin);
   }
 
@@ -326,7 +327,7 @@ public final class DomainLockUtils {
 
   private Domain getDomain(String domainName, String registrarId, DateTime now) {
     Domain domain =
-        loadByForeignKeyCached(Domain.class, domainName, now)
+        ForeignKeyUtils.loadResource(Domain.class, domainName, now)
             .orElseThrow(() -> new IllegalArgumentException("Domain doesn't exist"));
     // The user must have specified either the correct registrar ID or the admin registrar ID
     checkArgument(

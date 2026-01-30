@@ -57,7 +57,7 @@ public class BackendMetricsHandler extends ChannelDuplexHandler {
   private Channel relayedChannel;
 
   /**
-   * A queue that saves the time at which a request is sent to the GAE app.
+   * A queue that saves the time at which a request is sent to Nomulus.
    *
    * <p>This queue is used to calculate HTTP request-response latency. HTTP 1.1 specification allows
    * for pipelining, in which a client can sent multiple requests without waiting for each
@@ -104,7 +104,6 @@ public class BackendMetricsHandler extends ChannelDuplexHandler {
   @Override
   public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
     checkArgument(msg instanceof FullHttpRequest, "Outgoing request must be FullHttpRequest.");
-    // For WHOIS, client certificate hash is always set to "none".
     // For EPP, the client hash attribute is set upon handshake completion, before the first HELLO
     // is sent to the server. Therefore the first call to write() with HELLO payload has access to
     // the hash in its channel attribute.
@@ -124,7 +123,7 @@ public class BackendMetricsHandler extends ChannelDuplexHandler {
             .addListener(
                 future -> {
                   if (future.isSuccess()) {
-                    // Only instrument request metrics when the request is actually sent to GAE.
+                    // Only instrument request metrics when the request is actually sent to Nomulus
                     metrics.requestSent(relayedProtocolName, clientCertHash, bytes);
                     requestSentTimeQueue.add(clock.nowUtc());
                   }
