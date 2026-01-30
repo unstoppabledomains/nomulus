@@ -70,19 +70,40 @@ public class RstTmchUtils {
 
   /** Returns appropriate test labels if {@code tld} is for RST testing; otherwise returns empty. */
   public static Optional<SignedMarkRevocationList> getSmdrList(String tld) {
-    return getRstEnvironment(tld).map(SMDRL_CACHE::get).flatMap(Supplier::get);
+    Optional<RstEnvironment> rstEnv = getRstEnvironment(tld);
+    logger.atInfo().log(
+        "RST SMDRL lookup for TLD '%s': rstEnvironment=%s, registryEnvironment=%s",
+        tld, rstEnv, RegistryEnvironment.get());
+    Optional<SignedMarkRevocationList> result =
+        rstEnv.map(SMDRL_CACHE::get).flatMap(Supplier::get);
+    if (result.isPresent()) {
+      logger.atInfo().log(
+          "RST SMDRL for TLD '%s': loaded with %d entries, creationTime=%s",
+          tld, result.get().size(), result.get().getCreationTime());
+    } else {
+      logger.atInfo().log("RST SMDRL for TLD '%s': NOT FOUND, will use database SMDRL", tld);
+    }
+    return result;
   }
 
   static Optional<RstEnvironment> getRstEnvironment(String tld) {
-    if (!RegistryEnvironment.get().equals(SANDBOX)) {
+    RegistryEnvironment currentEnv = RegistryEnvironment.get();
+    logger.atInfo().log(
+        "getRstEnvironment: tld='%s', currentEnv=%s, isSandbox=%s",
+        tld, currentEnv, currentEnv.equals(SANDBOX));
+    if (!currentEnv.equals(SANDBOX)) {
+      logger.atInfo().log("getRstEnvironment: returning empty - not SANDBOX environment");
       return Optional.empty();
     }
     if (tld.startsWith("cc-rst-test-")) {
+      logger.atInfo().log("getRstEnvironment: returning OTE for tld '%s'", tld);
       return Optional.of(OTE);
     }
     if (tld.startsWith("zz--")) {
+      logger.atInfo().log("getRstEnvironment: returning PROD for tld '%s'", tld);
       return Optional.of(PROD);
     }
+    logger.atInfo().log("getRstEnvironment: returning empty - tld '%s' not RST pattern", tld);
     return Optional.empty();
   }
 
