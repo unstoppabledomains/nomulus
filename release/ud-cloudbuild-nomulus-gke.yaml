@@ -260,9 +260,7 @@ steps:
       google.registry.beam.rde.RdePipeline \
       google/registry/beam/rde_pipeline_metadata.json \
       google.registry.beam.resave.ResaveAllEppResourcesPipeline \
-      google/registry/beam/resave_all_epp_resources_pipeline_metadata.json \
-      google.registry.beam.wipeout.WipeOutContactHistoryPiiPipeline \
-      google/registry/beam/wipe_out_contact_history_pii_pipeline_metadata.json
+      google/registry/beam/resave_all_epp_resources_pipeline_metadata.json
 
 # Build Cloud SQL schema jar and nomulus:core jars needed for server/schema compatibility tests.
 # Note: Upstream removed the maven publishing configuration, so we build jars directly.
