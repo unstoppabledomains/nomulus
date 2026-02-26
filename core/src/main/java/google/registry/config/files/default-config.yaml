@@ -63,9 +63,6 @@ registryPolicy:
   # See reporting/icann/DnsCountQueryCoordinator.java
   dnsCountQueryCoordinatorClass: google.registry.reporting.icann.DummyDnsCountQueryCoordinator
 
-  # Length of time after which contact transfers automatically conclude.
-  contactAutomaticTransferDays: 5
-
   # Server ID used in the 'svID' element of an EPP 'greeting'.
   greetingServerId: Nomulus Registry
 
@@ -450,11 +447,6 @@ registryTool:
   # OAuth client secret used by the tool.
   clientSecret: YOUR_CLIENT_SECRET
 
-# Configuration options for handling contact history.
-contactHistory:
-  # The number of months that a ContactHistory entity should be stored in the database.
-  minMonthsBeforeWipeOut: 18
-
 # Configuration options relevant to the DNS update functionality.
 dnsUpdate:
   dnsUpdateFailRegistryName: Example name
@@ -645,5 +637,5 @@ mosapi:
   # Provides a fixed thread pool for parallel TLD processing.
   # @see <a href="https://www.icann.org/mosapi-specification.pdf">
   # ICANN MoSAPI Specification, Section 12.3</a>
-  tldThreadCnt: 4
+  tldThreadCount: 4
 

@@ -18,6 +18,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.uniqueIndex;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.domain.fee06.FeeCheckCommandExtensionV06;
@@ -46,10 +47,13 @@ public class ProtocolDefinition {
   public static final String LANGUAGE = "en";
 
   public static final ImmutableSet<String> SUPPORTED_OBJECT_SERVICES =
-      ImmutableSet.of(
-          "urn:ietf:params:xml:ns:host-1.0",
-          "urn:ietf:params:xml:ns:domain-1.0",
-          "urn:ietf:params:xml:ns:contact-1.0");
+      ImmutableSet.of("urn:ietf:params:xml:ns:host-1.0", "urn:ietf:params:xml:ns:domain-1.0");
+
+  public static final ImmutableSet<String> SUPPORTED_OBJECT_SERVICES_WITH_CONTACT =
+      new ImmutableSet.Builder<String>()
+          .addAll(SUPPORTED_OBJECT_SERVICES)
+          .add("urn:ietf:params:xml:ns:contact-1.0")
+          .build();
 
   /** Enum representing which environments should have which service extensions enabled. */
   private enum ServiceExtensionVisibility {
@@ -88,6 +92,7 @@ public class ProtocolDefinition {
     private final Class<? extends CommandExtension> commandExtensionClass;
     private final Class<? extends ResponseExtension> responseExtensionClass;
     private final String uri;
+    private final String xmlTag;
     private final ServiceExtensionVisibility visibility;
 
     ServiceExtension(
@@ -97,6 +102,7 @@ public class ProtocolDefinition {
       this.commandExtensionClass = commandExtensionClass;
       this.responseExtensionClass = responseExtensionClass;
       this.uri = getCommandExtensionUri(commandExtensionClass);
+      this.xmlTag = getCommandExtensionXmlTag(commandExtensionClass);
       this.visibility = visibility;
     }
 
@@ -112,9 +118,25 @@ public class ProtocolDefinition {
       return uri;
     }
 
+    public String getXmlTag() {
+      return xmlTag;
+    }
+
     /** Returns the namespace URI of the command extension class. */
     public static String getCommandExtensionUri(Class<? extends CommandExtension> clazz) {
       return clazz.getPackage().getAnnotation(XmlSchema.class).namespace();
+    }
+
+    /** Returns the XML tag for this extension in the response message. */
+    public static String getCommandExtensionXmlTag(Class<? extends CommandExtension> clazz) {
+      var xmlSchema = clazz.getPackage().getAnnotation(XmlSchema.class);
+      var xmlns = xmlSchema.xmlns();
+      if (xmlns == null || xmlns.length != 1) {
+        throw new VerifyException(
+            String.format(
+                "Expecting exactly one NS declaration in %s", clazz.getPackage().getName()));
+      }
+      return xmlns[0].prefix();
     }
 
     public boolean isVisible() {

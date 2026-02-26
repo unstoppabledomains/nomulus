@@ -20,7 +20,6 @@ import static google.registry.model.reporting.HistoryEntry.Type.DOMAIN_CREATE;
 import static google.registry.testing.DatabaseHelper.createBillingEventForTransfer;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.getOnlyHistoryEntryOfType;
-import static google.registry.testing.DatabaseHelper.persistActiveContact;
 import static google.registry.testing.DatabaseHelper.persistDomainWithDependentResources;
 import static google.registry.testing.DatabaseHelper.persistDomainWithPendingTransfer;
 import static google.registry.testing.DatabaseHelper.persistResource;
@@ -36,14 +35,13 @@ import google.registry.model.billing.BillingBase.Flag;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingRecurrence;
-import google.registry.model.contact.Contact;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainHistory;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.Host;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.tld.Tld;
-import google.registry.model.transfer.TransferData;
+import google.registry.model.transfer.DomainTransferData;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.persistence.transaction.JpaTransactionManagerExtension;
 import org.joda.time.DateTime;
@@ -72,7 +70,6 @@ abstract class DomainTransferFlowTestCase<F extends Flow, R extends EppResource>
   static final DateTime EXTENDED_REGISTRATION_EXPIRATION_TIME =
       REGISTRATION_EXPIRATION_TIME.plusYears(EXTENDED_REGISTRATION_YEARS);
 
-  protected Contact contact;
   protected Domain domain;
   Host subordinateHost;
   private DomainHistory historyEntryDomainCreate;
@@ -104,12 +101,10 @@ abstract class DomainTransferFlowTestCase<F extends Flow, R extends EppResource>
   /** Adds a domain with no pending transfer on it. */
   void setupDomain(String label, String tld) {
     createTld(tld);
-    contact = persistActiveContact("jd1234");
     domain =
         persistDomainWithDependentResources(
             label,
             tld,
-            contact,
             clock.nowUtc(),
             DateTime.parse("1999-04-03T22:00:00.0Z"),
             REGISTRATION_EXPIRATION_TIME);
@@ -166,7 +161,8 @@ abstract class DomainTransferFlowTestCase<F extends Flow, R extends EppResource>
         .build();
   }
 
-  void assertTransferFailed(Domain domain, TransferStatus status, TransferData oldTransferData) {
+  void assertTransferFailed(
+      Domain domain, TransferStatus status, DomainTransferData oldTransferData) {
     assertAboutDomains()
         .that(domain)
         .doesNotHaveStatusValue(StatusValue.PENDING_TRANSFER)

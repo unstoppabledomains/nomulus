@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <epp xmlns="urn:ietf:params:xml:ns:epp-1.0">
   <command>
     <update>
@@ -5,13 +6,12 @@
        xmlns:domain="urn:ietf:params:xml:ns:domain-1.0">
         <domain:name>example.tld</domain:name>
         <domain:add>
+          <domain:ns>
+            <domain:hostObj>ns2.zdns.google</domain:hostObj>
+          </domain:ns>
         </domain:add>
-        <domain:rem>
-        </domain:rem>
-        <domain:chg>
-        </domain:chg>
       </domain:update>
     </update>
-    <clTRID>ABC-12345</clTRID>
+    <clTRID>RegistryTool</clTRID>
   </command>
 </epp>

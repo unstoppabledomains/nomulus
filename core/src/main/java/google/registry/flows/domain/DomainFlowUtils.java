@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.ImmutableSetMultimap.toImmutableSetMultimap;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.intersection;
 import static com.google.common.collect.Sets.union;
@@ -45,10 +44,8 @@ import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.isAtOrAfter;
 import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 import static google.registry.util.DomainNameUtils.ACE_PREFIX;
-import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 
-import com.google.common.base.Ascii;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -57,9 +54,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.net.InternetDomainName;
@@ -73,22 +67,17 @@ import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.EppException.UnimplementedOptionException;
-import google.registry.flows.exceptions.ContactsProhibitedException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
 import google.registry.model.EppResource;
 import google.registry.model.billing.BillingBase.Flag;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingRecurrence;
-import google.registry.model.contact.Contact;
-import google.registry.model.domain.DesignatedContact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainCommand.Create;
 import google.registry.model.domain.DomainCommand.CreateOrUpdate;
 import google.registry.model.domain.DomainCommand.InvalidReferencesException;
 import google.registry.model.domain.DomainCommand.Update;
 import google.registry.model.domain.DomainHistory;
-import google.registry.model.domain.ForeignKeyedDesignatedContact;
 import google.registry.model.domain.Period;
 import google.registry.model.domain.Period.Unit;
 import google.registry.model.domain.fee.BaseFee;
@@ -133,10 +122,8 @@ import google.registry.tldconfig.idn.IdnLabelValidator;
 import google.registry.tools.DigestType;
 import google.registry.util.Idn;
 import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
@@ -405,34 +392,14 @@ public class DomainFlowUtils {
     return period;
   }
 
-  /** Verify that no linked resources have disallowed statuses. */
-  static void verifyNotInPendingDelete(
-      Set<DesignatedContact> contacts,
-      Optional<VKey<Contact>> registrant,
-      Set<VKey<Host>> nameservers)
-      throws EppException {
-    ImmutableList.Builder<VKey<? extends EppResource>> keysToLoad = new ImmutableList.Builder<>();
-    contacts.stream().map(DesignatedContact::getContactKey).forEach(keysToLoad::add);
-    registrant.ifPresent(keysToLoad::add);
-    keysToLoad.addAll(nameservers);
-    verifyNotInPendingDelete(EppResource.loadByCacheIfEnabled(keysToLoad.build()).values());
-  }
-
-  private static void verifyNotInPendingDelete(Iterable<EppResource> resources)
-      throws EppException {
-    for (EppResource resource : resources) {
+  /** Verify that no linked nameservers have disallowed statuses. */
+  static void verifyNotInPendingDelete(ImmutableSet<VKey<Host>> nameservers)
+      throws StatusProhibitsOperationException {
+    for (EppResource resource :
+        EppResource.loadByCacheIfEnabled(ImmutableSet.copyOf(nameservers)).values()) {
       if (resource.getStatusValues().contains(StatusValue.PENDING_DELETE)) {
         throw new LinkedResourceInPendingDeleteProhibitsOperationException(
             resource.getForeignKey());
-      }
-    }
-  }
-
-  static void validateContactsHaveTypes(Set<DesignatedContact> contacts)
-      throws ParameterValuePolicyErrorException {
-    for (DesignatedContact contact : contacts) {
-      if (contact.getType() == null) {
-        throw new MissingContactTypeException();
       }
     }
   }
@@ -448,66 +415,6 @@ public class DomainFlowUtils {
     if (count > MAX_NAMESERVERS_PER_DOMAIN) {
       throw new TooManyNameserversException(
           String.format("Only %d nameservers are allowed per domain", MAX_NAMESERVERS_PER_DOMAIN));
-    }
-  }
-
-  static void validateNoDuplicateContacts(Set<DesignatedContact> contacts)
-      throws ParameterValuePolicyErrorException {
-    ImmutableMultimap<Type, VKey<Contact>> contactsByType =
-        contacts.stream()
-            .collect(
-                toImmutableSetMultimap(
-                    DesignatedContact::getType, DesignatedContact::getContactKey));
-
-    // If any contact type has multiple contacts:
-    if (contactsByType.asMap().values().stream().anyMatch(v -> v.size() > 1)) {
-      // Find the duplicates.
-      Map<Type, Collection<VKey<Contact>>> dupeKeysMap =
-          Maps.filterEntries(contactsByType.asMap(), e -> e.getValue().size() > 1);
-      ImmutableList<VKey<Contact>> dupeKeys =
-          dupeKeysMap.values().stream().flatMap(Collection::stream).collect(toImmutableList());
-      // Load the duplicates in one batch.
-      Map<VKey<? extends Contact>, Contact> dupeContacts = tm().loadByKeys(dupeKeys);
-      ImmutableMultimap.Builder<Type, VKey<Contact>> typesMap = new ImmutableMultimap.Builder<>();
-      dupeKeysMap.forEach(typesMap::putAll);
-      // Create an error message showing the type and contact IDs of the duplicates.
-      throw new DuplicateContactForRoleException(
-          Multimaps.transformValues(typesMap.build(), key -> dupeContacts.get(key).getContactId()));
-    }
-  }
-
-  /**
-   * Enforces the presence/absence of contact data on domain creates depending on the minimum data
-   * set migration schedule.
-   */
-  static void validateCreateContactData(
-      Optional<VKey<Contact>> registrant, Set<DesignatedContact> contacts)
-      throws ParameterValuePolicyErrorException {
-    if (registrant.isPresent()) {
-      throw new RegistrantProhibitedException();
-    }
-    if (!contacts.isEmpty()) {
-      throw new ContactsProhibitedException();
-    }
-  }
-
-  /**
-   * Enforces the presence/absence of contact data on domain updates depending on the minimum data
-   * set migration schedule.
-   */
-  static void validateUpdateContactData(
-      Optional<VKey<Contact>> existingRegistrant,
-      Optional<VKey<Contact>> newRegistrant,
-      Set<DesignatedContact> existingContacts,
-      Set<DesignatedContact> newContacts)
-      throws ParameterValuePolicyErrorException {
-    // Throw if the update specifies a new registrant that is different from the existing one.
-    if (newRegistrant.isPresent() && !newRegistrant.equals(existingRegistrant)) {
-      throw new RegistrantProhibitedException();
-    }
-    // Throw if the update specifies any new contacts that weren't already present on the domain.
-    if (!Sets.difference(newContacts, existingContacts).isEmpty()) {
-      throw new ContactsProhibitedException();
     }
   }
 
@@ -1032,12 +939,8 @@ public class DomainFlowUtils {
   /** Validate the contacts and nameservers specified in a domain create command. */
   static void validateCreateCommandContactsAndNameservers(
       Create command, Tld tld, InternetDomainName domainName) throws EppException {
-    verifyNotInPendingDelete(
-        command.getContacts(), command.getRegistrant(), command.getNameservers());
-    validateContactsHaveTypes(command.getContacts());
+    verifyNotInPendingDelete(command.getNameservers());
     String tldStr = tld.getTldStr();
-    validateNoDuplicateContacts(command.getContacts());
-    validateCreateContactData(command.getRegistrant(), command.getContacts());
     ImmutableSet<String> hostNames = command.getNameserverHostNames();
     validateNameserversCountForTld(tldStr, domainName, hostNames.size());
     validateNameserversAllowedOnTld(tldStr, hostNames);
@@ -1141,17 +1044,6 @@ public class DomainFlowUtils {
         .setFees(feesAndCredits.getFees())
         .setCredits(feesAndCredits.getCredits())
         .build();
-  }
-
-  static ImmutableSet<ForeignKeyedDesignatedContact> loadForeignKeyedDesignatedContacts(
-      ImmutableSet<DesignatedContact> contacts) {
-    ImmutableSet.Builder<ForeignKeyedDesignatedContact> builder = new ImmutableSet.Builder<>();
-    for (DesignatedContact contact : contacts) {
-      builder.add(
-          ForeignKeyedDesignatedContact.create(
-              contact.getType(), tm().loadByKey(contact.getContactKey()).getContactId()));
-    }
-    return builder.build();
   }
 
   /**
@@ -1293,32 +1185,6 @@ public class DomainFlowUtils {
     }
   }
 
-  /** Missing type attribute for contact. */
-  static class MissingContactTypeException extends ParameterValuePolicyErrorException {
-    public MissingContactTypeException() {
-      super("Missing type attribute for contact");
-    }
-  }
-
-  /** More than one contact for a given role is not allowed. */
-  static class DuplicateContactForRoleException extends ParameterValuePolicyErrorException {
-
-    public DuplicateContactForRoleException(Multimap<Type, String> dupeContactsByType) {
-      super(
-          String.format(
-              "More than one contact for a given role is not allowed: %s",
-              dupeContactsByType.asMap().entrySet().stream()
-                  .sorted(comparing(e -> e.getKey().name()))
-                  .map(
-                      e ->
-                          String.format(
-                              "role [%s] has contacts [%s]",
-                              Ascii.toLowerCase(e.getKey().name()),
-                              e.getValue().stream().sorted().collect(joining(", "))))
-                  .collect(joining(", "))));
-    }
-  }
-
   /** Declared launch extension phase does not match the current registry phase. */
   static class LaunchPhaseMismatchException extends ParameterValuePolicyErrorException {
     public LaunchPhaseMismatchException() {
@@ -1355,7 +1221,7 @@ public class DomainFlowUtils {
   }
 
   /** Having a registrant is prohibited by registry policy. */
-  static class RegistrantProhibitedException extends ParameterValuePolicyErrorException {
+  public static class RegistrantProhibitedException extends ParameterValuePolicyErrorException {
     public RegistrantProhibitedException() {
       super("Having a registrant is prohibited by registry policy");
     }

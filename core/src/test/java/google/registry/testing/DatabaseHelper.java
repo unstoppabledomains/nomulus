@@ -24,8 +24,7 @@ import static com.google.common.collect.Iterables.toArray;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static google.registry.config.RegistryConfig.getContactAndHostRoidSuffix;
-import static google.registry.config.RegistryConfig.getContactAutomaticTransferLength;
+import static google.registry.config.RegistryConfig.getHostRoidSuffix;
 import static google.registry.model.EppResourceUtils.createDomainRepoId;
 import static google.registry.model.EppResourceUtils.createRepoId;
 import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
@@ -74,11 +73,6 @@ import google.registry.model.common.DnsRefreshRequest;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactAuthInfo;
-import google.registry.model.contact.ContactHistory;
-import google.registry.model.domain.DesignatedContact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainBase;
@@ -105,9 +99,7 @@ import google.registry.model.tld.label.PremiumList.PremiumEntry;
 import google.registry.model.tld.label.PremiumListDao;
 import google.registry.model.tld.label.ReservedList;
 import google.registry.model.tld.label.ReservedListDao;
-import google.registry.model.transfer.ContactTransferData;
 import google.registry.model.transfer.DomainTransferData;
-import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.persistence.VKey;
 import java.util.Arrays;
@@ -152,7 +144,7 @@ public final class DatabaseHelper {
   }
 
   public static Host newHost(String hostName) {
-    return newHostWithRoid(hostName, generateNewContactHostRoid());
+    return newHostWithRoid(hostName, generateNewHostRoid());
   }
 
   public static Host newHostWithRoid(String hostName, String repoId) {
@@ -167,11 +159,7 @@ public final class DatabaseHelper {
 
   public static Domain newDomain(String domainName) {
     String repoId = generateNewDomainRoid(getTldFromDomainName(domainName));
-    return newDomain(domainName, repoId, persistActiveContact("contact1234"));
-  }
-
-  public static Domain newDomain(String domainName, Contact contact) {
-    return newDomain(domainName, generateNewDomainRoid(getTldFromDomainName(domainName)), contact);
+    return newDomain(domainName, repoId);
   }
 
   public static Domain newDomain(String domainName, Host... hosts) {
@@ -180,8 +168,7 @@ public final class DatabaseHelper {
     return newDomain(domainName).asBuilder().setNameservers(hostKeys).build();
   }
 
-  public static Domain newDomain(String domainName, String repoId, Contact contact) {
-    VKey<Contact> contactKey = contact.createVKey();
+  public static Domain newDomain(String domainName, String repoId) {
     return new Domain.Builder()
         .setRepoId(repoId)
         .setDomainName(domainName)
@@ -189,31 +176,7 @@ public final class DatabaseHelper {
         .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
         .setCreationTimeForTest(START_OF_TIME)
         .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("2fooBAR")))
-        .setRegistrant(Optional.of(contactKey))
-        .setContacts(
-            ImmutableSet.of(
-                DesignatedContact.create(Type.ADMIN, contactKey),
-                DesignatedContact.create(Type.TECH, contactKey)))
         .setRegistrationExpirationTime(END_OF_TIME)
-        .build();
-  }
-
-  /**
-   * Returns a newly created {@link Contact} for the given contactId (which is the foreign key) with
-   * an auto-generated repoId.
-   */
-  public static Contact newContact(String contactId) {
-    return newContactWithRoid(contactId, generateNewContactHostRoid());
-  }
-
-  public static Contact newContactWithRoid(String contactId, String repoId) {
-    return new Contact.Builder()
-        .setRepoId(repoId)
-        .setContactId(contactId)
-        .setCreationRegistrarId("TheRegistrar")
-        .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
-        .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("2fooBAR")))
-        .setCreationTimeForTest(START_OF_TIME)
         .build();
   }
 
@@ -254,15 +217,6 @@ public final class DatabaseHelper {
         .setPremiumPricingEngine(StaticPremiumListPricingEngine.NAME)
         .setDnsWriters(ImmutableSet.of(VoidDnsWriter.NAME))
         .build();
-  }
-
-  public static Contact persistActiveContact(String contactId) {
-    return persistResource(newContact(contactId));
-  }
-
-  /** Persists a contact resource with the given contact id deleted at the specified time. */
-  public static Contact persistDeletedContact(String contactId, DateTime deletionTime) {
-    return persistResource(newContact(contactId).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static Host persistActiveHost(String hostName) {
@@ -492,24 +446,14 @@ public final class DatabaseHelper {
         .setPendingTransferExpirationTime(expirationTime);
   }
 
-  private static ContactTransferData.Builder createContactTransferDataBuilder(
-      DateTime requestTime, DateTime expirationTime) {
-    return new ContactTransferData.Builder()
-        .setTransferStatus(TransferStatus.PENDING)
-        .setGainingRegistrarId("NewRegistrar")
-        .setTransferRequestTime(requestTime)
-        .setLosingRegistrarId("TheRegistrar")
-        .setPendingTransferExpirationTime(expirationTime);
-  }
-
   public static PollMessage.OneTime createPollMessageForImplicitTransfer(
-      EppResource resource,
+      Domain domain,
       HistoryEntry historyEntry,
       String registrarId,
       DateTime requestTime,
       DateTime expirationTime,
       @Nullable DateTime extendedRegistrationExpirationTime) {
-    TransferData transferData =
+    DomainTransferData transferData =
         createDomainTransferDataBuilder(requestTime, expirationTime)
             .setTransferredRegistrationExpirationTime(extendedRegistrationExpirationTime)
             .build();
@@ -517,7 +461,7 @@ public final class DatabaseHelper {
         .setRegistrarId(registrarId)
         .setEventTime(expirationTime)
         .setMsg("Transfer server approved.")
-        .setResponseData(ImmutableList.of(createTransferResponse(resource, transferData)))
+        .setResponseData(ImmutableList.of(createTransferResponse(domain, transferData)))
         .setHistoryEntry(historyEntry)
         .build();
   }
@@ -536,57 +480,9 @@ public final class DatabaseHelper {
         .build();
   }
 
-  public static Contact persistContactWithPendingTransfer(
-      Contact contact, DateTime requestTime, DateTime expirationTime, DateTime now) {
-    ContactHistory historyEntryContactTransfer =
-        persistResource(
-            new ContactHistory.Builder()
-                .setType(HistoryEntry.Type.CONTACT_TRANSFER_REQUEST)
-                .setContact(persistResource(contact))
-                .setModificationTime(now)
-                .setRegistrarId(contact.getCurrentSponsorRegistrarId())
-                .build());
-    return persistResource(
-        contact
-            .asBuilder()
-            .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
-            .addStatusValue(StatusValue.PENDING_TRANSFER)
-            .setTransferData(
-                createContactTransferDataBuilder(requestTime, expirationTime)
-                    .setPendingTransferExpirationTime(now.plus(getContactAutomaticTransferLength()))
-                    .setServerApproveEntities(
-                        historyEntryContactTransfer.getRepoId(),
-                        historyEntryContactTransfer.getRevisionId(),
-                        ImmutableSet.of(
-                            // Pretend it's 3 days since the request
-                            persistResource(
-                                    createPollMessageForImplicitTransfer(
-                                        contact,
-                                        historyEntryContactTransfer,
-                                        "NewRegistrar",
-                                        requestTime,
-                                        expirationTime,
-                                        null))
-                                .createVKey(),
-                            persistResource(
-                                    createPollMessageForImplicitTransfer(
-                                        contact,
-                                        historyEntryContactTransfer,
-                                        "TheRegistrar",
-                                        requestTime,
-                                        expirationTime,
-                                        null))
-                                .createVKey()))
-                    .setTransferRequestTrid(
-                        Trid.create("transferClient-trid", "transferServer-trid"))
-                    .build())
-            .build());
-  }
-
   public static Domain persistDomainWithDependentResources(
       String label,
       String tld,
-      @Nullable Contact contact,
       DateTime now,
       DateTime creationTime,
       DateTime expirationTime) {
@@ -602,14 +498,6 @@ public final class DatabaseHelper {
             .setRegistrationExpirationTime(expirationTime)
             .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("fooBAR")));
     Duration addGracePeriodLength = Tld.get(tld).getAddGracePeriodLength();
-    if (contact != null) {
-      domainBuilder
-          .setRegistrant(Optional.of(contact.createVKey()))
-          .setContacts(
-              ImmutableSet.of(
-                  DesignatedContact.create(Type.ADMIN, contact.createVKey()),
-                  DesignatedContact.create(Type.TECH, contact.createVKey())));
-    }
     if (creationTime.plus(addGracePeriodLength).isAfter(now)) {
       domainBuilder.addGracePeriod(
           GracePeriod.create(
@@ -972,9 +860,9 @@ public final class DatabaseHelper {
     return createDomainRepoId(tm().reTransact(tm()::allocateId), tld);
   }
 
-  /** Returns a newly allocated, globally unique contact/host repoId of the format HEX_TLD-ROID. */
-  public static String generateNewContactHostRoid() {
-    return createRepoId(tm().reTransact(tm()::allocateId), getContactAndHostRoidSuffix());
+  /** Returns a newly allocated, globally unique host repoId of the format HEX_TLD-ROID. */
+  public static String generateNewHostRoid() {
+    return createRepoId(tm().reTransact(tm()::allocateId), getHostRoidSuffix());
   }
 
   /** Persists an object in the DB for tests. */
@@ -1114,11 +1002,7 @@ public final class DatabaseHelper {
   }
 
   private static HistoryEntry.Type getHistoryEntryType(EppResource resource) {
-    if (resource instanceof Contact) {
-      return resource.getRepoId() != null
-          ? HistoryEntry.Type.CONTACT_CREATE
-          : HistoryEntry.Type.CONTACT_UPDATE;
-    } else if (resource instanceof Host) {
+    if (resource instanceof Host) {
       return resource.getRepoId() != null
           ? HistoryEntry.Type.HOST_CREATE
           : HistoryEntry.Type.HOST_UPDATE;

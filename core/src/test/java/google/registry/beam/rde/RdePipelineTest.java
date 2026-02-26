@@ -81,7 +81,6 @@ import google.registry.testing.CloudTasksHelper.TaskMatcher;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeKeyringModule;
 import java.io.IOException;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -236,12 +235,7 @@ public class RdePipelineTest {
     persistHostHistory(host1);
     Domain helloDomain =
         persistEppResource(
-            newDomain("hello.soy")
-                .asBuilder()
-                .addNameserver(host1.createVKey())
-                .setRegistrant(Optional.empty())
-                .setContacts(ImmutableSet.of())
-                .build());
+            newDomain("hello.soy").asBuilder().addNameserver(host1.createVKey()).build());
     persistDomainHistory(helloDomain);
     persistHostHistory(persistActiveHost("not-used-subordinate.hello.soy"));
     Host host2 = persistActiveHost("ns1.hello.soy");
@@ -253,8 +247,6 @@ public class RdePipelineTest {
             newDomain("kitty.fun")
                 .asBuilder()
                 .addNameservers(ImmutableSet.of(host1.createVKey(), host2.createVKey()))
-                .setRegistrant(Optional.empty())
-                .setContacts(ImmutableSet.of())
                 .build());
     persistDomainHistory(kittyDomain);
     // Should not appear because the TLD is not included in a pending deposit.
@@ -348,7 +340,7 @@ public class RdePipelineTest {
                               """
                               <rdeDomain:domain>
                                   <rdeDomain:name>cat.fun</rdeDomain:name>
-                                  <rdeDomain:roid>10-FUN</rdeDomain:roid>
+                                  <rdeDomain:roid>F-FUN</rdeDomain:roid>
                                   <rdeDomain:uName>cat.fun</rdeDomain:uName>
                                   <rdeDomain:status s="ok"/>
                                   <rdeDomain:ns>

@@ -43,10 +43,7 @@ import com.google.common.collect.Sets;
 import com.google.gson.annotations.Expose;
 import google.registry.flows.ResourceFlowUtils;
 import google.registry.model.EppResource;
-import google.registry.model.EppResource.ResourceWithTransferData;
 import google.registry.model.billing.BillingRecurrence;
-import google.registry.model.contact.Contact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DomainDsData;
@@ -79,10 +76,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Transient;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.hibernate.collection.spi.PersistentSet;
 import org.joda.time.DateTime;
@@ -100,8 +95,7 @@ import org.joda.time.Interval;
 @MappedSuperclass
 @Embeddable
 @Access(AccessType.FIELD)
-public class DomainBase extends EppResource
-    implements ResourceWithTransferData<DomainTransferData> {
+public class DomainBase extends EppResource {
 
   /** The max number of years that a domain can be registered for, as set by ICANN policy. */
   public static final int MAX_REGISTRATION_YEARS = 10;
@@ -131,12 +125,12 @@ public class DomainBase extends EppResource
   /** References to hosts that are the nameservers for the domain. */
   @Expose @Transient Set<VKey<Host>> nsHosts;
 
-  /** Contacts. */
-  @Expose @Nullable VKey<Contact> adminContact;
+  /** Contacts keys are kept around for vestigial purposes for now. */
+  @Expose @Nullable String adminContact;
 
-  @Expose @Nullable VKey<Contact> billingContact;
-  @Expose @Nullable VKey<Contact> techContact;
-  @Expose @Nullable VKey<Contact> registrantContact;
+  @Expose @Nullable String billingContact;
+  @Expose @Nullable String techContact;
+  @Expose @Nullable String registrantContact;
 
   /** Authorization info (aka transfer secret) of the domain. */
   @Embedded
@@ -323,12 +317,10 @@ public class DomainBase extends EppResource
     return Optional.ofNullable(autorenewEndTime.equals(END_OF_TIME) ? null : autorenewEndTime);
   }
 
-  @Override
   public DomainTransferData getTransferData() {
     return Optional.ofNullable(transferData).orElse(DomainTransferData.EMPTY);
   }
 
-  @Override
   public DateTime getLastTransferTime() {
     return lastTransferTime;
   }
@@ -586,108 +578,13 @@ public class DomainBase extends EppResource
                     .collect(toImmutableSortedSet(Ordering.natural())));
   }
 
-  /** A key to the registrant who registered this domain. */
-  public Optional<VKey<Contact>> getRegistrant() {
-    return Optional.ofNullable(registrantContact);
-  }
-
-  public Optional<VKey<Contact>> getAdminContact() {
-    return Optional.ofNullable(adminContact);
-  }
-
-  public Optional<VKey<Contact>> getBillingContact() {
-    return Optional.ofNullable(billingContact);
-  }
-
-  public Optional<VKey<Contact>> getTechContact() {
-    return Optional.ofNullable(techContact);
-  }
-
-  /**
-   * Associated contacts for the domain (other than registrant).
-   *
-   * <p>Note: This can be an empty set if no contacts are present for the domain.
-   */
-  public ImmutableSet<DesignatedContact> getContacts() {
-    return getAllContacts(false);
-  }
-
-  /**
-   * Gets all associated contacts for the domain, including the registrant.
-   *
-   * <p>Note: This can be an empty set if no contacts are present for the domain.
-   */
-  public ImmutableSet<DesignatedContact> getAllContacts() {
-    return getAllContacts(true);
-  }
-
   @Nullable
   public DomainAuthInfo getAuthInfo() {
     return authInfo;
   }
 
-  /**
-   * Returns all referenced contacts from this domain.
-   *
-   * <p>Note: This can be an empty set if no contacts are present for the domain.
-   */
-  public ImmutableSet<VKey<Contact>> getReferencedContacts() {
-    return nullToEmptyImmutableCopy(getAllContacts(true)).stream()
-        .map(DesignatedContact::getContactKey)
-        .filter(Objects::nonNull)
-        .collect(toImmutableSet());
-  }
-
-  private ImmutableSet<DesignatedContact> getAllContacts(boolean includeRegistrant) {
-    ImmutableSet.Builder<DesignatedContact> builder = new ImmutableSet.Builder<>();
-    if (includeRegistrant) {
-      getRegistrant().ifPresent(c -> builder.add(DesignatedContact.create(Type.REGISTRANT, c)));
-    }
-    getAdminContact().ifPresent(c -> builder.add(DesignatedContact.create(Type.ADMIN, c)));
-    getBillingContact().ifPresent(c -> builder.add(DesignatedContact.create(Type.BILLING, c)));
-    getTechContact().ifPresent(c -> builder.add(DesignatedContact.create(Type.TECH, c)));
-    return builder.build();
-  }
-
   public String getTld() {
     return tld;
-  }
-
-  /**
-   * Sets the individual contact fields from {@code contacts}.
-   *
-   * <p>The registrant field is only set if {@code includeRegistrant} is true, as this field needs
-   * to be set in some circumstances but not in others.
-   */
-  void setContactFields(Set<DesignatedContact> contacts, boolean includeRegistrant) {
-    // Set the individual contact fields.
-    billingContact = null;
-    techContact = null;
-    adminContact = null;
-    if (includeRegistrant) {
-      registrantContact = null;
-    }
-    HashSet<Type> contactsDiscovered = new HashSet<>();
-    for (DesignatedContact contact : contacts) {
-      checkArgument(
-          !contactsDiscovered.contains(contact.getType()),
-          "Duplicate contact type %s in designated contact set.",
-          contact.getType());
-      contactsDiscovered.add(contact.getType());
-      switch (contact.getType()) {
-        case BILLING -> billingContact = contact.getContactKey();
-        case TECH -> techContact = contact.getContactKey();
-        case ADMIN -> adminContact = contact.getContactKey();
-        case REGISTRANT -> {
-          if (includeRegistrant) {
-            registrantContact = contact.getContactKey();
-          }
-        }
-        default ->
-            throw new IllegalArgumentException(
-                "Unknown contact resource type: " + contact.getType());
-      }
-    }
   }
 
   @Override
@@ -695,10 +592,6 @@ public class DomainBase extends EppResource
     throw new UnsupportedOperationException(
         "DomainBase is not an actual persisted entity you can create a key to; use Domain instead");
   }
-
-  /** Predicate to determine if a given {@link DesignatedContact} is the registrant. */
-  static final Predicate<DesignatedContact> IS_REGISTRANT =
-      (DesignatedContact contact) -> Type.REGISTRANT.equals(contact.type);
 
   /** An override of {@link EppResource#asBuilder} with tighter typing. */
   @Override
@@ -708,7 +601,7 @@ public class DomainBase extends EppResource
 
   /** A builder for constructing {@link Domain}, since it is immutable. */
   public static class Builder<T extends DomainBase, B extends Builder<T, B>>
-      extends EppResource.Builder<T, B> implements BuilderWithTransferData<DomainTransferData, B> {
+      extends EppResource.Builder<T, B> {
 
     public Builder() {}
 
@@ -764,12 +657,6 @@ public class DomainBase extends EppResource
       return thisCastToDerived();
     }
 
-    public B setRegistrant(Optional<VKey<Contact>> registrant) {
-      // Set the registrant field specifically.
-      getInstance().registrantContact = registrant.orElse(null);
-      return thisCastToDerived();
-    }
-
     public B setAuthInfo(DomainAuthInfo authInfo) {
       getInstance().authInfo = authInfo;
       return thisCastToDerived();
@@ -803,26 +690,6 @@ public class DomainBase extends EppResource
     public B removeNameservers(ImmutableSet<VKey<Host>> nameservers) {
       return setNameservers(
           ImmutableSet.copyOf(difference(getInstance().getNameservers(), nameservers)));
-    }
-
-    public B setContacts(DesignatedContact contact) {
-      return setContacts(ImmutableSet.of(contact));
-    }
-
-    public B setContacts(ImmutableSet<DesignatedContact> contacts) {
-      checkArgument(contacts.stream().noneMatch(IS_REGISTRANT), "Registrant cannot be a contact");
-
-      // Set the individual fields.
-      getInstance().setContactFields(contacts, false);
-      return thisCastToDerived();
-    }
-
-    public B addContacts(ImmutableSet<DesignatedContact> contacts) {
-      return setContacts(ImmutableSet.copyOf(Sets.union(getInstance().getContacts(), contacts)));
-    }
-
-    public B removeContacts(ImmutableSet<DesignatedContact> contacts) {
-      return setContacts(ImmutableSet.copyOf(difference(getInstance().getContacts(), contacts)));
     }
 
     public B setLaunchNotice(LaunchNotice launchNotice) {
@@ -912,13 +779,11 @@ public class DomainBase extends EppResource
       return thisCastToDerived();
     }
 
-    @Override
     public B setTransferData(DomainTransferData transferData) {
       getInstance().transferData = transferData;
       return thisCastToDerived();
     }
 
-    @Override
     public B setLastTransferTime(DateTime lastTransferTime) {
       getInstance().lastTransferTime = lastTransferTime;
       return thisCastToDerived();
