@@ -262,7 +262,7 @@ public class RdapJsonFormatter {
             .setDescription(rdapTos)
             .addLink(selfLink);
     if (rdapTosStaticUrl != null) {
-      URI htmlBaseURI = URI.create("https//:" + serverName + "/rdap/");
+      URI htmlBaseURI = URI.create("https://" + serverName + "/rdap/");
       URI htmlUri = htmlBaseURI.resolve(rdapTosStaticUrl);
       noticeBuilder.addLink(
           Link.builder()
