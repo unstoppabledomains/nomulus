@@ -21,6 +21,8 @@ import com.beust.jcommander.Parameters;
 import com.google.api.services.dns.Dns;
 import com.google.api.services.dns.model.ManagedZone;
 import com.google.api.services.dns.model.ManagedZoneDnsSecConfig;
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import google.registry.config.RegistryConfig.Config;
 import jakarta.inject.Inject;
 import java.io.IOException;
@@ -47,6 +49,18 @@ final class CreateCdnsTld extends ConfirmingCommand {
   )
   String name;
 
+  @Parameter(
+      names = "--skip_sandbox_tld_check",
+      description = "In Sandbox, skip the dns_name format check.")
+  boolean skipSandboxTldCheck;
+
+  @Parameter(
+      names = "--use_prod_name_servers_in_sandbox",
+      description =
+          "In Sandbox, create zone on the production name servers, e.g., for ICANN tests. "
+              + "Ignored in other environments.")
+  boolean useProdNameServersInSandbox;
+
   @Inject
   @Config("projectId")
   String projectId;
@@ -61,22 +75,37 @@ final class CreateCdnsTld extends ConfirmingCommand {
   protected void init() {
     // Sandbox talks to production Cloud DNS.  As a result, we can't configure any domains with a
     // suffix that might be used by customers on the same nameserver set.  Limit the user to setting
-    // up *.test TLDs.
-    if (RegistryToolEnvironment.get() == RegistryToolEnvironment.SANDBOX
-        && !dnsName.endsWith(".test.")) {
-      throw new IllegalArgumentException("Sandbox TLDs must be of the form \"*.test.\"");
+    // up *.test TLDs unless the user declares that the name is approved.
+    //
+    // The name format check simply provides a user-friendly error message. If the user wrongly
+    // declares name approval, the request to the Cloud DNS API will still fail.
+    if (RegistryToolEnvironment.get() == RegistryToolEnvironment.SANDBOX) {
+      if (!skipSandboxTldCheck && !dnsName.endsWith(".test.")) {
+        throw new IllegalArgumentException(
+            "Sandbox TLDs must be approved or in the form \"*.test.\"");
+      }
+    }
+
+    String nameServerSetName;
+    if (RegistryToolEnvironment.get().equals(RegistryToolEnvironment.PRODUCTION)) {
+      nameServerSetName = "cloud-dns-registry";
+    } else if (RegistryToolEnvironment.get().equals(RegistryToolEnvironment.SANDBOX)
+        && useProdNameServersInSandbox) {
+      nameServerSetName = "cloud-dns-registry";
+    } else {
+      nameServerSetName = "cloud-dns-registry-test";
     }
 
     managedZone =
         new ManagedZone()
             .setDescription(description)
-            .setNameServerSet(
-                RegistryToolEnvironment.get() == RegistryToolEnvironment.PRODUCTION
-                ? "cloud-dns-registry"
-                : "cloud-dns-registry-test")
+            .setNameServerSet(nameServerSetName)
             .setDnsName(dnsName)
-            .setName((name != null) ? name : dnsName)
-            .setDnssecConfig(new ManagedZoneDnsSecConfig().setNonExistence("NSEC").setState("ON"));
+            .setName(
+                (name != null)
+                    ? name
+                    : Joiner.on('_').join(Splitter.on('.').omitEmptyStrings().split(dnsName)))
+            .setDnssecConfig(new ManagedZoneDnsSecConfig().setNonExistence("nsec").setState("on"));
   }
 
   @Override

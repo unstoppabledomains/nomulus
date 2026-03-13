@@ -27,12 +27,12 @@ import java.util.Map;
 /**
  * Utility class to help in dumping routing maps.
  *
- * <p>Each of the App Engine services (frontend, backend, and tools) has a Dagger component used for
- * routing requests (e.g., FrontendRequestComponent). This class produces a text file representation
- * of the routing configuration, showing what paths map to what action classes, as well as the
- * properties of the action classes' annotations (which cover things like allowable HTTP methods,
- * authentication settings, etc.). The text file can be useful for documentation, and is also used
- * in unit tests to check against golden routing maps to find possibly unexpected changes.
+ * <p>The request-handling service has a Dagger component (RequestComponent) used for routing
+ * requests. This class produces a text file representation of the routing configuration, showing
+ * what paths map to what action classes, as well as the properties of the action classes'
+ * annotations (which cover things like allowable HTTP methods, authentication settings, etc.). The
+ * text file can be useful for documentation, and is also used in unit tests to check against golden
+ * routing maps to find possibly unexpected changes.
  *
  * <p>The file has fixed-width columns with a header row. The width of the columns is determined by
  * the content to be displayed. The columns are:
@@ -94,7 +94,7 @@ public class RouterDisplayHelper {
   private static String routeToString(Route route, String formatString) {
     return String.format(
         formatString,
-        Action.ServiceGetter.get(route.action()).name(),
+        route.action().service().name(),
         route.action().isPrefix() ? (route.action().path() + "(*)") : route.action().path(),
         route.actionClass().getSimpleName(),
         Joiner.on(",").join(route.action().method()),
@@ -112,7 +112,7 @@ public class RouterDisplayHelper {
     int methodsWidth = 7;
     int minLevelWidth = 3;
     for (Route route : routes) {
-      int len = Action.ServiceGetter.get(route.action()).name().length();
+      int len = route.action().service().name().length();
       if (len > serviceWidth) {
         serviceWidth = len;
       }
@@ -148,9 +148,7 @@ public class RouterDisplayHelper {
     return headerToString(formatString)
         + String.format("%n")
         + Streams.stream(routes)
-            .sorted(
-                Comparator.comparing(
-                    (Route route) -> Action.ServiceGetter.get(route.action()).ordinal()))
+            .sorted(Comparator.comparing((Route route) -> route.action().service().ordinal()))
             .map(route -> routeToString(route, formatString))
             .collect(joining(String.format("%n")));
   }

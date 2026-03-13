@@ -44,13 +44,27 @@ apt-get install openjdk-21-jdk-headless -y
 # Install Python
 apt-get install python3 -y
 
-# Install Node
-apt-get install npm -y
-npm cache clean -f
-npm install -g n
-# Retrying because fails are possible for node.js intallation. See
+# ============================================================================
+# UD CUSTOMIZATION: Install Node via the 'n' version manager
+#
+# This section differs from upstream and will likely cause a merge conflict
+# on future upstream syncs. Resolve by keeping this approach.
+#
+# WARNING: Do NOT install 'n' via apt's npm (i.e. `apt-get install npm &&
+# npm install -g n`). Ubuntu 24.04 ships npm 9.2.0 which installs an outdated
+# version of 'n' that SILENTLY resolves unknown Node versions to an older
+# release (e.g. requesting 22.12.0 installs 22.7.0 with no error).
+#
+# Instead, we download 'n' directly from its GitHub repo so it always has
+# up-to-date version resolution.
+# ============================================================================
+curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o /usr/local/bin/n
+chmod +x /usr/local/bin/n
+# Retrying because fails are possible for node.js installation. See
 # https://github.com/nodejs/build/issues/1993
-for i in {1..5}; do n 22.7.0 && break || sleep 15; done
+for i in {1..5}; do n 22.12.0 && break || sleep 15; done
+# Install npm at the version bundled with this Node release
+npm install -g npm
 
 # Install gp_dump
 apt-get install postgresql-client-17 procps -y

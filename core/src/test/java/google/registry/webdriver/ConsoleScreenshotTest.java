@@ -16,12 +16,16 @@ package google.registry.webdriver;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.server.Fixture.BASIC;
+import static google.registry.testing.DatabaseHelper.persistResource;
 
 import com.google.common.collect.ImmutableMap;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.RegistrarRole;
+import google.registry.model.registrar.Registrar;
 import google.registry.server.RegistryTestServer;
 import java.util.List;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -74,6 +78,10 @@ public class ConsoleScreenshotTest {
   @BeforeEach
   void beforeEach() throws Exception {
     server.setRegistrarRoles(ImmutableMap.of("TheRegistrar", RegistrarRole.ACCOUNT_MANAGER));
+    Registrar registrar = Registrar.loadByRegistrarId("TheRegistrar").get();
+    registrar =
+        registrar.asBuilder().setLastPocVerificationDate(DateTime.now(DateTimeZone.UTC)).build();
+    persistResource(registrar);
     loadHomePage();
   }
 
@@ -112,7 +120,7 @@ public class ConsoleScreenshotTest {
     driver.diffPage("registrarSelected_contacts");
     driver.findElement(By.cssSelector("a[routerLink=\"rdap\"]")).click();
     Thread.sleep(500);
-    driver.diffPage("registrarSelected_whois");
+    driver.diffPage("registrarSelected_rdap");
     driver.findElement(By.cssSelector("a[routerLink=\"security\"]")).click();
     Thread.sleep(500);
     driver.diffPage("registrarSelected_security");

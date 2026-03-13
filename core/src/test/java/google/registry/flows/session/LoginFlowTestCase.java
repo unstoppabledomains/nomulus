@@ -14,14 +14,19 @@
 
 package google.registry.flows.session;
 
+import static com.google.common.io.BaseEncoding.base64;
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.common.FeatureFlag.FeatureName.PROHIBIT_CONTACT_OBJECTS_ON_LOGIN;
+import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.testing.DatabaseHelper.deleteResource;
 import static google.registry.testing.DatabaseHelper.loadRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.testing.EppExceptionSubject.assertAboutEppExceptions;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppException.UnimplementedObjectServiceException;
@@ -34,10 +39,14 @@ import google.registry.flows.session.LoginFlow.BadRegistrarIdException;
 import google.registry.flows.session.LoginFlow.RegistrarAccountNotActiveException;
 import google.registry.flows.session.LoginFlow.TooManyFailedLoginsException;
 import google.registry.flows.session.LoginFlow.UnsupportedLanguageException;
+import google.registry.model.common.FeatureFlag;
+import google.registry.model.common.FeatureFlag.FeatureStatus;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.Registrar.State;
 import google.registry.testing.DatabaseHelper;
+import google.registry.util.PasswordUtils;
+import google.registry.util.PasswordUtils.HashAlgorithm;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +61,11 @@ public abstract class LoginFlowTestCase extends FlowTestCase<LoginFlow> {
     sessionMetadata.setRegistrarId(null); // Don't implicitly log in (all other flows need to).
     registrar = loadRegistrar("NewRegistrar");
     registrarBuilder = registrar.asBuilder();
+    persistResource(
+        new FeatureFlag.Builder()
+            .setFeatureName(PROHIBIT_CONTACT_OBJECTS_ON_LOGIN)
+            .setStatusMap(ImmutableSortedMap.of(START_OF_TIME, FeatureStatus.ACTIVE))
+            .build());
   }
 
   // Can't inline this since it may be overridden in subclasses.
@@ -111,6 +125,21 @@ public abstract class LoginFlowTestCase extends FlowTestCase<LoginFlow> {
   @Test
   void testFailure_invalidExtension() {
     doFailingTest("login_invalid_extension.xml", UnimplementedExtensionException.class);
+  }
+
+  @Test
+  void testFailure_invalidContactObjectUri() {
+    doFailingTest("login_with_contact_objuri.xml", UnimplementedObjectServiceException.class);
+  }
+
+  @Test
+  void testSuccess_contactObjectUri_worksWhenNotProhibited() throws Exception {
+    persistResource(
+        FeatureFlag.get(PROHIBIT_CONTACT_OBJECTS_ON_LOGIN)
+            .asBuilder()
+            .setStatusMap(ImmutableSortedMap.of(START_OF_TIME, FeatureStatus.INACTIVE))
+            .build());
+    doSuccessfulTest("login_with_contact_objuri.xml");
   }
 
   @Test
@@ -184,6 +213,32 @@ public abstract class LoginFlowTestCase extends FlowTestCase<LoginFlow> {
   void testFailure_disabledRegistrar() {
     persistResource(getRegistrarBuilder().setState(State.DISABLED).build());
     doFailingTest("login_valid.xml", RegistrarAccountNotActiveException.class);
+  }
+
+  @Test
+  void testSuccess_scryptPasswordToArgon2() throws Exception {
+    String password = "foo-BAR2";
+    tm().transact(
+            () -> {
+              // The salt is not exposed by Registrar (nor should it be), so we query it directly.
+              String encodedSalt =
+                  tm().query("SELECT salt FROM Registrar WHERE registrarId = :id", String.class)
+                      .setParameter("id", registrar.getRegistrarId())
+                      .getSingleResult();
+              byte[] salt = base64().decode(encodedSalt);
+              String newHash = PasswordUtils.hashPassword(password, salt, HashAlgorithm.SCRYPT_P_1);
+              // Set password directly, as the Java method would have used Argon2.
+              tm().query("UPDATE Registrar SET passwordHash = :hash WHERE registrarId = :id")
+                  .setParameter("id", registrar.getRegistrarId())
+                  .setParameter("hash", newHash)
+                  .executeUpdate();
+            });
+    assertThat(loadRegistrar("NewRegistrar").getCurrentHashAlgorithm(password).get())
+        .isEqualTo(HashAlgorithm.SCRYPT_P_1);
+    doSuccessfulTest("login_valid.xml");
+    // Verifies that after successfully login, the password is re-hased with Scrypt.
+    assertThat(loadRegistrar("NewRegistrar").getCurrentHashAlgorithm(password).get())
+        .isEqualTo(HashAlgorithm.ARGON_2_ID);
   }
 
   @Test

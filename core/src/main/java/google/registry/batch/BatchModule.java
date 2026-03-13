@@ -28,11 +28,20 @@ import static google.registry.request.RequestParameters.extractRequiredDatetimeP
 import static google.registry.request.RequestParameters.extractRequiredParameter;
 import static google.registry.request.RequestParameters.extractSetOfDatetimeParameters;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.RateLimiter;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.reflect.TypeToken;
 import dagger.Module;
 import dagger.Provides;
+import google.registry.request.HttpException.BadRequestException;
+import google.registry.request.OptionalJsonPayload;
 import google.registry.request.Parameter;
+import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Optional;
 import org.joda.time.DateTime;
 
@@ -41,6 +50,8 @@ import org.joda.time.DateTime;
 public class BatchModule {
 
   public static final String PARAM_FAST = "fast";
+
+  static final int DEFAULT_MAX_QPS = 10;
 
   @Provides
   @Parameter("url")
@@ -121,12 +132,6 @@ public class BatchModule {
   }
 
   @Provides
-  @Parameter(WipeOutContactHistoryPiiAction.PARAM_CUTOFF_TIME)
-  static Optional<DateTime> provideCutoffTime(HttpServletRequest req) {
-    return extractOptionalDatetimeParameter(req, WipeOutContactHistoryPiiAction.PARAM_CUTOFF_TIME);
-  }
-
-  @Provides
   @Parameter(ExpandBillingRecurrencesAction.PARAM_ADVANCE_CURSOR)
   static boolean provideAdvanceCursor(HttpServletRequest req) {
     return extractBooleanParameter(req, ExpandBillingRecurrencesAction.PARAM_ADVANCE_CURSOR);
@@ -136,5 +141,51 @@ public class BatchModule {
   @Parameter(PARAM_FAST)
   static boolean provideIsFast(HttpServletRequest req) {
     return extractBooleanParameter(req, PARAM_FAST);
+  }
+
+  @Provides
+  @Parameter("maxQps")
+  static int provideMaxQps(HttpServletRequest req) {
+    return extractOptionalIntParameter(req, "maxQps").orElse(DEFAULT_MAX_QPS);
+  }
+
+  @Provides
+  @Named("standardRateLimiter")
+  static RateLimiter provideStandardRateLimiter(@Parameter("maxQps") int maxQps) {
+    return RateLimiter.create(maxQps);
+  }
+
+  @Provides
+  @Parameter("gainingRegistrarId")
+  static String provideGainingRegistrarId(HttpServletRequest req) {
+    return extractRequiredParameter(req, "gainingRegistrarId");
+  }
+
+  @Provides
+  @Parameter("losingRegistrarId")
+  static String provideLosingRegistrarId(HttpServletRequest req) {
+    return extractRequiredParameter(req, "losingRegistrarId");
+  }
+
+  @Provides
+  @Parameter("bulkTransferDomainNames")
+  static ImmutableList<String> provideBulkTransferDomainNames(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> optionalJsonElement) {
+    return optionalJsonElement
+        .map(je -> ImmutableList.copyOf(gson.fromJson(je, new TypeToken<List<String>>() {})))
+        .orElseThrow(
+            () -> new BadRequestException("Missing POST body of bulk transfer domain names"));
+  }
+
+  @Provides
+  @Parameter("requestedByRegistrar")
+  static boolean provideRequestedByRegistrar(HttpServletRequest req) {
+    return extractBooleanParameter(req, "requestedByRegistrar");
+  }
+
+  @Provides
+  @Parameter("reason")
+  static String provideReason(HttpServletRequest req) {
+    return extractRequiredParameter(req, "reason");
   }
 }

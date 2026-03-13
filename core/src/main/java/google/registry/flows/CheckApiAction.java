@@ -38,7 +38,6 @@ import static google.registry.pricing.PricingEngineProxy.isDomainPremium;
 import static google.registry.util.DomainNameUtils.canonicalizeHostname;
 import static org.json.simple.JSONValue.toJSONString;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.FluentLogger;
@@ -55,7 +54,6 @@ import google.registry.model.tld.label.ReservationType;
 import google.registry.monitoring.whitebox.CheckApiMetric;
 import google.registry.monitoring.whitebox.CheckApiMetric.Availability;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
 import google.registry.request.Response;
@@ -73,7 +71,7 @@ import org.joda.time.DateTime;
  * user controlled, lest it open an XSS vector. Do not modify this to return the domain name in the
  * response.
  */
-@Action(service = GaeService.PUBAPI, path = "/check", auth = Auth.AUTH_PUBLIC)
+@Action(service = Action.Service.PUBAPI, path = "/check", auth = Auth.AUTH_PUBLIC)
 public class CheckApiAction implements Runnable {
 
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
@@ -185,7 +183,7 @@ public class CheckApiAction implements Runnable {
   }
 
   private boolean checkExists(String domainString, DateTime now) {
-    return !ForeignKeyUtils.loadCached(Domain.class, ImmutableList.of(domainString), now).isEmpty();
+    return ForeignKeyUtils.loadKeyByCache(Domain.class, domainString, now).isPresent();
   }
 
   private Optional<String> checkReserved(InternetDomainName domainName) {

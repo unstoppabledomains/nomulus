@@ -14,7 +14,6 @@
 
 package google.registry.ui.server.console;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.request.Action.Method.GET;
 import static org.joda.time.DateTimeZone.UTC;
@@ -24,24 +23,22 @@ import com.google.common.flogger.FluentLogger;
 import com.google.common.net.MediaType;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.User;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.util.Clock;
 import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.joda.time.DateTime;
 
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = ConsoleDumDownloadAction.PATH,
     method = {GET},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
@@ -100,27 +97,40 @@ public class ConsoleDumDownloadAction extends ConsoleApiAction {
       consoleApiParams.response().setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       return;
     }
+    tm().transact(
+            () -> {
+              finishAndPersistConsoleUpdateHistory(
+                  new ConsoleUpdateHistory.Builder()
+                      .setType(ConsoleUpdateHistory.Type.DUM_DOWNLOAD)
+                      .setDescription(registrarId));
+            });
     consoleApiParams.response().setStatus(HttpServletResponse.SC_OK);
   }
 
   private void writeCsv(CSVPrinter printer) throws IOException {
     String sql = SQL_TEMPLATE.replaceAll(":now", clock.nowUtc().toString());
 
-    // We deliberately don't want to use ImmutableList.copyOf because underlying list may contain
-    // large amount of records and that will degrade performance.
-    List<String> queryResult =
-        tm().transact(
-                () ->
-                    tm().getEntityManager()
-                        .createNativeQuery(sql)
-                        .setParameter("registrarId", registrarId)
-                        .setHint("org.hibernate.fetchSize", 1000)
-                        .getResultList());
-
-    ImmutableList<String[]> formattedRecords =
-        queryResult.stream().map(r -> r.split(",")).collect(toImmutableList());
     printer.printRecord(
         ImmutableList.of("Domain Name", "Creation Time", "Expiration Time", "Domain Statuses"));
-    printer.printRecords(formattedRecords);
+
+    tm().transact(
+            () -> {
+              try (var resultStream =
+                  tm().getEntityManager()
+                      .createNativeQuery(sql, String.class)
+                      .setParameter("registrarId", registrarId)
+                      .setHint("org.hibernate.fetchSize", 1000)
+                      .getResultStream()) {
+
+                resultStream.forEach(
+                    row -> {
+                      try {
+                        printer.printRecord((Object[]) ((String) row).split(","));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                    });
+              }
+            });
   }
 }

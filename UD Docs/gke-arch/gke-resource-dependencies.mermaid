@@ -1,0 +1,62 @@
+graph TD
+    STATIC_IPS["Static IP Addresses"]
+    
+    FR_GCP["Forwarding Rules (GCP)"]
+    
+    BS_GCP["Backend Services (GCP)"]
+    
+    NEG_GCP["Network Endpoint Groups (GCP)"]
+    
+    GKE_NODES["GKE Nodes/Pods"]
+    
+    GATEWAY_K8S["Gateway (K8s)"]
+    
+    HTTPROUTES_K8S["HTTPRoutes (K8s)"]
+    
+    SVCIMPORTS_K8S["ServiceImports (K8s)"]
+    
+    SERVICES_K8S["Services (K8s)"]
+    
+    DEPLOYS_K8S["Deployments (K8s)"]
+    
+    PODS_K8S["Pods (K8s)"]
+    
+    HCP_K8S["HealthCheckPolicy (K8s)"]
+    
+    BPPOLICY_K8S["GCPBackendPolicy (K8s)"]
+    
+    BS_GCP2["Backend Services (GCP)"]
+    
+    STATIC_IPS --> FR_GCP
+    FR_GCP --> BS_GCP
+    BS_GCP --> NEG_GCP
+    NEG_GCP --> GKE_NODES
+    
+    STATIC_IPS --> GATEWAY_K8S
+    GATEWAY_K8S --> HTTPROUTES_K8S
+    HTTPROUTES_K8S --> SVCIMPORTS_K8S
+    SVCIMPORTS_K8S --> SERVICES_K8S
+    SERVICES_K8S --> DEPLOYS_K8S
+    DEPLOYS_K8S --> PODS_K8S
+    HTTPROUTES_K8S --> HCP_K8S
+    HTTPROUTES_K8S --> BPPOLICY_K8S
+    BPPOLICY_K8S --> BS_GCP2
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient
+    classDef gcp fill:#4A7FFF,stroke:#37B2E3,stroke-width:2px,color:#ffffff
+    classDef gateway fill:#E1C7FF,stroke:#C9A3FF,stroke-width:2px,color:#6B2D9F
+    classDef route fill:#C9A3FF,stroke:#B080FF,stroke-width:2px,color:#ffffff
+    classDef service fill:#B080FF,stroke:#8E5CFF,stroke-width:2px,color:#ffffff
+    classDef serviceimport fill:#8E5CFF,stroke:#6B4DFF,stroke-width:2px,color:#ffffff
+    classDef deployment fill:#2DD4BF,stroke:#14B8A6,stroke-width:2px,color:#ffffff
+    classDef pod fill:#6B4DFF,stroke:#4A7FFF,stroke-width:2px,color:#ffffff
+    classDef policy fill:#37B2E3,stroke:#2A9FD4,stroke-width:2px,color:#ffffff
+    
+    class STATIC_IPS,FR_GCP,BS_GCP,NEG_GCP,BS_GCP2 gcp
+    class GATEWAY_K8S gateway
+    class HTTPROUTES_K8S route
+    class SVCIMPORTS_K8S serviceimport
+    class SERVICES_K8S service
+    class DEPLOYS_K8S deployment
+    class PODS_K8S,GKE_NODES pod
+    class HCP_K8S,BPPOLICY_K8S policy

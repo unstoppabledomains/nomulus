@@ -39,10 +39,10 @@ public class RegistryConfigSettings {
   public Beam beam;
   public RegistryTool registryTool;
   public SslCertificateValidation sslCertificateValidation;
-  public ContactHistory contactHistory;
   public DnsUpdate dnsUpdate;
   public BulkPricingPackageMonitoring bulkPricingPackageMonitoring;
   public Bsa bsa;
+  public MosApi mosapi;
 
   /** Configuration options that apply to the entire GCP project. */
   public static class GcpProject {
@@ -50,11 +50,6 @@ public class RegistryConfigSettings {
     public long projectIdNumber;
     public String locationId;
     public boolean isLocal;
-    public String defaultServiceUrl;
-    public String backendServiceUrl;
-    public String bsaServiceUrl;
-    public String toolsServiceUrl;
-    public String pubapiServiceUrl;
     public String baseDomain;
   }
 
@@ -90,9 +85,7 @@ public class RegistryConfigSettings {
     public String contactAndHostRoidSuffix;
     public String productName;
     public String customLogicFactoryClass;
-    public String whoisCommandFactoryClass;
     public String dnsCountQueryCoordinatorClass;
-    public int contactAutomaticTransferDays;
     public String greetingServerId;
     public List<String> registrarChangesNotificationEmailAddresses;
     public String defaultRegistrarWhoisServer;
@@ -102,9 +95,6 @@ public class RegistryConfigSettings {
     public String registryAdminClientId;
     public String premiumTermsExportDisclaimer;
     public String reservedTermsExportDisclaimer;
-    public String whoisRedactedEmailText;
-    public String whoisDisclaimer;
-    public String domainBlockedByBsaTemplate;
     public String rdapTos;
     public String rdapTosStaticUrl;
     public String registryName;
@@ -231,11 +221,6 @@ public class RegistryConfigSettings {
     public String expirationWarningEmailSubjectText;
   }
 
-  /** Configuration for contact history. */
-  public static class ContactHistory {
-    public int minMonthsBeforeWipeOut;
-  }
-
   /** Configuration for dns update. */
   public static class DnsUpdate {
     public String dnsUpdateFailEmailSubjectText;
@@ -270,5 +255,16 @@ public class RegistryConfigSettings {
     public String orderStatusUrl;
     public String unblockableDomainsUrl;
     public String uploadUnavailableDomainsUrl;
+  }
+
+  /** Configuration for Mosapi. */
+  public static class MosApi {
+    public String serviceUrl;
+    public String tlsCertSecretName;
+    public String tlsKeySecretName;
+    public String entityType;
+    public List<String> tlds;
+    public List<String> services;
+    public int tldThreadCount;
   }
 }

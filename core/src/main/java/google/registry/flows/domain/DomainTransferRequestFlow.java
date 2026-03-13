@@ -76,7 +76,7 @@ import google.registry.model.reporting.HistoryEntry.HistoryEntryId;
 import google.registry.model.reporting.IcannReportingTypes.ActivityReportField;
 import google.registry.model.tld.Tld;
 import google.registry.model.transfer.DomainTransferData;
-import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
+import google.registry.model.transfer.DomainTransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferResponse.DomainTransferResponse;
 import google.registry.model.transfer.TransferStatus;
 import jakarta.inject.Inject;
@@ -133,10 +133,9 @@ import org.joda.time.DateTime;
 @ReportingSpec(ActivityReportField.DOMAIN_TRANSFER_REQUEST)
 public final class DomainTransferRequestFlow implements MutatingFlow {
 
-  private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
-      StatusValue.CLIENT_TRANSFER_PROHIBITED,
-      StatusValue.PENDING_DELETE,
-      StatusValue.SERVER_TRANSFER_PROHIBITED);
+  private static final ImmutableSet<StatusValue> NON_SUPERUSER_DISALLOWED_STATUSES =
+      ImmutableSet.of(
+          StatusValue.CLIENT_TRANSFER_PROHIBITED, StatusValue.SERVER_TRANSFER_PROHIBITED);
 
   @Inject ResourceCommand resourceCommand;
   @Inject ExtensionManager extensionManager;
@@ -283,11 +282,9 @@ public final class DomainTransferRequestFlow implements MutatingFlow {
 
     asyncTaskEnqueuer.enqueueAsyncResave(
         newDomain.createVKey(), now, ImmutableSortedSet.of(automaticTransferTime));
-    tm().putAll(
-            new ImmutableSet.Builder<>()
-                .add(newDomain, domainHistory, requestPollMessage)
-                .addAll(serverApproveEntities)
-                .build());
+    tm().put(newDomain);
+    tm().putAll(serverApproveEntities);
+    tm().insertAll(domainHistory, requestPollMessage);
     return responseBuilder
         .setResultFromCode(SUCCESS_WITH_ACTION_PENDING)
         .setResData(createResponse(period, existingDomain, newDomain, now))
@@ -301,8 +298,9 @@ public final class DomainTransferRequestFlow implements MutatingFlow {
       DateTime now,
       Optional<DomainTransferRequestSuperuserExtension> superuserExtension)
       throws EppException {
-    verifyNoDisallowedStatuses(existingDomain, DISALLOWED_STATUSES);
+    verifyNoDisallowedStatuses(existingDomain, ImmutableSet.of(StatusValue.PENDING_DELETE));
     if (!isSuperuser) {
+      verifyNoDisallowedStatuses(existingDomain, NON_SUPERUSER_DISALLOWED_STATUSES);
       verifyAuthInfoPresentForResourceTransfer(authInfo);
       verifyAuthInfo(authInfo.get(), existingDomain);
     }

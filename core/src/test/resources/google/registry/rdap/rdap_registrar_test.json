@@ -1,12 +1,20 @@
 {
   "rdapConformance": [
     "rdap_level_0",
-    "icann_rdap_response_profile_0",
-    "icann_rdap_technical_implementation_guide_0"
+    "icann_rdap_response_profile_1",
+    "icann_rdap_technical_implementation_guide_1"
   ],
   "objectClassName" : "entity",
-  "handle" : "%NAME%",
-  "status" : ["%STATUS%"],
+  "handle" : "%REGISTRAR_HANDLE_1%",
+  "links" : [
+    {
+      "rel": "about",
+      "href": "http://my.fake.url",
+      "type": "text/html",
+      "value": "https://rdap.example.com/withSlash/"
+    }
+  ],
+  "status" : ["%STATUS_1%"],
   "roles" : ["registrar"],
   "events": [
     {
@@ -19,7 +27,7 @@
     "vcard",
     [
       ["version", {}, "text", "4.0"],
-      ["fn", {}, "text", "%FULLNAME%"],
+      ["fn", {}, "text", "%REGISTRAR_FULLNAME_1%"],
       ["adr", {}, "text",
         [
           "",

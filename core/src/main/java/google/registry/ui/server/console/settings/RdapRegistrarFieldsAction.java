@@ -25,8 +25,7 @@ import google.registry.model.console.ConsoleUpdateHistory;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.request.auth.AuthenticatedRegistrarAccessor;
@@ -35,16 +34,16 @@ import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 /**
- * Console action for editing fields on a registrar that are visible in WHOIS/RDAP.
+ * Console action for editing fields on a registrar that are visible in RDAP.
  *
- * <p>This doesn't cover many of the registrar fields but rather only those that are visible in
- * WHOIS/RDAP and don't have any other obvious means of edit.
+ * <p>This doesn't cover many of the registrar fields but rather only those that are visible in RDAP
+ * and don't have any other obvious means of edit.
  */
 @Action(
-    service = GaeService.DEFAULT,
-    gkeService = GkeService.CONSOLE,
+    service = Service.CONSOLE,
     path = RdapRegistrarFieldsAction.PATH,
     method = {POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
@@ -82,19 +81,37 @@ public class RdapRegistrarFieldsAction extends ConsoleApiAction {
       return;
     }
 
-    Registrar newRegistrar =
-        savedRegistrar
-            .asBuilder()
-            .setLocalizedAddress(providedRegistrar.getLocalizedAddress())
-            .setPhoneNumber(providedRegistrar.getPhoneNumber())
-            .setFaxNumber(providedRegistrar.getFaxNumber())
-            .setEmailAddress(providedRegistrar.getEmailAddress())
-            .build();
+    StringJoiner updates = new StringJoiner(",");
+
+    var newRegistrarBuilder = savedRegistrar.asBuilder();
+
+    if (!providedRegistrar.getLocalizedAddress().equals(savedRegistrar.getLocalizedAddress())) {
+      newRegistrarBuilder.setLocalizedAddress(providedRegistrar.getLocalizedAddress());
+      updates.add("ADDRESS");
+    }
+    if (!providedRegistrar.getPhoneNumber().equals(savedRegistrar.getPhoneNumber())) {
+      newRegistrarBuilder.setPhoneNumber(providedRegistrar.getPhoneNumber());
+      updates.add("PHONE");
+    }
+    if (!providedRegistrar.getFaxNumber().equals(savedRegistrar.getPhoneNumber())) {
+      newRegistrarBuilder.setFaxNumber(providedRegistrar.getFaxNumber());
+      updates.add("FAX");
+    }
+    if (!providedRegistrar.getEmailAddress().equals(savedRegistrar.getEmailAddress())) {
+      newRegistrarBuilder.setEmailAddress(providedRegistrar.getEmailAddress());
+      updates.add("EMAIL");
+    }
+    var newRegistrar = newRegistrarBuilder.build();
     tm().put(newRegistrar);
     finishAndPersistConsoleUpdateHistory(
         new ConsoleUpdateHistory.Builder()
             .setType(ConsoleUpdateHistory.Type.REGISTRAR_UPDATE)
-            .setDescription(newRegistrar.getRegistrarId()));
+            .setDescription(
+                String.format(
+                    "%s%s%s",
+                    newRegistrar.getRegistrarId(),
+                    ConsoleUpdateHistory.DESCRIPTION_SEPARATOR,
+                    updates)));
     sendExternalUpdatesIfNecessary(
         EmailInfo.create(
             savedRegistrar,

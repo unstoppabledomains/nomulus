@@ -18,7 +18,6 @@ import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.dns.RefreshDnsOnHostRenameAction.PARAM_HOST_KEY;
 import static google.registry.dns.RefreshDnsOnHostRenameAction.QUEUE_HOST_RENAME;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.testing.DatabaseHelper.assertHostDnsRequests;
 import static google.registry.testing.DatabaseHelper.assertNoBillingEvents;
 import static google.registry.testing.DatabaseHelper.assertNoDnsRequests;
@@ -49,19 +48,22 @@ import google.registry.flows.EppException;
 import google.registry.flows.EppRequestSource;
 import google.registry.flows.FlowUtils.NotLoggedInException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.AddExistingValueException;
 import google.registry.flows.ResourceFlowUtils.AddRemoveSameValueException;
+import google.registry.flows.ResourceFlowUtils.RemoveNonexistentValueException;
 import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceFlowUtils.StatusNotClientSettableException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
 import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
+import google.registry.flows.host.HostFlowUtils.BadHostNameCharacterException;
 import google.registry.flows.host.HostFlowUtils.HostDomainNotOwnedException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotLowerCaseException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotNormalizedException;
 import google.registry.flows.host.HostFlowUtils.HostNameNotPunyCodedException;
 import google.registry.flows.host.HostFlowUtils.HostNameTooLongException;
 import google.registry.flows.host.HostFlowUtils.HostNameTooShallowException;
-import google.registry.flows.host.HostFlowUtils.InvalidHostNameException;
+import google.registry.flows.host.HostFlowUtils.LoopbackIpNotValidForHostException;
 import google.registry.flows.host.HostFlowUtils.SuperordinateDomainDoesNotExistException;
 import google.registry.flows.host.HostFlowUtils.SuperordinateDomainInPendingDeleteException;
 import google.registry.flows.host.HostUpdateFlow.CannotAddIpToExternalHostException;
@@ -77,7 +79,6 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.tld.Tld;
 import google.registry.model.transfer.DomainTransferData;
 import google.registry.model.transfer.TransferStatus;
-import google.registry.persistence.VKey;
 import google.registry.testing.CloudTasksHelper.TaskMatcher;
 import google.registry.testing.DatabaseHelper;
 import javax.annotation.Nullable;
@@ -168,7 +169,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
     // should now return null.
     assertThat(reloadResourceByForeignKey()).isNull();
     // However, it should load correctly if we use the new name (taken from the xml).
-    Host renamedHost = loadByForeignKey(Host.class, "ns2.example.tld", clock.nowUtc()).get();
+    Host renamedHost =
+        ForeignKeyUtils.loadResource(Host.class, "ns2.example.tld", clock.nowUtc()).get();
     assertAboutHosts()
         .that(renamedHost)
         .hasOnlyOneHistoryEntryWhich()
@@ -185,8 +187,7 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
     Host renamedHost = doSuccessfulTest();
     assertThat(renamedHost.isSubordinate()).isTrue();
     assertHostDnsRequests("ns1.example.tld", "ns2.example.tld");
-    VKey<Host> oldVKeyAfterRename = ForeignKeyUtils.load(Host.class, oldHostName(), clock.nowUtc());
-    assertThat(oldVKeyAfterRename).isNull();
+    assertThat(ForeignKeyUtils.loadKey(Host.class, oldHostName(), clock.nowUtc())).isEmpty();
   }
 
   @Test
@@ -523,6 +524,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .asBuilder()
             .setSuperordinateDomain(foo.createVKey())
             .setLastTransferTime(null)
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     persistResource(foo.asBuilder().setSubordinateHosts(ImmutableSet.of(oldHostName())).build());
     clock.advanceOneMilli();
@@ -562,6 +565,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
                 .setSuperordinateDomain(domain.createVKey())
                 .setLastTransferTime(clock.nowUtc().minusDays(20))
                 .setLastSuperordinateChange(clock.nowUtc().minusDays(3))
+                .setInetAddresses(
+                    ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
                 .build());
     DateTime lastTransferTime = host.getLastTransferTime();
     persistResource(domain.asBuilder().setSubordinateHosts(ImmutableSet.of(oldHostName())).build());
@@ -599,6 +604,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .setSuperordinateDomain(foo.createVKey())
             .setLastTransferTime(lastTransferTime)
             .setLastSuperordinateChange(clock.nowUtc().minusDays(3))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     persistResource(foo.asBuilder().setSubordinateHosts(ImmutableSet.of(oldHostName())).build());
     clock.advanceOneMilli();
@@ -633,6 +640,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .setSuperordinateDomain(foo.createVKey())
             .setLastTransferTime(lastTransferTime)
             .setLastSuperordinateChange(clock.nowUtc().minusDays(10))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     persistResource(foo.asBuilder().setSubordinateHosts(ImmutableSet.of(oldHostName())).build());
     clock.advanceOneMilli();
@@ -667,6 +676,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .setSuperordinateDomain(foo.createVKey())
             .setLastTransferTime(null)
             .setLastSuperordinateChange(clock.nowUtc().minusDays(3))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     persistResource(foo.asBuilder().setSubordinateHosts(ImmutableSet.of(oldHostName())).build());
     Host renamedHost = doSuccessfulTest();
@@ -688,7 +699,12 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
     createTld("foo");
     Domain domain = persistActiveDomain("example.foo");
     persistResource(
-        newHost(oldHostName()).asBuilder().setSuperordinateDomain(domain.createVKey()).build());
+        newHost(oldHostName())
+            .asBuilder()
+            .setSuperordinateDomain(domain.createVKey())
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
+            .build());
     DateTime lastTransferTime = clock.nowUtc().minusDays(2);
     persistResource(
         domain
@@ -729,6 +745,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .setSuperordinateDomain(domain.createVKey())
             .setLastTransferTime(lastTransferTime)
             .setLastSuperordinateChange(clock.nowUtc().minusDays(4))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     persistResource(
         domain
@@ -764,6 +782,8 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
             .setSuperordinateDomain(domain.createVKey())
             .setLastTransferTime(clock.nowUtc().minusDays(12))
             .setLastSuperordinateChange(clock.nowUtc().minusDays(4))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
             .build());
     domain =
         persistResource(
@@ -1009,6 +1029,50 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
   }
 
   @Test
+  void testFailure_addExistingInetAddress() throws Exception {
+    createTld("tld");
+    Domain domain = persistActiveDomain("example.tld");
+    persistResource(
+        newHost(oldHostName())
+            .asBuilder()
+            .setSuperordinateDomain(domain.createVKey())
+            .setLastTransferTime(clock.nowUtc().minusDays(12))
+            .setLastSuperordinateChange(clock.nowUtc().minusDays(4))
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
+            .build());
+    setEppHostUpdateInput(
+        "ns1.example.tld",
+        "ns2.example.tld",
+        "<host:addr ip=\"v6\">1080:0:0:0:8:800:200C:417A</host:addr>",
+        null);
+    assertAboutEppExceptions()
+        .that(assertThrows(AddExistingValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_removeNonexistentInetAddress() throws Exception {
+    createTld("tld");
+    Domain domain = persistActiveDomain("example.tld");
+    persistResource(
+        newHost(oldHostName())
+            .asBuilder()
+            .setSuperordinateDomain(domain.createVKey())
+            .setLastTransferTime(clock.nowUtc().minusDays(12))
+            .setLastSuperordinateChange(clock.nowUtc().minusDays(4))
+            .build());
+    setEppHostUpdateInput(
+        "ns1.example.tld",
+        "ns2.example.tld",
+        null,
+        "<host:addr ip=\"v6\">1080:0:0:0:8:800:200C:417A</host:addr>");
+    assertAboutEppExceptions()
+        .that(assertThrows(RemoveNonexistentValueException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
   void testSuccess_clientUpdateProhibited_removed() throws Exception {
     setEppInput("host_update_remove_client_update_prohibited.xml");
     persistResource(
@@ -1079,7 +1143,12 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
     setEppInput("host_update_prohibited_status.xml");
     createTld("tld");
     persistActiveDomain("example.tld");
-    persistActiveHost("ns1.example.tld");
+    persistResource(
+        persistActiveHost("ns1.example.tld")
+            .asBuilder()
+            .setInetAddresses(
+                ImmutableSet.of(InetAddresses.forString("1080:0:0:0:8:800:200C:417A")))
+            .build());
 
     clock.advanceOneMilli();
     runFlowAssertResponse(
@@ -1261,7 +1330,7 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
 
   @Test
   void testFailure_renameToBadCharacter() throws Exception {
-    doFailingHostNameTest("foo bar", InvalidHostNameException.class);
+    doFailingHostNameTest("foo bar", BadHostNameCharacterException.class);
   }
 
   @Test
@@ -1306,6 +1375,28 @@ class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Host> {
   void testFailure_ccTldInBailiwick() throws Exception {
     createTld("co.uk");
     doFailingHostNameTest("foo.co.uk", HostNameTooShallowException.class);
+  }
+
+  @Test
+  void testFailure_localhostInetAddress_ipv4() throws Exception {
+    createTld("tld");
+    persistActiveSubordinateHost(oldHostName(), persistActiveDomain("example.tld"));
+    setEppHostUpdateInput(
+        "ns1.example.tld", "ns2.example.tld", "<host:addr ip=\"v4\">127.0.0.1</host:addr>", null);
+    assertAboutEppExceptions()
+        .that(assertThrows(LoopbackIpNotValidForHostException.class, this::runFlow))
+        .marshalsToXml();
+  }
+
+  @Test
+  void testFailure_localhostInetAddress_ipv6() throws Exception {
+    createTld("tld");
+    persistActiveSubordinateHost(oldHostName(), persistActiveDomain("example.tld"));
+    setEppHostUpdateInput(
+        "ns1.example.tld", "ns2.example.tld", "<host:addr ip=\"v6\">::1</host:addr>", null);
+    assertAboutEppExceptions()
+        .that(assertThrows(LoopbackIpNotValidForHostException.class, this::runFlow))
+        .marshalsToXml();
   }
 
   @Test

@@ -14,6 +14,7 @@
 
 package google.registry.keyring;
 
+import com.google.common.flogger.FluentLogger;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
@@ -27,6 +28,8 @@ import java.util.Optional;
 @Module
 public abstract class KeyringModule {
 
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+
   @Binds
   @Singleton
   public abstract Keyring provideKeyring(SecretManagerKeyring keyring);
@@ -34,7 +37,18 @@ public abstract class KeyringModule {
   @Provides
   @Config("cloudSqlInstanceConnectionName")
   public static String provideCloudSqlInstanceConnectionName(Keyring keyring) {
-    return keyring.getSqlPrimaryConnectionName();
+    // TODO: have @cursor remove this logger line before merging PR
+    logger.atInfo().log("DIAGNOSTIC: Attempting to get SQL primary connection name from Keyring");
+    try {
+      String result = keyring.getSqlPrimaryConnectionName();
+      // TODO: have @cursor remove this logger line before merging PR
+      logger.atInfo().log("DIAGNOSTIC: Successfully retrieved connection name: %s", result);
+      return result;
+    } catch (Exception e) {
+      // TODO: have @cursor remove this logger line before merging PR
+      logger.atSevere().withCause(e).log("DIAGNOSTIC: Failed to get SQL primary connection name from Keyring");
+      throw e;
+    }
   }
 
   @Provides

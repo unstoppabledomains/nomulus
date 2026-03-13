@@ -20,11 +20,10 @@ import static google.registry.model.domain.token.AllocationToken.TokenStatus.NOT
 import static google.registry.model.domain.token.AllocationToken.TokenType.BULK_PRICING;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.testing.DatabaseHelper.createTld;
-import static google.registry.testing.DatabaseHelper.insertInDb;
 import static google.registry.testing.DatabaseHelper.loadByEntity;
 import static google.registry.testing.DatabaseHelper.loadByKey;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static google.registry.testing.DatabaseHelper.updateInDb;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static google.registry.testing.SqlHelper.assertThrowForeignKeyViolation;
 import static google.registry.testing.SqlHelper.saveRegistrar;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
@@ -36,8 +35,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Sets;
 import google.registry.model.billing.BillingBase.RenewalPriceBehavior;
-import google.registry.model.contact.Contact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.fee.FeeQueryCommandExtensionItem.CommandName;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.rgp.GracePeriodStatus;
@@ -47,14 +44,12 @@ import google.registry.model.domain.token.AllocationToken.TokenStatus;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.Host;
-import google.registry.model.transfer.ContactTransferData;
 import google.registry.persistence.VKey;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.persistence.transaction.JpaTestExtensions.JpaIntegrationWithCoverageExtension;
 import google.registry.testing.FakeClock;
 import google.registry.util.SerializeUtils;
 import java.util.Arrays;
-import java.util.Optional;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -72,12 +67,8 @@ public class DomainSqlTest {
       new JpaTestExtensions.Builder().withClock(fakeClock).buildIntegrationWithCoverageExtension();
 
   private Domain domain;
-  private Optional<VKey<Contact>> contactKey;
-  private VKey<Contact> contact2Key;
   private VKey<Host> host1VKey;
   private Host host;
-  private Contact contact;
-  private Contact contact2;
   private AllocationToken allocationToken;
 
   @BeforeEach
@@ -85,9 +76,6 @@ public class DomainSqlTest {
     saveRegistrar("registrar1");
     saveRegistrar("registrar2");
     saveRegistrar("registrar3");
-    contactKey = Optional.of(createKey(Contact.class, "contact_id1"));
-    contact2Key = createKey(Contact.class, "contact_id2");
-
     host1VKey = createKey(Host.class, "host1");
 
     domain =
@@ -107,8 +95,6 @@ public class DomainSqlTest {
                     StatusValue.SERVER_UPDATE_PROHIBITED,
                     StatusValue.SERVER_RENEW_PROHIBITED,
                     StatusValue.SERVER_HOLD))
-            .setRegistrant(contactKey)
-            .setContacts(ImmutableSet.of(DesignatedContact.create(Type.ADMIN, contact2Key)))
             .setSubordinateHosts(ImmutableSet.of("ns1.example.com"))
             .setPersistedCurrentSponsorRegistrarId("registrar3")
             .setRegistrationExpirationTime(fakeClock.nowUtc().plusYears(1))
@@ -129,8 +115,6 @@ public class DomainSqlTest {
             .setCreationRegistrarId("registrar1")
             .setPersistedCurrentSponsorRegistrarId("registrar2")
             .build();
-    contact = makeContact("contact_id1");
-    contact2 = makeContact("contact_id2");
 
     allocationToken =
         new AllocationToken.Builder()
@@ -169,13 +153,13 @@ public class DomainSqlTest {
   @Test
   void testHostForeignKeyConstraints() {
     // Persist the domain without the associated host object.
-    assertThrowForeignKeyViolation(() -> insertInDb(contact, contact2, domain));
+    assertThrowForeignKeyViolation(() -> persistResources(domain));
   }
 
   @Test
   void testContactForeignKeyConstraints() {
     // Persist the domain without the associated contact objects.
-    assertThrowForeignKeyViolation(() -> insertInDb(domain, host));
+    assertThrowForeignKeyViolation(() -> persistResources(domain, host));
   }
 
   @Test
@@ -358,7 +342,7 @@ public class DomainSqlTest {
   @Test
   void testSerializable() {
     createTld("com");
-    insertInDb(contact, contact2, domain, host);
+    persistResources(domain, host);
     Domain persisted = tm().transact(() -> tm().loadByEntity(domain));
     assertThat(SerializeUtils.serializeDeserialize(persisted)).isEqualTo(persisted);
   }
@@ -366,26 +350,17 @@ public class DomainSqlTest {
   @Test
   void testUpdates() {
     createTld("com");
-    insertInDb(contact, contact2, domain, host);
+    persistResources(domain, host);
     domain = domain.asBuilder().setNameservers(ImmutableSet.of()).build();
-    updateInDb(domain);
+    persistResource(domain);
     assertAboutImmutableObjects()
         .that(loadByEntity(domain))
         .isEqualExceptFields(domain, "updateTimestamp", "creationTime");
   }
 
-  static Contact makeContact(String repoId) {
-    return new Contact.Builder()
-        .setRepoId(repoId)
-        .setCreationRegistrarId("registrar1")
-        .setTransferData(new ContactTransferData.Builder().build())
-        .setPersistedCurrentSponsorRegistrarId("registrar1")
-        .build();
-  }
-
   private void persistDomain() {
     createTld("com");
-    insertInDb(contact, contact2, domain, host);
+    persistResources(domain, host);
   }
 
   private <T> VKey<T> createKey(Class<T> clazz, String key) {
@@ -414,24 +389,19 @@ public class DomainSqlTest {
     Domain persisted = loadByKey(domain.createVKey());
     DateTime originalUpdateTime = persisted.getUpdateTimestamp().getTimestamp();
     fakeClock.advanceOneMilli();
-    DateTime transactionTime =
-        tm().transact(
-                () -> {
-                  Host host2 =
-                      new Host.Builder()
-                          .setRepoId("host2")
-                          .setHostName("ns2.example.com")
-                          .setCreationRegistrarId("registrar1")
-                          .setPersistedCurrentSponsorRegistrarId("registrar2")
-                          .build();
-                  insertInDb(host2);
-                  domain = persisted.asBuilder().addNameserver(host2.createVKey()).build();
-                  updateInDb(domain);
-                  return tm().getTransactionTime();
-                });
+    Host host2 =
+        new Host.Builder()
+            .setRepoId("host2")
+            .setHostName("ns2.example.com")
+            .setCreationRegistrarId("registrar1")
+            .setPersistedCurrentSponsorRegistrarId("registrar2")
+            .build();
+    persistResource(host2);
+    domain = persisted.asBuilder().addNameserver(host2.createVKey()).build();
+    persistResource(domain);
     domain = loadByKey(domain.createVKey());
-    assertThat(domain.getUpdateTimestamp().getTimestamp()).isEqualTo(transactionTime);
-    assertThat(domain.getUpdateTimestamp().getTimestamp()).isNotEqualTo(originalUpdateTime);
+    assertThat(domain.getUpdateTimestamp().getTimestamp())
+        .isEqualTo(originalUpdateTime.plusMillis(1));
   }
 
   @Test
@@ -440,20 +410,14 @@ public class DomainSqlTest {
     Domain persisted = loadByKey(domain.createVKey());
     DateTime originalUpdateTime = persisted.getUpdateTimestamp().getTimestamp();
     fakeClock.advanceOneMilli();
-    DateTime transactionTime =
-        tm().transact(
-                () -> {
-                  domain =
-                      persisted
-                          .asBuilder()
-                          .setDsData(
-                              ImmutableSet.of(DomainDsData.create(1, 2, 3, new byte[] {0, 1, 2})))
-                          .build();
-                  updateInDb(domain);
-                  return tm().getTransactionTime();
-                });
+    domain =
+        persisted
+            .asBuilder()
+            .setDsData(ImmutableSet.of(DomainDsData.create(1, 2, 3, new byte[] {0, 1, 2})))
+            .build();
+    persistResource(domain);
     domain = loadByKey(domain.createVKey());
-    assertThat(domain.getUpdateTimestamp().getTimestamp()).isEqualTo(transactionTime);
-    assertThat(domain.getUpdateTimestamp().getTimestamp()).isNotEqualTo(originalUpdateTime);
+    assertThat(domain.getUpdateTimestamp().getTimestamp())
+        .isEqualTo(originalUpdateTime.plusMillis(1));
   }
 }

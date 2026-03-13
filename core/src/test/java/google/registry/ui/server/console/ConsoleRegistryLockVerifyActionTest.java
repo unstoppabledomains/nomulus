@@ -30,12 +30,10 @@ import google.registry.model.console.UserRoles;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.RegistryLock;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.CloudTasksHelper;
 import google.registry.testing.ConsoleApiParamsUtils;
 import google.registry.testing.DeterministicStringGenerator;
-import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
 import google.registry.tools.DomainLockUtils;
 import google.registry.util.StringGenerator;
@@ -43,19 +41,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.joda.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Tests for {@link ConsoleRegistryLockVerifyAction}. */
-public class ConsoleRegistryLockVerifyActionTest {
+public class ConsoleRegistryLockVerifyActionTest extends ConsoleActionBaseTestCase {
 
   private static final String DEFAULT_CODE = "123456789ABCDEFGHJKLMNPQRSTUUUUU";
-  private final FakeClock fakeClock = new FakeClock();
-
-  @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().withClock(fakeClock).buildIntegrationTestExtension();
-
-  private FakeResponse response;
   private Domain defaultDomain;
   private User user;
 
@@ -66,16 +56,17 @@ public class ConsoleRegistryLockVerifyActionTest {
     createTld("test");
     defaultDomain = persistActiveDomain("example.test");
     user =
-        new User.Builder()
-            .setEmailAddress("user@theregistrar.com")
-            .setRegistryLockEmailAddress("registrylock@theregistrar.com")
-            .setUserRoles(
-                new UserRoles.Builder()
-                    .setRegistrarRoles(
-                        ImmutableMap.of("TheRegistrar", RegistrarRole.PRIMARY_CONTACT))
-                    .build())
-            .setRegistryLockPassword("registryLockPassword")
-            .build();
+        persistResource(
+            new User.Builder()
+                .setEmailAddress("user@theregistrar.com")
+                .setRegistryLockEmailAddress("registrylock@theregistrar.com")
+                .setUserRoles(
+                    new UserRoles.Builder()
+                        .setRegistrarRoles(
+                            ImmutableMap.of("TheRegistrar", RegistrarRole.PRIMARY_CONTACT))
+                        .build())
+                .setRegistryLockPassword("registryLockPassword")
+                .build());
     action = createAction(DEFAULT_CODE);
   }
 
@@ -96,8 +87,8 @@ public class ConsoleRegistryLockVerifyActionTest {
     persistResource(defaultDomain.asBuilder().setStatusValues(REGISTRY_LOCK_STATUSES).build());
     saveRegistryLock(
         createDefaultLockBuilder()
-            .setLockCompletionTime(fakeClock.nowUtc())
-            .setUnlockRequestTime(fakeClock.nowUtc())
+            .setLockCompletionTime(clock.nowUtc())
+            .setUnlockRequestTime(clock.nowUtc())
             .build());
     action.run();
     assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
@@ -130,8 +121,8 @@ public class ConsoleRegistryLockVerifyActionTest {
     saveRegistryLock(
         createDefaultLockBuilder()
             .isSuperuser(true)
-            .setLockCompletionTime(fakeClock.nowUtc())
-            .setUnlockRequestTime(fakeClock.nowUtc())
+            .setLockCompletionTime(clock.nowUtc())
+            .setUnlockRequestTime(clock.nowUtc())
             .build());
     user =
         user.asBuilder()
@@ -159,7 +150,7 @@ public class ConsoleRegistryLockVerifyActionTest {
   @Test
   void testFailure_expiredLock() {
     saveRegistryLock(createDefaultLockBuilder().build());
-    fakeClock.advanceBy(Duration.standardDays(1));
+    clock.advanceBy(Duration.standardDays(1));
     action.run();
     assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
     assertThat(response.getPayload()).isEqualTo("The pending lock has expired; please try again");
@@ -181,8 +172,8 @@ public class ConsoleRegistryLockVerifyActionTest {
     saveRegistryLock(
         createDefaultLockBuilder()
             .isSuperuser(true)
-            .setLockCompletionTime(fakeClock.nowUtc())
-            .setUnlockRequestTime(fakeClock.nowUtc())
+            .setLockCompletionTime(clock.nowUtc())
+            .setUnlockRequestTime(clock.nowUtc())
             .build());
     action.run();
     assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
@@ -196,7 +187,7 @@ public class ConsoleRegistryLockVerifyActionTest {
         .setRepoId(defaultDomain.getRepoId())
         .setDomainName(defaultDomain.getDomainName())
         .setRegistrarId(defaultDomain.getCurrentSponsorRegistrarId())
-        .setRegistrarPocId("johndoe@theregistrar.com")
+        .setRegistryLockEmail("johndoe@theregistrar.com")
         .setVerificationCode(DEFAULT_CODE);
   }
 
@@ -209,7 +200,7 @@ public class ConsoleRegistryLockVerifyActionTest {
         new DomainLockUtils(
             new DeterministicStringGenerator(StringGenerator.Alphabets.BASE_58),
             "adminreg",
-            new CloudTasksHelper(fakeClock).getTestCloudTasksUtils());
+            new CloudTasksHelper(clock).getTestCloudTasksUtils());
     response = (FakeResponse) params.response();
     return new ConsoleRegistryLockVerifyAction(params, domainLockUtils, verificationCode);
   }

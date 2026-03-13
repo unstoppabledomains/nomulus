@@ -44,13 +44,11 @@ import google.registry.gcs.GcsUtils;
 import google.registry.keyring.api.KeyModule.Key;
 import google.registry.model.common.Cursor;
 import google.registry.model.common.Cursor.CursorType;
-import google.registry.model.contact.Contact;
 import google.registry.model.domain.Domain;
 import google.registry.model.host.Host;
 import google.registry.model.rde.RdeMode;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
@@ -81,8 +79,8 @@ import org.joda.time.Duration;
  * type and loads the embedded resource from it, which is then projected to watermark time to
  * account for things like pending transfer.
  *
- * <p>Only {@link Contact}s and {@link Host}s that are referenced by an included {@link Domain} will
- * be included in the corresponding pending deposit.
+ * <p>Only {@link Host}s that are referenced by an included {@link Domain} will be included in the
+ * corresponding pending deposit.
  *
  * <p>{@link Registrar} entities, both active and inactive, are included in all deposits. They are
  * not rewound point-in-time.
@@ -101,8 +99,8 @@ import org.joda.time.Duration;
  *
  * <h2>Logging</h2>
  *
- * <p>To identify the reduce worker request for a deposit in App Engine's log viewer, you can use
- * search text like {@code tld=soy}, {@code watermark=2015-01-01}, and {@code mode=FULL}.
+ * <p>To identify the reduce worker request for a deposit in the log viewer, you can use search text
+ * like {@code tld=soy}, {@code watermark=2015-01-01}, and {@code mode=FULL}.
  *
  * <h3>Error Handling</h3>
  *
@@ -205,7 +203,7 @@ import org.joda.time.Duration;
  *     Name Registration Data Objects Mapping</a>
  */
 @Action(
-    service = GaeService.BACKEND,
+    service = Action.Service.BACKEND,
     path = RdeStagingAction.PATH,
     method = {GET, POST},
     auth = Auth.AUTH_ADMIN)

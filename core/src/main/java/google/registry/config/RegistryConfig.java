@@ -36,8 +36,9 @@ import dagger.Provides;
 import google.registry.bsa.UploadBsaUnavailableDomainsAction;
 import google.registry.dns.ReadDnsRefreshRequestsAction;
 import google.registry.model.common.DnsRefreshRequest;
+import google.registry.mosapi.MosApiClient;
 import google.registry.persistence.transaction.JpaTransactionManager;
-import google.registry.request.Action.GkeService;
+import google.registry.request.Action.Service;
 import google.registry.util.RegistryEnvironment;
 import google.registry.util.YamlUtils;
 import jakarta.inject.Named;
@@ -141,15 +142,15 @@ public final class RegistryConfig {
     }
 
     /**
-     * Returns the roid suffix to be used for the roids of all contacts and hosts. E.g. a value of
-     * "ROID" would end up creating roids that look like "ABC123-ROID".
+     * Returns the roid suffix to be used for the roids of all hosts. E.g. a value of "ROID" would
+     * end up creating roids that look like "ABC123-ROID".
      *
      * @see <a href="http://www.iana.org/assignments/epp-repository-ids/epp-repository-ids.xhtml">
      *     Extensible Provisioning Protocol (EPP) Repository Identifiers</a>
      */
     @Provides
-    @Config("contactAndHostRoidSuffix")
-    public static String provideContactAndHostRoidSuffix(RegistryConfigSettings config) {
+    @Config("hostRoidSuffix")
+    public static String provideHostRoidSuffix(RegistryConfigSettings config) {
       return config.registryPolicy.contactAndHostRoidSuffix;
     }
 
@@ -960,7 +961,7 @@ public final class RegistryConfig {
     }
 
     /**
-     * Number of times to retry a GAE operation when {@code TransientFailureException} is thrown.
+     * Number of times to retry an operation when {@code TransientFailureException} is thrown.
      *
      * <p>The number of milliseconds it'll sleep before giving up is {@code (2^n - 2) * 100}.
      *
@@ -976,17 +977,6 @@ public final class RegistryConfig {
     }
 
     /**
-     * Amount of time public HTTP proxies are permitted to cache our WHOIS responses.
-     *
-     * @see google.registry.whois.WhoisHttpAction
-     */
-    @Provides
-    @Config("whoisHttpExpires")
-    public static Duration provideWhoisHttpExpires() {
-      return Duration.standardDays(1);
-    }
-
-    /**
      * Maximum number of results to return for an RDAP search query
      *
      * @see google.registry.rdap.RdapActionBase
@@ -995,39 +985,6 @@ public final class RegistryConfig {
     @Config("rdapResultSetMaxSize")
     public static int provideRdapResultSetMaxSize() {
       return 100;
-    }
-
-    /**
-     * Redaction text for email address in WHOIS
-     *
-     * @see google.registry.whois.WhoisResponse
-     */
-    @Provides
-    @Config("whoisRedactedEmailText")
-    public static String provideWhoisRedactedEmailText(RegistryConfigSettings config) {
-      return config.registryPolicy.whoisRedactedEmailText;
-    }
-
-    /**
-     * Disclaimer displayed at the end of WHOIS query results.
-     *
-     * @see google.registry.whois.WhoisResponse
-     */
-    @Provides
-    @Config("whoisDisclaimer")
-    public static String provideWhoisDisclaimer(RegistryConfigSettings config) {
-      return config.registryPolicy.whoisDisclaimer;
-    }
-
-    /**
-     * Message template for whois response when queried domain is blocked by BSA.
-     *
-     * @see google.registry.whois.WhoisResponse
-     */
-    @Provides
-    @Config("domainBlockedByBsaTemplate")
-    public static String provideDomainBlockedByBsaTemplate(RegistryConfigSettings config) {
-      return config.registryPolicy.domainBlockedByBsaTemplate;
     }
 
     /**
@@ -1067,18 +1024,6 @@ public final class RegistryConfig {
     }
 
     /**
-     * The global automatic transfer length for contacts. After this amount of time has elapsed, the
-     * transfer is automatically approved.
-     *
-     * @see google.registry.flows.contact.ContactTransferRequestFlow
-     */
-    @Provides
-    @Config("contactAutomaticTransferLength")
-    public static Duration provideContactAutomaticTransferLength(RegistryConfigSettings config) {
-      return Duration.standardDays(config.registryPolicy.contactAutomaticTransferDays);
-    }
-
-    /**
      * Returns the maximum number of entities that can be checked at one time in an EPP check flow.
      */
     @Provides
@@ -1102,12 +1047,6 @@ public final class RegistryConfig {
     @Config("customLogicFactoryClass")
     public static String provideCustomLogicFactoryClass(RegistryConfigSettings config) {
       return config.registryPolicy.customLogicFactoryClass;
-    }
-
-    @Provides
-    @Config("whoisCommandFactoryClass")
-    public static String provideWhoisCommandFactoryClass(RegistryConfigSettings config) {
-      return config.registryPolicy.whoisCommandFactoryClass;
     }
 
     @Provides
@@ -1313,12 +1252,6 @@ public final class RegistryConfig {
     }
 
     @Provides
-    @Config("minMonthsBeforeWipeOut")
-    public static int provideMinMonthsBeforeWipeOut(RegistryConfigSettings config) {
-      return config.contactHistory.minMonthsBeforeWipeOut;
-    }
-
-    @Provides
     @Config("jdbcBatchSize")
     public static int provideHibernateJdbcBatchSize(RegistryConfigSettings config) {
       return config.hibernate.jdbcBatchSize;
@@ -1464,6 +1397,58 @@ public final class RegistryConfig {
       return config.bsa.uploadUnavailableDomainsUrl;
     }
 
+    /**
+     * Returns the URL we send HTTP requests for MoSAPI.
+     *
+     * @see MosApiClient
+     */
+    @Provides
+    @Config("mosapiServiceUrl")
+    public static String provideMosapiServiceUrl(RegistryConfigSettings config) {
+      return config.mosapi.serviceUrl;
+    }
+
+    /**
+     * Returns the entityType we send HTTP requests for MoSAPI.
+     *
+     * @see MosApiClient
+     */
+    @Provides
+    @Config("mosapiEntityType")
+    public static String provideMosapiEntityType(RegistryConfigSettings config) {
+      return config.mosapi.entityType;
+    }
+
+    @Provides
+    @Config("mosapiTlsCertSecretName")
+    public static String provideMosapiTlsCertSecretName(RegistryConfigSettings config) {
+      return config.mosapi.tlsCertSecretName;
+    }
+
+    @Provides
+    @Config("mosapiTlsKeySecretName")
+    public static String provideMosapiTlsKeySecretName(RegistryConfigSettings config) {
+      return config.mosapi.tlsKeySecretName;
+    }
+
+    @Provides
+    @Config("mosapiTlds")
+    public static ImmutableSet<String> provideMosapiTlds(RegistryConfigSettings config) {
+      return ImmutableSet.copyOf(config.mosapi.tlds);
+    }
+
+    @Provides
+    @Config("mosapiServices")
+    public static ImmutableSet<String> provideMosapiServices(RegistryConfigSettings config) {
+      return ImmutableSet.copyOf(config.mosapi.services);
+    }
+
+    @Provides
+    @Config("mosapiTldThreadCount")
+    public static int provideMosapiTldThreads(RegistryConfigSettings config) {
+      return config.mosapi.tldThreadCount;
+    }
+
     private static String formatComments(String text) {
       return Splitter.on('\n').omitEmptyStrings().trimResults().splitToList(text).stream()
           .map(s -> "# " + s)
@@ -1471,7 +1456,7 @@ public final class RegistryConfig {
     }
   }
 
-  /** Returns the App Engine project ID, which is based off the environment name. */
+  /** Returns the project ID, which is based off the environment name. */
   public static String getProjectId() {
     return CONFIG_SETTINGS.get().gcpProject.projectId;
   }
@@ -1493,53 +1478,8 @@ public final class RegistryConfig {
     return CONFIG_SETTINGS.get().gcpProject.baseDomain;
   }
 
-  public static URL getServiceUrl(GkeService service) {
+  public static URL getServiceUrl(Service service) {
     return makeUrl(String.format("https://%s.%s", service.getServiceId(), getBaseDomain()));
-  }
-
-  /**
-   * Returns the address of the Nomulus app default HTTP server.
-   *
-   * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
-   */
-  public static URL getDefaultServer() {
-    return makeUrl(CONFIG_SETTINGS.get().gcpProject.defaultServiceUrl);
-  }
-
-  /**
-   * Returns the address of the Nomulus app backend HTTP server.
-   *
-   * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
-   */
-  public static URL getBackendServer() {
-    return makeUrl(CONFIG_SETTINGS.get().gcpProject.backendServiceUrl);
-  }
-
-  /**
-   * Returns the address of the Nomulus app bsa HTTP server.
-   *
-   * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
-   */
-  public static URL getBsaServer() {
-    return makeUrl(CONFIG_SETTINGS.get().gcpProject.bsaServiceUrl);
-  }
-
-  /**
-   * Returns the address of the Nomulus app tools HTTP server.
-   *
-   * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
-   */
-  public static URL getToolsServer() {
-    return makeUrl(CONFIG_SETTINGS.get().gcpProject.toolsServiceUrl);
-  }
-
-  /**
-   * Returns the address of the Nomulus app pubapi HTTP server.
-   *
-   * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
-   */
-  public static URL getPubapiServer() {
-    return makeUrl(CONFIG_SETTINGS.get().gcpProject.pubapiServiceUrl);
   }
 
   /** Returns the amount of time a singleton should be cached, before expiring. */
@@ -1605,12 +1545,7 @@ public final class RegistryConfig {
     return CONFIG_SETTINGS.get().gSuite.outgoingEmailDisplayName;
   }
 
-  /**
-   * Returns default WHOIS server to use when {@code Registrar#getWhoisServer()} is {@code null}.
-   *
-   * @see "google.registry.whois.DomainWhoisResponse"
-   * @see "google.registry.whois.RegistrarWhoisResponse"
-   */
+  /** Returns default WHOIS server to use when {@code Registrar#getWhoisServer()} is null. */
   public static String getDefaultRegistrarWhoisServer() {
     return CONFIG_SETTINGS.get().registryPolicy.defaultRegistrarWhoisServer;
   }
@@ -1675,15 +1610,11 @@ public final class RegistryConfig {
     return CONFIG_SETTINGS.get().hibernate.jdbcFetchSize;
   }
 
-  /** Returns the roid suffix to be used for the roids of all contacts and hosts. */
-  public static String getContactAndHostRoidSuffix() {
+  /** Returns the roid suffix to be used for the roids of all hosts. */
+  public static String getHostRoidSuffix() {
     return CONFIG_SETTINGS.get().registryPolicy.contactAndHostRoidSuffix;
   }
 
-  /** Returns the global automatic transfer length for contacts. */
-  public static Duration getContactAutomaticTransferLength() {
-    return Duration.standardDays(CONFIG_SETTINGS.get().registryPolicy.contactAutomaticTransferDays);
-  }
 
   /** A discount for all sunrise domain creates, between 0.0 (no discount) and 1.0 (free). */
   public static double getSunriseDomainCreateDiscount() {

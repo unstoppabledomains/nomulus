@@ -17,21 +17,19 @@ package google.registry.model.reporting;
 import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
 import static google.registry.model.reporting.Spec11ThreatMatch.ThreatType.MALWARE;
 import static google.registry.model.reporting.Spec11ThreatMatch.ThreatType.UNWANTED_SOFTWARE;
+import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 import static google.registry.testing.DatabaseHelper.createTld;
-import static google.registry.testing.DatabaseHelper.insertInDb;
 import static google.registry.testing.DatabaseHelper.loadByEntity;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static google.registry.testing.SqlHelper.assertThrowForeignKeyViolation;
 import static google.registry.testing.SqlHelper.saveRegistrar;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.EntityTestCase;
-import google.registry.model.contact.Contact;
 import google.registry.model.domain.Domain;
 import google.registry.model.host.Host;
-import google.registry.model.transfer.ContactTransferData;
 import google.registry.persistence.VKey;
-import java.util.Optional;
 import org.joda.time.LocalDate;
 import org.joda.time.format.ISODateTimeFormat;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +45,6 @@ public final class Spec11ThreatMatchTest extends EntityTestCase {
   private Spec11ThreatMatch threat;
   private Domain domain;
   private Host host;
-  private Contact registrantContact;
 
   Spec11ThreatMatchTest() {
     super(JpaEntityCoverageCheck.ENABLED);
@@ -56,7 +53,6 @@ public final class Spec11ThreatMatchTest extends EntityTestCase {
   @BeforeEach
   void setUp() {
     VKey<Host> hostVKey = VKey.create(Host.class, "host");
-    VKey<Contact> registrantContactVKey = VKey.create(Contact.class, "contact_id");
     String domainRepoId = "4-TLD";
     createTld("tld");
 
@@ -69,17 +65,6 @@ public final class Spec11ThreatMatchTest extends EntityTestCase {
             .setDomainName("foo.tld")
             .setRepoId(domainRepoId)
             .setNameservers(hostVKey)
-            .setRegistrant(Optional.of(registrantContactVKey))
-            .setContacts(ImmutableSet.of())
-            .build();
-
-    // Create a contact for the purpose of testing a foreign key reference in the Domain table.
-    registrantContact =
-        new Contact.Builder()
-            .setRepoId("contact_id")
-            .setCreationRegistrarId(REGISTRAR_ID)
-            .setTransferData(new ContactTransferData.Builder().build())
-            .setPersistedCurrentSponsorRegistrarId(REGISTRAR_ID)
             .build();
 
     // Create a host for the purpose of testing a foreign key reference in the Domain table. */
@@ -105,7 +90,7 @@ public final class Spec11ThreatMatchTest extends EntityTestCase {
   void testPersistence() {
     createTld("tld");
     saveRegistrar(REGISTRAR_ID);
-    insertInDb(registrantContact, domain, host, threat);
+    tm().transact(() -> tm().insertAll(domain, host, threat));
     assertAboutImmutableObjects().that(loadByEntity(threat)).isEqualExceptFields(threat, "id");
   }
 
@@ -113,12 +98,12 @@ public final class Spec11ThreatMatchTest extends EntityTestCase {
   @Disabled("We can't rely on foreign keys until we've migrated to SQL")
   void testThreatForeignKeyConstraints() {
     // Persist the threat without the associated registrar.
-    assertThrowForeignKeyViolation(() -> insertInDb(host, registrantContact, domain, threat));
+    assertThrowForeignKeyViolation(() -> persistResources(host, domain, threat));
 
     saveRegistrar(REGISTRAR_ID);
 
     // Persist the threat without the associated domain.
-    assertThrowForeignKeyViolation(() -> insertInDb(registrantContact, host, threat));
+    assertThrowForeignKeyViolation(() -> persistResources(host, threat));
   }
 
   @Test

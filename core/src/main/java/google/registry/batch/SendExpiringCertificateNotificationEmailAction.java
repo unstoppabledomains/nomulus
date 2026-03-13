@@ -35,7 +35,6 @@ import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarPoc;
 import google.registry.model.registrar.RegistrarPoc.Type;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.Response;
 import google.registry.request.auth.Auth;
 import google.registry.util.EmailMessage;
@@ -50,7 +49,7 @@ import org.joda.time.format.DateTimeFormatter;
 
 /** An action that sends notification emails to registrars whose certificates are expiring soon. */
 @Action(
-    service = GaeService.BACKEND,
+    service = Action.Service.BACKEND,
     path = SendExpiringCertificateNotificationEmailAction.PATH,
     auth = Auth.AUTH_ADMIN)
 public class SendExpiringCertificateNotificationEmailAction implements Runnable {
@@ -275,7 +274,7 @@ public class SendExpiringCertificateNotificationEmailAction implements Runnable 
    */
   @VisibleForTesting
   ImmutableSet<InternetAddress> getEmailAddresses(Registrar registrar, Type contactType) {
-    ImmutableSortedSet<RegistrarPoc> contacts = registrar.getContactsOfType(contactType);
+    ImmutableSortedSet<RegistrarPoc> contacts = registrar.getPocsOfType(contactType);
     ImmutableSet.Builder<InternetAddress> recipientEmails = new ImmutableSet.Builder<>();
     for (RegistrarPoc contact : contacts) {
       try {

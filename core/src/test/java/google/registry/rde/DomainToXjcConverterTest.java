@@ -26,18 +26,12 @@ import static google.registry.xjc.rgp.XjcRgpStatusValueType.TRANSFER_PERIOD;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.joda.money.CurrencyUnit.USD;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
 import google.registry.model.billing.BillingBase.Flag;
 import google.registry.model.billing.BillingBase.Reason;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingRecurrence;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactAddress;
-import google.registry.model.contact.ContactPhoneNumber;
-import google.registry.model.contact.PostalInfo;
-import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainHistory;
@@ -69,8 +63,8 @@ import google.registry.xjc.rdedomain.XjcRdeDomain;
 import google.registry.xjc.rdedomain.XjcRdeDomainElement;
 import google.registry.xjc.rgp.XjcRgpStatusType;
 import google.registry.xjc.secdns.XjcSecdnsDsDataType;
+import google.registry.xml.XmlException;
 import java.io.ByteArrayOutputStream;
-import java.util.Optional;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,7 +100,7 @@ public class DomainToXjcConverterTest {
     assertThat(
             bean.getContacts().stream()
                 .map(input -> String.format("%s %s", input.getType().toString(), input.getValue())))
-        .containsExactly("ADMIN 5372808-IRL", "TECH 5372808-TRL");
+        .isEmpty();
 
     assertThat(bean.getCrDate()).isEqualTo(DateTime.parse("1900-01-01T00:00:00Z"));
 
@@ -135,7 +129,7 @@ public class DomainToXjcConverterTest {
     //    name used to generate the IDN variant.
     // TODO(b/26125498): bean.getOriginalName()
 
-    assertThat(bean.getRegistrant()).isEqualTo("5372808-ERL");
+    assertThat(bean.getRegistrant()).isNull();
 
     // o  Zero or more OPTIONAL <rgpStatus> element to represent
     //    "pendingDelete" sub-statuses, including "redemptionPeriod",
@@ -198,6 +192,15 @@ public class DomainToXjcConverterTest {
     wrapDeposit(bean).marshal(new ByteArrayOutputStream(), UTF_8);
   }
 
+  @Test
+  void testConvertAbsentContacts() throws XmlException {
+    Domain domain = makeDomain(clock);
+    XjcRdeDomain bean = DomainToXjcConverter.convertDomain(domain, RdeMode.FULL);
+    assertThat(bean.getRegistrant()).isNull();
+    assertThat(bean.getContacts()).isEmpty();
+    wrapDeposit(bean).marshal(new ByteArrayOutputStream(), UTF_8);
+  }
+
   XjcRdeDeposit wrapDeposit(XjcRdeDomain domain) {
     XjcRdeDeposit deposit = new XjcRdeDeposit();
     deposit.setId("984302");
@@ -246,26 +249,6 @@ public class DomainToXjcConverterTest {
         domain
             .asBuilder()
             .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("secret")))
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(
-                        DesignatedContact.Type.ADMIN,
-                        makeContact(
-                                clock,
-                                "10-Q9JYB4C",
-                                "5372808-IRL",
-                                "be that word our sign in parting",
-                                "BOFH@cat.みんな")
-                            .createVKey()),
-                    DesignatedContact.create(
-                        DesignatedContact.Type.TECH,
-                        makeContact(
-                                clock,
-                                "11-Q9JYB4C",
-                                "5372808-TRL",
-                                "bird or fiend!? i shrieked upstarting",
-                                "bog@cat.みんな")
-                            .createVKey())))
             .setCreationRegistrarId("TheRegistrar")
             .setCreationTimeForTest(DateTime.parse("1900-01-01T00:00:00Z"))
             .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
@@ -279,15 +262,6 @@ public class DomainToXjcConverterTest {
                 ImmutableSet.of(
                     makeHost(clock, "3-Q9JYB4C", "bird.or.devil.みんな", "1.2.3.4").createVKey(),
                     makeHost(clock, "4-Q9JYB4C", "ns2.cat.みんな", "bad:f00d:cafe::15:beef")
-                        .createVKey()))
-            .setRegistrant(
-                Optional.of(
-                    makeContact(
-                            clock,
-                            "12-Q9JYB4C",
-                            "5372808-ERL",
-                            "(◕‿◕) nevermore",
-                            "prophet@evil.みんな")
                         .createVKey()))
             .setRegistrationExpirationTime(DateTime.parse("1930-01-01T00:00:00Z"))
             .setGracePeriods(
@@ -384,37 +358,6 @@ public class DomainToXjcConverterTest {
             .build();
     clock.advanceOneMilli();
     return persistResource(domain);
-  }
-
-  private static Contact makeContact(
-      FakeClock clock, String repoId, String id, String name, String email) {
-    clock.advanceOneMilli();
-    return persistEppResource(
-        new Contact.Builder()
-            .setContactId(id)
-            .setEmailAddress(email)
-            .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
-            .setCreationRegistrarId("TheRegistrar")
-            .setCreationTimeForTest(END_OF_TIME)
-            .setInternationalizedPostalInfo(
-                new PostalInfo.Builder()
-                    .setType(PostalInfo.Type.INTERNATIONALIZED)
-                    .setName(name)
-                    .setOrg("SINNERS INCORPORATED")
-                    .setAddress(
-                        new ContactAddress.Builder()
-                            .setStreet(ImmutableList.of("123 Example Boulevard"))
-                            .setCity("KOKOMO")
-                            .setState("BM")
-                            .setZip("31337")
-                            .setCountryCode("US")
-                            .build())
-                    .build())
-            .setRepoId(repoId)
-            .setVoiceNumber(
-                new ContactPhoneNumber.Builder().setPhoneNumber("+1.2126660420").build())
-            .setFaxNumber(new ContactPhoneNumber.Builder().setPhoneNumber("+1.2126660421").build())
-            .build());
   }
 
   private static Host makeHost(FakeClock clock, String repoId, String fqhn, String ip) {

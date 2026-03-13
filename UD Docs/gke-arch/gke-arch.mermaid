@@ -1,0 +1,85 @@
+%%{init: {'theme':'base', 'themeVariables': {'primaryBgColor':'#ffffff', 'primaryTextColor':'#000000', 'primaryBorderColor':'#000000', 'lineColor':'#000000', 'secondaryColor':'#f5f5f5', 'tertiaryColor':'#ffffff'}}}%%
+graph TB
+    Internet[Internet/External Traffic]
+    
+    subgraph "Gateway API Layer"
+        Gateway[Gateway: nomulus<br/>Ports: 80 HTTP, 443 HTTPS<br/>IPs: nomulus-ipv4, nomulus-ipv6]
+        RedirectRoute[HTTPRoute: redirect<br/>HTTP -> HTTPS redirect]
+    end
+    
+    subgraph "HTTPRoute Routing"
+        FrontendRoute[HTTPRoute: frontend<br/>Host: frontend.BASE_DOMAIN<br/>Path: /_dr/epp]
+        BackendRoute[HTTPRoute: backend<br/>Host: backend.BASE_DOMAIN<br/>Paths: /_dr/task, /_dr/cron, etc.]
+        ConsoleRoute[HTTPRoute: console<br/>Host: console.BASE_DOMAIN<br/>Paths: /console, /console-api]
+        PubapiRoute[HTTPRoute: pubapi<br/>Host: pubapi.BASE_DOMAIN<br/>Paths: /check, /rdap]
+    end
+    
+    subgraph "Service Layer"
+        FrontendSvc[Service: frontend<br/>Port: 80 -> 8080]
+        BackendSvc[Service: backend<br/>Port: 80 -> 8080]
+        ConsoleSvc[Service: console<br/>Port: 80 -> 8080]
+        PubapiSvc[Service: pubapi<br/>Port: 80 -> 8080]
+        EPPLoadBalancer[Service: EPP<br/>Type: LoadBalancer<br/>Port: 700 -> 30002<br/>IPv4 + IPv6]
+        ProxyNodePort[Service: proxy-service<br/>Type: NodePort<br/>Ports: 30000, 30001, 30002]
+    end
+    
+    subgraph "Pod Layer - Frontend"
+        FrontendPod[Frontend Pod<br/>Container: frontend<br/>Image: gcr.io/GCP_PROJECT/nomulus<br/>Port: 8080]
+        EPPContainer[EPP Container<br/>Image: gcr.io/GCP_PROJECT/proxy<br/>Port: 30002]
+    end
+    
+    subgraph "Pod Layer - Backend"
+        BackendPod[Backend Pod<br/>Container: backend<br/>Image: gcr.io/GCP_PROJECT/nomulus<br/>Port: 8080]
+    end
+    
+    subgraph "Pod Layer - Console"
+        ConsolePod[Console Pod<br/>Container: console<br/>Image: gcr.io/GCP_PROJECT/nomulus<br/>Port: 8080]
+    end
+    
+    subgraph "Pod Layer - Pubapi"
+        PubapiPod[Pubapi Pod<br/>Container: pubapi<br/>Image: gcr.io/GCP_PROJECT/nomulus<br/>Port: 8080]
+    end
+    
+    subgraph "Pod Layer - Proxy"
+        ProxyPod[Proxy Pod<br/>Container: proxy<br/>Image: us-central1-docker.pkg.dev/ud-registry-alpha/nomulus/proxy<br/>Ports: 30000, 30001, 30002]
+    end
+    
+    %% HTTP/HTTPS Traffic Flow
+    Internet -->|HTTP/HTTPS| Gateway
+    Gateway -->|HTTP| RedirectRoute
+    RedirectRoute -.->|Redirect| Gateway
+    Gateway -->|HTTPS| FrontendRoute
+    Gateway -->|HTTPS| BackendRoute
+    Gateway -->|HTTPS| ConsoleRoute
+    Gateway -->|HTTPS| PubapiRoute
+    
+    FrontendRoute -->|ServiceImport| FrontendSvc
+    BackendRoute -->|ServiceImport| BackendSvc
+    ConsoleRoute -->|ServiceImport| ConsoleSvc
+    PubapiRoute -->|ServiceImport| PubapiSvc
+    
+    FrontendSvc --> FrontendPod
+    BackendSvc --> BackendPod
+    ConsoleSvc --> ConsolePod
+    PubapiSvc --> PubapiPod
+    
+    %% EPP TCP Traffic Flow (Direct LoadBalancer)
+    Internet -->|TCP Port 700<br/>EPP Protocol| EPPLoadBalancer
+    EPPLoadBalancer -->|Port 30002| EPPContainer
+    
+    %% Proxy TCP Traffic Flow (NodePort)
+    Internet -->|TCP Ports<br/>30000, 30001, 30002| ProxyNodePort
+    ProxyNodePort --> ProxyPod
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient (white -> purple -> blue)
+    classDef external fill:#F5E8FF,stroke:#E1C7FF,stroke-width:2px,color:#6B2D9F
+    classDef gateway fill:#E1C7FF,stroke:#C9A3FF,stroke-width:2px,color:#6B2D9F
+    classDef route fill:#C9A3FF,stroke:#B080FF,stroke-width:2px,color:#ffffff
+    classDef service fill:#B080FF,stroke:#8E5CFF,stroke-width:2px,color:#ffffff
+    classDef pod fill:#6B4DFF,stroke:#4A7FFF,stroke-width:2px,color:#ffffff
+    
+    class Gateway,RedirectRoute gateway
+    class FrontendRoute,BackendRoute,ConsoleRoute,PubapiRoute route
+    class FrontendSvc,BackendSvc,ConsoleSvc,PubapiSvc,EPPLoadBalancer,ProxyNodePort service
+    class FrontendPod,BackendPod,ConsolePod,PubapiPod,EPPContainer,ProxyPod pod
+    class Internet external

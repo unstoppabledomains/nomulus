@@ -19,7 +19,6 @@ import static google.registry.request.RequestParameters.extractOptionalIntParame
 import static google.registry.request.RequestParameters.extractOptionalParameter;
 import static google.registry.request.RequestParameters.extractRequiredParameter;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import dagger.Module;
@@ -37,6 +36,7 @@ import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordDat
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
+import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import org.joda.time.DateTime;
@@ -192,10 +192,10 @@ public final class ConsoleModule {
   }
 
   @Provides
-  @Parameter("contacts")
-  public static Optional<ImmutableSet<RegistrarPoc>> provideContacts(
+  @Parameter("contact")
+  public static Optional<RegistrarPoc> provideContacts(
       Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
-    return payload.map(s -> ImmutableSet.copyOf(gson.fromJson(s, RegistrarPoc[].class)));
+    return payload.map(s -> gson.fromJson(s, RegistrarPoc.class));
   }
 
   @Provides
@@ -248,6 +248,12 @@ public final class ConsoleModule {
   }
 
   @Provides
+  @Parameter("resetRequestVerificationCode")
+  public static String provideResetRequestVerificationCode(HttpServletRequest req) {
+    return extractRequiredParameter(req, "resetRequestVerificationCode");
+  }
+
+  @Provides
   @Parameter("eppPasswordChangeRequest")
   public static Optional<EppPasswordData> provideEppPasswordChangeRequest(
       Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
@@ -273,5 +279,22 @@ public final class ConsoleModule {
   public static Optional<ConsoleRegistryLockPostInput> provideRegistryLockPostInput(
       Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload.map(e -> gson.fromJson(e, ConsoleRegistryLockPostInput.class));
+  }
+
+  @Provides
+  @Parameter("passwordResetRequestData")
+  public static PasswordResetRequestData providePasswordResetRequestData(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload
+        .map(e -> gson.fromJson(e, PasswordResetRequestData.class))
+        .orElseThrow(
+            () -> new IllegalArgumentException("Must provide password request reset data"));
+  }
+
+  @Provides
+  @Parameter("newPassword")
+  public static Optional<String> provideNewPassword(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(e -> gson.fromJson(e, String.class));
   }
 }

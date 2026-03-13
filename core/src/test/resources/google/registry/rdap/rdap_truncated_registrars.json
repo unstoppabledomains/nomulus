@@ -9,7 +9,14 @@
         {
           "rel" : "self",
           "href": "https://example.tld/rdap/entity/301",
-          "type" : "application/rdap+json"
+          "type" : "application/rdap+json",
+          "value": "https://example.tld/rdap/entities"
+        },
+        {
+          "rel": "about",
+          "href": "http://my.fake.url",
+          "type": "text/html",
+          "value": "https://rdap.example.com/withSlash/"
         }
       ],
       "publicIds" :
@@ -66,7 +73,14 @@
         {
           "rel" : "self",
           "href": "https://example.tld/rdap/entity/302",
-          "type" : "application/rdap+json"
+          "type" : "application/rdap+json",
+          "value": "https://example.tld/rdap/entities"
+        },
+        {
+          "rel": "about",
+          "href": "http://my.fake.url",
+          "type": "text/html",
+          "value": "https://rdap.example.com/withSlash/"
         }
       ],
       "publicIds" :
@@ -123,7 +137,14 @@
         {
           "rel" : "self",
           "href": "https://example.tld/rdap/entity/303",
-          "type" : "application/rdap+json"
+          "type" : "application/rdap+json",
+          "value": "https://example.tld/rdap/entities"
+        },
+        {
+          "rel": "about",
+          "href": "http://my.fake.url",
+          "type": "text/html",
+          "value": "https://rdap.example.com/withSlash/"
         }
       ],
       "publicIds" :
@@ -180,7 +201,14 @@
         {
           "rel" : "self",
           "href": "https://example.tld/rdap/entity/304",
-          "type" : "application/rdap+json"
+          "type" : "application/rdap+json",
+          "value": "https://example.tld/rdap/entities"
+        },
+        {
+          "rel": "about",
+          "href": "http://my.fake.url",
+          "type": "text/html",
+          "value": "https://rdap.example.com/withSlash/"
         }
       ],
       "publicIds" :
@@ -232,8 +260,8 @@
   ],
   "rdapConformance": [
     "rdap_level_0",
-    "icann_rdap_response_profile_0",
-    "icann_rdap_technical_implementation_guide_0"
+    "icann_rdap_response_profile_1",
+    "icann_rdap_technical_implementation_guide_1"
   ],
   "notices" :
   [
@@ -252,7 +280,8 @@
         {
           "type" : "application/rdap+json",
           "href" : "https://example.tld/rdap/entities?%NAME%",
-          "rel" : "next"
+          "rel" : "next",
+          "value": "https://example.tld/rdap/entities"
         }
       ],
       "description" : [ "Links to related pages." ]
@@ -277,19 +306,15 @@
         {
           "href": "https://example.tld/rdap/help/tos",
           "rel": "self",
-          "type": "application/rdap+json"
+          "type": "application/rdap+json",
+          "value": "https://example.tld/rdap/entities"
         },
         {
-          "href": "https://www.registry.tld/about/rdap/tos.html",
-          "rel": "alternate",
-          "type": "text/html"
+          "href": "https://www.example.tld/about/rdap/tos.html",
+          "rel": "terms-of-service",
+          "type": "text/html",
+          "value": "https://example.tld/rdap/entities"
         }
-      ]
-    },
-    {
-      "description" :
-      [
-        "This response conforms to the RDAP Operational Profile for gTLD Registries and Registrars version 1.0"
       ]
     }
   ]

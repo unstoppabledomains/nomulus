@@ -14,8 +14,8 @@
 
 package google.registry.testing;
 
-import static google.registry.testing.DatabaseHelper.generateNewContactHostRoid;
 import static google.registry.testing.DatabaseHelper.generateNewDomainRoid;
+import static google.registry.testing.DatabaseHelper.generateNewHostRoid;
 import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.util.DomainNameUtils.getTldFromDomainName;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -24,11 +24,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
 import google.registry.model.EppResource;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactAddress;
-import google.registry.model.contact.ContactPhoneNumber;
-import google.registry.model.contact.PostalInfo;
-import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainHistory;
 import google.registry.model.domain.Period;
@@ -43,12 +38,10 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.persistence.VKey;
 import google.registry.util.Idn;
 import java.net.InetAddress;
-import java.util.List;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 
-/** Test helper methods for the rdap and whois packages. */
+/** Test helper methods for the RDAP package. */
 public final class FullFieldsTestEntityHelper {
 
   public static Registrar makeRegistrar(
@@ -84,9 +77,7 @@ public final class FullFieldsTestEntityHelper {
         .setFaxNumber("+1.2125551213")
         .setEmailAddress("contact-us@example.com")
         .setWhoisServer("whois.example.com")
-        .setRdapBaseUrls(
-            ImmutableSet.of(
-                "https://rdap.example.com/withSlash/", "https://rdap.example.com/withoutSlash"))
+        .setRdapBaseUrls(ImmutableSet.of("https://rdap.example.com/withSlash/"))
         .setUrl("http://my.fake.url")
         .build();
   }
@@ -102,8 +93,8 @@ public final class FullFieldsTestEntityHelper {
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
             // Purposely flip the internal/external admin/tech
             // distinction to make sure we're not relying on it.  Sigh.
-            .setVisibleInWhoisAsAdmin(false)
-            .setVisibleInWhoisAsTech(true)
+            .setVisibleInRdapAsAdmin(false)
+            .setVisibleInRdapAsTech(true)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -114,8 +105,8 @@ public final class FullFieldsTestEntityHelper {
             .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH))
             // Purposely flip the internal/external admin/tech
             // distinction to make sure we're not relying on it.  Sigh.
-            .setVisibleInWhoisAsAdmin(true)
-            .setVisibleInWhoisAsTech(false)
+            .setVisibleInRdapAsAdmin(true)
+            .setVisibleInRdapAsTech(false)
             .build(),
         new RegistrarPoc.Builder()
             .setRegistrar(registrar)
@@ -123,7 +114,7 @@ public final class FullFieldsTestEntityHelper {
             .setEmailAddress("jakedoe@example.com")
             .setPhoneNumber("+1.2125551216")
             .setFaxNumber("+1.2125551216")
-            .setVisibleInDomainWhoisAsAbuse(true)
+            .setVisibleInDomainRdapAsAbuse(true)
             .build());
   }
 
@@ -137,10 +128,15 @@ public final class FullFieldsTestEntityHelper {
 
   public static Host makeHost(
       String fqhn, @Nullable String ip1, @Nullable String ip2, String registrarClientId) {
+    return makePunycodedHost(Idn.toASCII(fqhn), ip1, ip2, registrarClientId);
+  }
+
+  public static Host makePunycodedHost(
+      String fqhn, @Nullable String ip1, @Nullable String ip2, String registrarClientId) {
     Host.Builder builder =
         new Host.Builder()
-            .setRepoId(generateNewContactHostRoid())
-            .setHostName(Idn.toASCII(fqhn))
+            .setRepoId(generateNewHostRoid())
+            .setHostName(fqhn)
             .setCreationTimeForTest(DateTime.parse("2000-10-08T00:45:00Z"))
             .setPersistedCurrentSponsorRegistrarId(registrarClientId);
     if ((ip1 != null) || (ip2 != null)) {
@@ -180,156 +176,8 @@ public final class FullFieldsTestEntityHelper {
     return host;
   }
 
-  public static Contact makeContact(String id, String name, @Nullable String email) {
-    return makeContact(id, name, email, ImmutableList.of("123 Example Boulevard <script>"), null);
-  }
-
-  public static Contact makeContact(
-      String id, String name, @Nullable String email, @Nullable Registrar registrar) {
-    return makeContact(
-        id, name, email, ImmutableList.of("123 Example Boulevard <script>"), registrar);
-  }
-
-  public static Contact makeContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable List<String> street,
-      @Nullable Registrar registrar) {
-    return makeContact(id, name, email, street, registrar, null);
-  }
-
-  public static Contact makeContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable List<String> street,
-      @Nullable Registrar registrar,
-      @Nullable DateTime deletionTime) {
-    PostalInfo.Builder postalBuilder = new PostalInfo.Builder()
-        .setType(PostalInfo.Type.INTERNATIONALIZED)
-        .setName(name)
-        .setOrg("GOOGLE INCORPORATED <script>");
-    if (street != null) {
-        postalBuilder.setAddress(new ContactAddress.Builder()
-            .setStreet(ImmutableList.copyOf(street))
-            .setCity("KOKOMO")
-            .setState("BM")
-            .setZip("31337")
-            .setCountryCode("US")
-            .build());
-    }
-    Contact.Builder builder =
-        new Contact.Builder()
-            .setContactId(id)
-            .setRepoId(generateNewContactHostRoid())
-            .setCreationTimeForTest(DateTime.parse("2000-10-08T00:45:00Z"))
-            .setInternationalizedPostalInfo(postalBuilder.build())
-            .setVoiceNumber(
-                new ContactPhoneNumber.Builder().setPhoneNumber("+1.2126660420").build())
-            .setFaxNumber(new ContactPhoneNumber.Builder().setPhoneNumber("+1.2126660420").build());
-    if (email != null) {
-      builder.setEmailAddress(email);
-    }
-    String registrarId = registrar == null ? "TheRegistrar" : registrar.getRegistrarId();
-    builder.setCreationRegistrarId(registrarId).setPersistedCurrentSponsorRegistrarId(registrarId);
-    if (deletionTime != null) {
-      builder.setDeletionTime(deletionTime);
-    }
-    return builder.build();
-  }
-
-  public static Contact makeWipedOutContact(
-      String id, @Nullable Registrar registrar, @Nullable DateTime deletionTime) {
-    Contact.Builder builder =
-        new Contact.Builder()
-            .setContactId(id)
-            .setRepoId(generateNewContactHostRoid())
-            .setCreationTimeForTest(DateTime.parse("2000-10-08T00:45:00Z"));
-    if (registrar != null) {
-      builder
-          .setCreationRegistrarId(registrar.getRegistrarId())
-          .setPersistedCurrentSponsorRegistrarId(registrar.getRegistrarId());
-    }
-    if (deletionTime != null) {
-      builder.setDeletionTime(deletionTime);
-    }
-    return builder.build();
-  }
-
-  public static Contact makeAndPersistContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable DateTime creationTime,
-      @Nullable Registrar registrar) {
-    return makeAndPersistContact(
-        id,
-        name,
-        email,
-        ImmutableList.of("123 Example Boulevard <script>"),
-        creationTime,
-        registrar,
-        null);
-  }
-
-  public static Contact makeAndPersistContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable List<String> street,
-      @Nullable DateTime creationTime) {
-    return makeAndPersistContact(id, name, email, street, creationTime, null, null);
-  }
-
-  public static Contact makeAndPersistContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable List<String> street,
-      @Nullable DateTime creationTime,
-      @Nullable Registrar registrar) {
-    return makeAndPersistContact(id, name, email, street, creationTime, registrar, null);
-  }
-
-  public static Contact makeAndPersistContact(
-      String id,
-      String name,
-      @Nullable String email,
-      @Nullable List<String> street,
-      @Nullable DateTime creationTime,
-      @Nullable Registrar registrar,
-      @Nullable DateTime deletionTime) {
-    Contact contact =
-        persistResource(makeContact(id, name, email, street, registrar, deletionTime));
-    if (creationTime != null) {
-      persistResource(
-          makeHistoryEntry(
-              contact, HistoryEntry.Type.CONTACT_CREATE, null, "created", creationTime));
-    }
-    if (deletionTime != null) {
-      persistResource(
-          makeHistoryEntry(
-              contact, HistoryEntry.Type.CONTACT_DELETE, null, "deleted", deletionTime));
-    }
-    return contact;
-  }
-
-  public static Contact makeAndPersistDeletedContact(
-      String id, DateTime creationTime, Registrar registrar, DateTime deletionTime) {
-    Contact contact = persistResource(makeWipedOutContact(id, registrar, deletionTime));
-    persistResource(
-        makeHistoryEntry(contact, HistoryEntry.Type.CONTACT_CREATE, null, "created", creationTime));
-    persistResource(
-        makeHistoryEntry(contact, HistoryEntry.Type.CONTACT_DELETE, null, "deleted", deletionTime));
-    return contact;
-  }
-
   public static Domain makeDomain(
       String domain,
-      @Nullable Contact registrant,
-      @Nullable Contact admin,
-      @Nullable Contact tech,
       @Nullable Host ns1,
       @Nullable Host ns2,
       Registrar registrar) {
@@ -349,21 +197,6 @@ public final class FullFieldsTestEntityHelper {
                     StatusValue.CLIENT_TRANSFER_PROHIBITED,
                     StatusValue.SERVER_UPDATE_PROHIBITED))
             .setDsData(ImmutableSet.of(DomainDsData.create(1, 2, 3, "deadface")));
-    if (registrant != null) {
-      builder.setRegistrant(Optional.of(registrant.createVKey()));
-    }
-    if ((admin != null) || (tech != null)) {
-      ImmutableSet.Builder<DesignatedContact> contactsBuilder = new ImmutableSet.Builder<>();
-      if (admin != null) {
-        contactsBuilder.add(
-            DesignatedContact.create(DesignatedContact.Type.ADMIN, admin.createVKey()));
-      }
-      if (tech != null) {
-        contactsBuilder.add(
-            DesignatedContact.create(DesignatedContact.Type.TECH, tech.createVKey()));
-      }
-      builder.setContacts(contactsBuilder.build());
-    }
     if ((ns1 != null) || (ns2 != null)) {
       ImmutableSet.Builder<VKey<Host>> nsBuilder = new ImmutableSet.Builder<>();
       if (ns1 != null) {

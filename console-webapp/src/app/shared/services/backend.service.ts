@@ -30,6 +30,8 @@ import {
 import { Contact } from '../../settings/contact/contact.service';
 import { EppPasswordBackendModel } from '../../settings/security/security.service';
 import { UserData } from './userData.service';
+import { PasswordResetVerifyResponse } from '../components/passwordReset/passwordResetVerify.component';
+import { HistoryRecord } from '../../history/history.service';
 
 @Injectable()
 export class BackendService {
@@ -70,13 +72,26 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<Contact[]>(err)));
   }
 
-  postContacts(
-    registrarId: string,
-    contacts: Contact[]
-  ): Observable<Contact[]> {
-    return this.http.post<Contact[]>(
+  updateContact(registrarId: string, contact: Contact): Observable<Contact> {
+    return this.http.put<Contact>(
       `/console-api/settings/contacts?registrarId=${registrarId}`,
-      contacts
+      contact
+    );
+  }
+
+  createContact(registrarId: string, contact: Contact): Observable<Contact> {
+    return this.http.post<Contact>(
+      `/console-api/settings/contacts?registrarId=${registrarId}`,
+      contact
+    );
+  }
+
+  deleteContact(registrarId: string, contact: Contact): Observable<Contact> {
+    return this.http.delete<Contact>(
+      `/console-api/settings/contacts?registrarId=${registrarId}`,
+      {
+        body: JSON.stringify(contact),
+      }
     );
   }
 
@@ -107,6 +122,16 @@ export class BackendService {
     return this.http
       .get<DomainListResult>(url)
       .pipe(catchError((err) => this.errorCatcher<DomainListResult>(err)));
+  }
+
+  getHistoryLog(registrarId: string, userEmail?: string) {
+    return this.http
+      .get<HistoryRecord[]>(
+        userEmail
+          ? `/console-api/history?registrarId=${registrarId}&consoleUserEmail=${userEmail}`
+          : `/console-api/history?registrarId=${registrarId}`
+      )
+      .pipe(catchError((err) => this.errorCatcher<HistoryRecord[]>(err)));
   }
 
   getRegistrars(): Observable<Registrar[]> {
@@ -265,6 +290,39 @@ export class BackendService {
   ): Observable<RegistryLockVerificationResponse> {
     return this.http.get<RegistryLockVerificationResponse>(
       `/console-api/registry-lock-verify?lockVerificationCode=${lockVerificationCode}`
+    );
+  }
+
+  requestRegistryLockPasswordReset(
+    registrarId: string,
+    registryLockEmail: string
+  ) {
+    return this.http.post('/console-api/password-reset-request', {
+      type: 'REGISTRY_LOCK',
+      registrarId,
+      registryLockEmail,
+    });
+  }
+
+  requestEppPasswordReset(registrarId: string) {
+    return this.http.post('/console-api/password-reset-request', {
+      type: 'EPP',
+      registrarId,
+    });
+  }
+
+  getPasswordResetInformation(
+    verificationCode: string
+  ): Observable<PasswordResetVerifyResponse> {
+    return this.http.get<PasswordResetVerifyResponse>(
+      `/console-api/password-reset-verify?resetRequestVerificationCode=${verificationCode}`
+    );
+  }
+
+  finalizePasswordReset(verificationCode: string, newPassword: string) {
+    return this.http.post(
+      `/console-api/password-reset-verify?resetRequestVerificationCode=${verificationCode}`,
+      newPassword
     );
   }
 }

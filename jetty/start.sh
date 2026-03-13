@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2024 The Nomulus Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +21,19 @@ cd webapps
 find . -maxdepth 1 -type d -name "console-*" -exec rm -rf {} +
 cd /jetty-base
 echo "Running ${env}"
-java -Dgoogle.registry.environment=${env} \
-    -Djava.util.logging.config.file=/logging.properties \
+PROFILER_ARGS=""
+# Use the CONTAINER_NAME variable from Kubernetes YAML to set Cloud profiler args, enable it only in frontend and console.
+case "${CONTAINER_NAME}" in
+  "frontend"|"console")
+  PROFILER_ARGS="-agentpath:/opt/cprof/profiler_java_agent.so=-cprof_service=${CONTAINER_NAME},-cprof_enable_heap_sampling=true"
+esac
+JVM_OPTS=(
+    # Allocate bigger than default fraction of available memory to the
+    # application, as it's running in a (single-purposed) container.
+    -XX:InitialRAMPercentage=50.0
+    -XX:MaxRAMPercentage=50.0
+    -Dgoogle.registry.environment="${env}"
+    -Djava.util.logging.config.file=/logging.properties
     -jar /usr/local/jetty/start.jar
+)
+java $PROFILER_ARGS "${JVM_OPTS[@]}"

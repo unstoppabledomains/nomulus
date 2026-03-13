@@ -17,6 +17,7 @@ package google.registry.module;
 import dagger.Module;
 import dagger.Subcomponent;
 import google.registry.batch.BatchModule;
+import google.registry.batch.BulkDomainTransferAction;
 import google.registry.batch.CannedScriptExecutionAction;
 import google.registry.batch.DeleteExpiredDomainsAction;
 import google.registry.batch.DeleteLoadTestDataAction;
@@ -26,7 +27,6 @@ import google.registry.batch.RelockDomainAction;
 import google.registry.batch.ResaveAllEppResourcesPipelineAction;
 import google.registry.batch.ResaveEntityAction;
 import google.registry.batch.SendExpiringCertificateNotificationEmailAction;
-import google.registry.batch.WipeOutContactHistoryPiiAction;
 import google.registry.bsa.BsaDownloadAction;
 import google.registry.bsa.BsaRefreshAction;
 import google.registry.bsa.BsaValidateAction;
@@ -38,11 +38,8 @@ import google.registry.dns.PublishDnsUpdatesAction;
 import google.registry.dns.ReadDnsRefreshRequestsAction;
 import google.registry.dns.RefreshDnsAction;
 import google.registry.dns.RefreshDnsOnHostRenameAction;
-import google.registry.dns.writer.VoidDnsWriterModule;
-import google.registry.dns.writer.clouddns.CloudDnsWriterModule;
+import google.registry.dns.writer.DnsWritersModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
-import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
-import google.registry.dns.writer.powerdns.PowerDnsWriterModule;
 import google.registry.export.ExportDomainListsAction;
 import google.registry.export.ExportPremiumTermsAction;
 import google.registry.export.ExportReservedTermsAction;
@@ -63,6 +60,9 @@ import google.registry.module.ReadinessProbeAction.ReadinessProbeActionFrontend;
 import google.registry.module.ReadinessProbeAction.ReadinessProbeActionPubApi;
 import google.registry.module.ReadinessProbeAction.ReadinessProbeConsoleAction;
 import google.registry.monitoring.whitebox.WhiteboxModule;
+import google.registry.mosapi.GetServiceStateAction;
+import google.registry.mosapi.TriggerServiceStateAction;
+import google.registry.mosapi.module.MosApiRequestModule;
 import google.registry.rdap.RdapAutnumAction;
 import google.registry.rdap.RdapDomainAction;
 import google.registry.rdap.RdapDomainSearchAction;
@@ -118,6 +118,7 @@ import google.registry.ui.server.console.ConsoleDomainGetAction;
 import google.registry.ui.server.console.ConsoleDomainListAction;
 import google.registry.ui.server.console.ConsoleDumDownloadAction;
 import google.registry.ui.server.console.ConsoleEppPasswordAction;
+import google.registry.ui.server.console.ConsoleHistoryDataAction;
 import google.registry.ui.server.console.ConsoleModule;
 import google.registry.ui.server.console.ConsoleOteAction;
 import google.registry.ui.server.console.ConsoleRegistryLockAction;
@@ -125,14 +126,13 @@ import google.registry.ui.server.console.ConsoleRegistryLockVerifyAction;
 import google.registry.ui.server.console.ConsoleUpdateRegistrarAction;
 import google.registry.ui.server.console.ConsoleUserDataAction;
 import google.registry.ui.server.console.ConsoleUsersAction;
+import google.registry.ui.server.console.PasswordResetRequestAction;
+import google.registry.ui.server.console.PasswordResetVerifyAction;
 import google.registry.ui.server.console.RegistrarsAction;
 import google.registry.ui.server.console.domains.ConsoleBulkDomainAction;
 import google.registry.ui.server.console.settings.ContactAction;
 import google.registry.ui.server.console.settings.RdapRegistrarFieldsAction;
 import google.registry.ui.server.console.settings.SecurityAction;
-import google.registry.whois.WhoisAction;
-import google.registry.whois.WhoisHttpAction;
-import google.registry.whois.WhoisModule;
 
 /** Dagger component with per-request lifetime. */
 @RequestScope
@@ -141,19 +141,18 @@ import google.registry.whois.WhoisModule;
       BatchModule.class,
       BillingModule.class,
       CheckApiModule.class,
-      CloudDnsWriterModule.class,
       ConsoleModule.class,
       CronModule.class,
       CustomLogicModule.class,
       DnsCountQueryCoordinatorModule.class,
       DnsModule.class,
       DnsUpdateConfigModule.class,
-      DnsUpdateWriterModule.class,
-      PowerDnsWriterModule.class,
+      DnsWritersModule.class,
       EppTlsModule.class,
       EppToolModule.class,
       IcannReportingModule.class,
       LoadTestModule.class,
+      MosApiRequestModule.class,
       RdapModule.class,
       RdeModule.class,
       ReportingModule.class,
@@ -162,9 +161,7 @@ import google.registry.whois.WhoisModule;
       Spec11Module.class,
       TmchModule.class,
       ToolsServerModule.class,
-      VoidDnsWriterModule.class,
-      WhiteboxModule.class,
-      WhoisModule.class,
+      WhiteboxModule.class
     })
 interface RequestComponent {
   FlowComponent.Builder flowComponentBuilder();
@@ -177,6 +174,8 @@ interface RequestComponent {
 
   BsaValidateAction bsaValidateAction();
 
+  BulkDomainTransferAction bulkDomainTransferAction();
+
   CannedScriptExecutionAction cannedScriptExecutionAction();
 
   CheckApiAction checkApiAction();
@@ -188,6 +187,8 @@ interface RequestComponent {
   ConsoleDomainListAction consoleDomainListAction();
 
   ConsoleEppPasswordAction consoleEppPasswordAction();
+
+  ConsoleHistoryDataAction consoleHistoryDataAction();
 
   ConsoleOteAction consoleOteAction();
 
@@ -233,6 +234,8 @@ interface RequestComponent {
 
   GenerateZoneFilesAction generateZoneFilesAction();
 
+  GetServiceStateAction getServiceStateAction();
+
   IcannReportingStagingAction icannReportingStagingAction();
 
   IcannReportingUploadAction icannReportingUploadAction();
@@ -254,6 +257,10 @@ interface RequestComponent {
   NordnUploadAction nordnUploadAction();
 
   NordnVerifyAction nordnVerifyAction();
+
+  PasswordResetRequestAction passwordResetRequestAction();
+
+  PasswordResetVerifyAction passwordResetVerifyAction();
 
   PublishDnsUpdatesAction publishDnsUpdatesAction();
 
@@ -286,6 +293,8 @@ interface RequestComponent {
   RdapNameserverAction rdapNameserverAction();
 
   RdapNameserverSearchAction rdapNameserverSearchAction();
+
+  RdapRegistrarFieldsAction rdapRegistrarFieldsAction();
 
   RdeReportAction rdeReportAction();
 
@@ -327,6 +336,8 @@ interface RequestComponent {
 
   TmchSmdrlAction tmchSmdrlAction();
 
+  TriggerServiceStateAction triggerServiceStateAction();
+
   UpdateRegistrarRdapBaseUrlsAction updateRegistrarRdapBaseUrlsAction();
 
   UpdateUserGroupAction updateUserGroupAction();
@@ -334,14 +345,6 @@ interface RequestComponent {
   UploadBsaUnavailableDomainsAction uploadBsaUnavailableDomains();
 
   VerifyOteAction verifyOteAction();
-
-  WhoisAction whoisAction();
-
-  WhoisHttpAction whoisHttpAction();
-
-  RdapRegistrarFieldsAction rdapRegistrarFieldsAction();
-
-  WipeOutContactHistoryPiiAction wipeOutContactHistoryPiiAction();
 
   @Subcomponent.Builder
   abstract class Builder implements RequestComponentBuilder<RequestComponent> {

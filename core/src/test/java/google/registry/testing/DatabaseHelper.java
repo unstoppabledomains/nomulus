@@ -24,8 +24,7 @@ import static com.google.common.collect.Iterables.toArray;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static google.registry.config.RegistryConfig.getContactAndHostRoidSuffix;
-import static google.registry.config.RegistryConfig.getContactAutomaticTransferLength;
+import static google.registry.config.RegistryConfig.getHostRoidSuffix;
 import static google.registry.model.EppResourceUtils.createDomainRepoId;
 import static google.registry.model.EppResourceUtils.createRepoId;
 import static google.registry.model.ImmutableObjectSubject.assertAboutImmutableObjects;
@@ -61,7 +60,7 @@ import google.registry.dns.DnsUtils.TargetType;
 import google.registry.dns.writer.VoidDnsWriter;
 import google.registry.model.Buildable;
 import google.registry.model.EppResource;
-import google.registry.model.EppResourceUtils;
+import google.registry.model.ForeignKeyUtils;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingBase;
 import google.registry.model.billing.BillingBase.Flag;
@@ -74,11 +73,6 @@ import google.registry.model.common.DnsRefreshRequest;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactAuthInfo;
-import google.registry.model.contact.ContactHistory;
-import google.registry.model.domain.DesignatedContact;
-import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainBase;
@@ -105,9 +99,7 @@ import google.registry.model.tld.label.PremiumList.PremiumEntry;
 import google.registry.model.tld.label.PremiumListDao;
 import google.registry.model.tld.label.ReservedList;
 import google.registry.model.tld.label.ReservedListDao;
-import google.registry.model.transfer.ContactTransferData;
 import google.registry.model.transfer.DomainTransferData;
-import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.persistence.VKey;
 import java.util.Arrays;
@@ -152,7 +144,7 @@ public final class DatabaseHelper {
   }
 
   public static Host newHost(String hostName) {
-    return newHostWithRoid(hostName, generateNewContactHostRoid());
+    return newHostWithRoid(hostName, generateNewHostRoid());
   }
 
   public static Host newHostWithRoid(String hostName, String repoId) {
@@ -167,11 +159,7 @@ public final class DatabaseHelper {
 
   public static Domain newDomain(String domainName) {
     String repoId = generateNewDomainRoid(getTldFromDomainName(domainName));
-    return newDomain(domainName, repoId, persistActiveContact("contact1234"));
-  }
-
-  public static Domain newDomain(String domainName, Contact contact) {
-    return newDomain(domainName, generateNewDomainRoid(getTldFromDomainName(domainName)), contact);
+    return newDomain(domainName, repoId);
   }
 
   public static Domain newDomain(String domainName, Host... hosts) {
@@ -180,8 +168,7 @@ public final class DatabaseHelper {
     return newDomain(domainName).asBuilder().setNameservers(hostKeys).build();
   }
 
-  public static Domain newDomain(String domainName, String repoId, Contact contact) {
-    VKey<Contact> contactKey = contact.createVKey();
+  public static Domain newDomain(String domainName, String repoId) {
     return new Domain.Builder()
         .setRepoId(repoId)
         .setDomainName(domainName)
@@ -189,31 +176,7 @@ public final class DatabaseHelper {
         .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
         .setCreationTimeForTest(START_OF_TIME)
         .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("2fooBAR")))
-        .setRegistrant(Optional.of(contactKey))
-        .setContacts(
-            ImmutableSet.of(
-                DesignatedContact.create(Type.ADMIN, contactKey),
-                DesignatedContact.create(Type.TECH, contactKey)))
         .setRegistrationExpirationTime(END_OF_TIME)
-        .build();
-  }
-
-  /**
-   * Returns a newly created {@link Contact} for the given contactId (which is the foreign key) with
-   * an auto-generated repoId.
-   */
-  public static Contact newContact(String contactId) {
-    return newContactWithRoid(contactId, generateNewContactHostRoid());
-  }
-
-  public static Contact newContactWithRoid(String contactId, String repoId) {
-    return new Contact.Builder()
-        .setRepoId(repoId)
-        .setContactId(contactId)
-        .setCreationRegistrarId("TheRegistrar")
-        .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
-        .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("2fooBAR")))
-        .setCreationTimeForTest(START_OF_TIME)
         .build();
   }
 
@@ -254,15 +217,6 @@ public final class DatabaseHelper {
         .setPremiumPricingEngine(StaticPremiumListPricingEngine.NAME)
         .setDnsWriters(ImmutableSet.of(VoidDnsWriter.NAME))
         .build();
-  }
-
-  public static Contact persistActiveContact(String contactId) {
-    return persistResource(newContact(contactId));
-  }
-
-  /** Persists a contact resource with the given contact id deleted at the specified time. */
-  public static Contact persistDeletedContact(String contactId, DateTime deletionTime) {
-    return persistResource(newContact(contactId).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static Host persistActiveHost(String hostName) {
@@ -420,8 +374,7 @@ public final class DatabaseHelper {
   public static Tld createTld(String tld, ImmutableSortedMap<DateTime, TldState> tldStates) {
     // Coerce the TLD string into a valid ROID suffix.
     String roidSuffix =
-        Ascii.toUpperCase(tld.replaceFirst(ACE_PREFIX_REGEX, "").replace('.', '_'))
-            .replace('-', '_');
+        Ascii.toUpperCase(tld.replaceFirst(ACE_PREFIX_REGEX, "").replace(".", "")).replace("-", "");
     return createTld(
         tld, roidSuffix.length() > 8 ? roidSuffix.substring(0, 8) : roidSuffix, tldStates);
   }
@@ -462,7 +415,7 @@ public final class DatabaseHelper {
                   .forEach(
                       hostname ->
                           deleteResource(
-                              EppResourceUtils.loadByForeignKey(Host.class, hostname, now).get()));
+                              ForeignKeyUtils.loadResource(Host.class, hostname, now).get()));
               for (HistoryEntry hist : historyEntries) {
                 deleteResource(hist);
               }
@@ -493,24 +446,14 @@ public final class DatabaseHelper {
         .setPendingTransferExpirationTime(expirationTime);
   }
 
-  private static ContactTransferData.Builder createContactTransferDataBuilder(
-      DateTime requestTime, DateTime expirationTime) {
-    return new ContactTransferData.Builder()
-        .setTransferStatus(TransferStatus.PENDING)
-        .setGainingRegistrarId("NewRegistrar")
-        .setTransferRequestTime(requestTime)
-        .setLosingRegistrarId("TheRegistrar")
-        .setPendingTransferExpirationTime(expirationTime);
-  }
-
   public static PollMessage.OneTime createPollMessageForImplicitTransfer(
-      EppResource resource,
+      Domain domain,
       HistoryEntry historyEntry,
       String registrarId,
       DateTime requestTime,
       DateTime expirationTime,
       @Nullable DateTime extendedRegistrationExpirationTime) {
-    TransferData transferData =
+    DomainTransferData transferData =
         createDomainTransferDataBuilder(requestTime, expirationTime)
             .setTransferredRegistrationExpirationTime(extendedRegistrationExpirationTime)
             .build();
@@ -518,7 +461,7 @@ public final class DatabaseHelper {
         .setRegistrarId(registrarId)
         .setEventTime(expirationTime)
         .setMsg("Transfer server approved.")
-        .setResponseData(ImmutableList.of(createTransferResponse(resource, transferData)))
+        .setResponseData(ImmutableList.of(createTransferResponse(domain, transferData)))
         .setHistoryEntry(historyEntry)
         .build();
   }
@@ -537,57 +480,9 @@ public final class DatabaseHelper {
         .build();
   }
 
-  public static Contact persistContactWithPendingTransfer(
-      Contact contact, DateTime requestTime, DateTime expirationTime, DateTime now) {
-    ContactHistory historyEntryContactTransfer =
-        persistResource(
-            new ContactHistory.Builder()
-                .setType(HistoryEntry.Type.CONTACT_TRANSFER_REQUEST)
-                .setContact(persistResource(contact))
-                .setModificationTime(now)
-                .setRegistrarId(contact.getCurrentSponsorRegistrarId())
-                .build());
-    return persistResource(
-        contact
-            .asBuilder()
-            .setPersistedCurrentSponsorRegistrarId("TheRegistrar")
-            .addStatusValue(StatusValue.PENDING_TRANSFER)
-            .setTransferData(
-                createContactTransferDataBuilder(requestTime, expirationTime)
-                    .setPendingTransferExpirationTime(now.plus(getContactAutomaticTransferLength()))
-                    .setServerApproveEntities(
-                        historyEntryContactTransfer.getRepoId(),
-                        historyEntryContactTransfer.getRevisionId(),
-                        ImmutableSet.of(
-                            // Pretend it's 3 days since the request
-                            persistResource(
-                                    createPollMessageForImplicitTransfer(
-                                        contact,
-                                        historyEntryContactTransfer,
-                                        "NewRegistrar",
-                                        requestTime,
-                                        expirationTime,
-                                        null))
-                                .createVKey(),
-                            persistResource(
-                                    createPollMessageForImplicitTransfer(
-                                        contact,
-                                        historyEntryContactTransfer,
-                                        "TheRegistrar",
-                                        requestTime,
-                                        expirationTime,
-                                        null))
-                                .createVKey()))
-                    .setTransferRequestTrid(
-                        Trid.create("transferClient-trid", "transferServer-trid"))
-                    .build())
-            .build());
-  }
-
   public static Domain persistDomainWithDependentResources(
       String label,
       String tld,
-      Contact contact,
       DateTime now,
       DateTime creationTime,
       DateTime expirationTime) {
@@ -601,11 +496,6 @@ public final class DatabaseHelper {
             .setCreationRegistrarId("TheRegistrar")
             .setCreationTimeForTest(creationTime)
             .setRegistrationExpirationTime(expirationTime)
-            .setRegistrant(Optional.of(contact.createVKey()))
-            .setContacts(
-                ImmutableSet.of(
-                    DesignatedContact.create(Type.ADMIN, contact.createVKey()),
-                    DesignatedContact.create(Type.TECH, contact.createVKey())))
             .setAuthInfo(DomainAuthInfo.create(PasswordAuth.create("fooBAR")));
     Duration addGracePeriodLength = Tld.get(tld).getAddGracePeriodLength();
     if (creationTime.plus(addGracePeriodLength).isAfter(now)) {
@@ -762,7 +652,7 @@ public final class DatabaseHelper {
       String registrarName,
       Registrar.Type type,
       @Nullable Long ianaIdentifier) {
-    return persistSimpleResource(
+    return persistResource(
         new Registrar.Builder()
             .setRegistrarId(registrarId)
             .setRegistrarName(registrarName)
@@ -970,9 +860,9 @@ public final class DatabaseHelper {
     return createDomainRepoId(tm().reTransact(tm()::allocateId), tld);
   }
 
-  /** Returns a newly allocated, globally unique contact/host repoId of the format HEX_TLD-ROID. */
-  public static String generateNewContactHostRoid() {
-    return createRepoId(tm().reTransact(tm()::allocateId), getContactAndHostRoidSuffix());
+  /** Returns a newly allocated, globally unique host repoId of the format HEX_TLD-ROID. */
+  public static String generateNewHostRoid() {
+    return createRepoId(tm().reTransact(tm()::allocateId), getHostRoidSuffix());
   }
 
   /** Persists an object in the DB for tests. */
@@ -986,7 +876,13 @@ public final class DatabaseHelper {
   }
 
   /** Persists the specified resources to the DB. */
-  public static <R extends ImmutableObject> void persistResources(final Iterable<R> resources) {
+  public static <R extends ImmutableObject> ImmutableList<R> persistResources(R... resources) {
+    return persistResources(ImmutableList.copyOf(resources));
+  }
+
+  /** Persists the specified resources to the DB. */
+  public static <R extends ImmutableObject> ImmutableList<R> persistResources(
+      final Iterable<R> resources) {
     for (R resource : resources) {
       assertWithMessage("Attempting to persist a Builder is almost certainly an error in test code")
           .that(resource)
@@ -994,6 +890,7 @@ public final class DatabaseHelper {
     }
     tm().transact(() -> resources.forEach(e -> tm().put(e)));
     maybeAdvanceClock();
+    return loadByEntitiesIfPresent(resources);
   }
 
   /**
@@ -1042,6 +939,8 @@ public final class DatabaseHelper {
                                   .setGlobalRole(GlobalRole.FTE)
                                   .setIsAdmin(true)
                                   .build())
+                          .setRegistryLockEmailAddress("registrylock" + emailAddress)
+                          .setRegistryLockPassword("password")
                           .build();
                   tm().put(user);
                   return user;
@@ -1103,11 +1002,7 @@ public final class DatabaseHelper {
   }
 
   private static HistoryEntry.Type getHistoryEntryType(EppResource resource) {
-    if (resource instanceof Contact) {
-      return resource.getRepoId() != null
-          ? HistoryEntry.Type.CONTACT_CREATE
-          : HistoryEntry.Type.CONTACT_UPDATE;
-    } else if (resource instanceof Host) {
+    if (resource instanceof Host) {
       return resource.getRepoId() != null
           ? HistoryEntry.Type.HOST_CREATE
           : HistoryEntry.Type.HOST_UPDATE;
@@ -1145,29 +1040,6 @@ public final class DatabaseHelper {
             .setModificationTime(DateTime.now(DateTimeZone.UTC))
             .setRegistrarId(parentResource.getPersistedCurrentSponsorRegistrarId())
             .build());
-  }
-
-  /** Persists a single resource, without adjusting foreign resources or keys. */
-  public static <R> R persistSimpleResource(final R resource) {
-    return persistSimpleResources(ImmutableList.of(resource)).get(0);
-  }
-
-  /**
-   * Like persistResource but for multiple entities, with no helper for saving
-   * ForeignKeyedEppResources.
-   */
-  public static <R> ImmutableList<R> persistSimpleResources(final Iterable<R> resources) {
-    insertSimpleResources(resources);
-    return tm().transact(() -> tm().loadByEntities(resources));
-  }
-
-  /**
-   * Like {@link #persistSimpleResources(Iterable)} but without reloading/returning the saved
-   * entities.
-   */
-  public static <R> void insertSimpleResources(final Iterable<R> resources) {
-    tm().transact(() -> tm().putAll(ImmutableList.copyOf(resources)));
-    maybeAdvanceClock();
   }
 
   public static void deleteResource(final Object resource) {
@@ -1230,8 +1102,8 @@ public final class DatabaseHelper {
   /**
    * Loads (i.e. reloads) the specified entity from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> T loadByEntity(T entity) {
     return tm().transact(() -> tm().loadByEntity(entity));
@@ -1240,8 +1112,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entity by its key from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> T loadByKey(VKey<T> key) {
     return tm().transact(() -> tm().loadByKey(key));
@@ -1250,8 +1122,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entity by its key from the DB or empty if it doesn't exist.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> Optional<T> loadByKeyIfPresent(VKey<T> key) {
     return tm().transact(() -> tm().loadByKeyIfPresent(key));
@@ -1260,8 +1132,8 @@ public final class DatabaseHelper {
   /**
    * Loads the specified entities by their keys from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> ImmutableCollection<T> loadByKeys(Iterable<? extends VKey<? extends T>> keys) {
     return tm().transact(() -> tm().loadByKeys(keys).values());
@@ -1270,8 +1142,8 @@ public final class DatabaseHelper {
   /**
    * Loads all the entities of the specified type from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    */
   public static <T> ImmutableList<T> loadAllOf(Class<T> clazz) {
     return tm().transact(() -> tm().loadAllOf(clazz));
@@ -1280,8 +1152,8 @@ public final class DatabaseHelper {
   /**
    * Loads the set of entities by their keys from the DB.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    *
    * <p>Nonexistent keys / entities are absent from the resulting map, but no {@link
    * NoSuchElementException} will be thrown.
@@ -1294,8 +1166,8 @@ public final class DatabaseHelper {
   /**
    * Loads all given entities from the database if possible.
    *
-   * <p>If the transaction manager is Cloud SQL, then this creates an inner wrapping transaction for
-   * convenience, so you don't need to wrap it in a transaction at the call site.
+   * <p>This creates an inner wrapping transaction for convenience, so you don't need to wrap it in
+   * a transaction at the call site.
    *
    * <p>Nonexistent entities are absent from the resulting list, but no {@link
    * NoSuchElementException} will be thrown.
@@ -1312,36 +1184,6 @@ public final class DatabaseHelper {
   /** Returns whether or not the given entity exists in Cloud SQL. */
   public static boolean existsInDb(ImmutableObject object) {
     return tm().transact(() -> tm().exists(object));
-  }
-
-  /** Inserts the given entity/entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void insertInDb(T... entities) {
-    tm().transact(() -> tm().insertAll(entities));
-  }
-
-  /** Inserts the given entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void insertInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().insertAll(entities));
-  }
-
-  /** Puts the given entity/entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void putInDb(T... entities) {
-    tm().transact(() -> tm().putAll(entities));
-  }
-
-  /** Puts the given entities into Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void putInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().putAll(entities));
-  }
-
-  /** Updates the given entities in Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void updateInDb(T... entities) {
-    tm().transact(() -> tm().updateAll(entities));
-  }
-
-  /** Updates the given entities in Cloud SQL in a single transaction. */
-  public static <T extends ImmutableObject> void updateInDb(ImmutableCollection<T> entities) {
-    tm().transact(() -> tm().updateAll(entities));
   }
 
   /**

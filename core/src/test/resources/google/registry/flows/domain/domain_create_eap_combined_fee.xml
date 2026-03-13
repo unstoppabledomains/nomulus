@@ -4,16 +4,13 @@
       <domain:create xmlns:domain="urn:ietf:params:xml:ns:domain-1.0">
         <domain:name>example.tld</domain:name>
         <domain:period unit="y">2</domain:period>
-        <domain:registrant>jd1234</domain:registrant>
-        <domain:contact type="admin">sh8013</domain:contact>
-        <domain:contact type="tech">sh8013</domain:contact>
         <domain:authInfo>
           <domain:pw>2fooBAR</domain:pw>
         </domain:authInfo>
       </domain:create>
     </create>
     <extension>
-      <fee:create xmlns:fee="urn:ietf:params:xml:ns:fee-0.6">
+      <fee:create xmlns:fee="urn:ietf:params:xml:ns:%FEE_VERSION%">
         <fee:currency>USD</fee:currency>
         <fee:fee>126.00</fee:fee>
       </fee:create>

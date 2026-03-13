@@ -18,7 +18,6 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static google.registry.dns.DnsUtils.requestDomainDnsRefresh;
 import static google.registry.flows.FlowUtils.persistEntityChanges;
 import static google.registry.flows.FlowUtils.validateRegistrarIsLoggedIn;
-import static google.registry.flows.ResourceFlowUtils.verifyResourceDoesNotExist;
 import static google.registry.flows.domain.DomainFlowUtils.COLLISION_MESSAGE;
 import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToTld;
 import static google.registry.flows.domain.DomainFlowUtils.checkHasBillingAccount;
@@ -72,7 +71,9 @@ import google.registry.flows.custom.DomainCreateFlowCustomLogic;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic.BeforeResponseParameters;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic.BeforeResponseReturnData;
 import google.registry.flows.custom.EntityChanges;
+import google.registry.flows.domain.DomainFlowUtils.RegistrantProhibitedException;
 import google.registry.flows.domain.token.AllocationTokenFlowUtils;
+import google.registry.flows.exceptions.ContactsProhibitedException;
 import google.registry.flows.exceptions.ResourceAlreadyExistsForThisClientException;
 import google.registry.flows.exceptions.ResourceCreateContentionException;
 import google.registry.model.ImmutableObject;
@@ -147,6 +148,7 @@ import org.joda.time.Duration;
  * @error {@link DomainCreateFlow.NoGeneralRegistrationsInCurrentPhaseException}
  * @error {@link DomainCreateFlow.NoTrademarkedRegistrationsBeforeSunriseException}
  * @error {@link BulkDomainRegisteredForTooManyYearsException}
+ * @error {@link ContactsProhibitedException}
  * @error {@link DomainCreateFlow.SignedMarksOnlyDuringSunriseException}
  * @error {@link DomainFlowTmchUtils.NoMarksFoundMatchingDomainException}
  * @error {@link DomainFlowTmchUtils.FoundMarkNotYetValidException}
@@ -165,7 +167,6 @@ import org.joda.time.Duration;
  * @error {@link DomainFlowUtils.DomainLabelBlockedByBsaException}
  * @error {@link DomainFlowUtils.DomainLabelTooLongException}
  * @error {@link DomainFlowUtils.DomainReservedException}
- * @error {@link DomainFlowUtils.DuplicateContactForRoleException}
  * @error {@link DomainFlowUtils.EmptyDomainNamePartException}
  * @error {@link DomainFlowUtils.ExceedsMaxRegistrationYearsException}
  * @error {@link DomainFlowUtils.ExpiredClaimException}
@@ -184,16 +185,12 @@ import org.joda.time.Duration;
  * @error {@link DomainFlowUtils.LinkedResourceInPendingDeleteProhibitsOperationException}
  * @error {@link DomainFlowUtils.MalformedTcnIdException}
  * @error {@link DomainFlowUtils.MaxSigLifeNotSupportedException}
- * @error {@link DomainFlowUtils.MissingAdminContactException}
  * @error {@link DomainFlowUtils.MissingBillingAccountMapException}
  * @error {@link DomainFlowUtils.MissingClaimsNoticeException}
- * @error {@link DomainFlowUtils.MissingContactTypeException}
- * @error {@link DomainFlowUtils.MissingRegistrantException}
- * @error {@link DomainFlowUtils.MissingTechnicalContactException}
  * @error {@link DomainFlowUtils.NameserversNotAllowedForTldException}
  * @error {@link DomainFlowUtils.NameserversNotSpecifiedForTldWithNameserverAllowListException}
  * @error {@link DomainFlowUtils.PremiumNameBlockedException}
- * @error {@link DomainFlowUtils.RegistrantNotAllowedException}
+ * @error {@link RegistrantProhibitedException}
  * @error {@link DomainFlowUtils.RegistrarMustBeActiveForThisOperationException}
  * @error {@link DomainFlowUtils.TldDoesNotExistException}
  * @error {@link DomainFlowUtils.TooManyDsRecordsException}
@@ -220,8 +217,10 @@ public final class DomainCreateFlow implements MutatingFlow {
   @Inject DomainCreateFlowCustomLogic flowCustomLogic;
   @Inject DomainFlowTmchUtils tmchUtils;
   @Inject DomainPricingLogic pricingLogic;
+  @Inject DomainDeletionTimeCache domainDeletionTimeCache;
 
-  @Inject DomainCreateFlow() {}
+  @Inject
+  DomainCreateFlow() {}
 
   @Override
   public EppResponse run() throws EppException {
@@ -235,16 +234,16 @@ public final class DomainCreateFlow implements MutatingFlow {
     validateRegistrarIsLoggedIn(registrarId);
     verifyRegistrarIsActive(registrarId);
     extensionManager.validate();
+    verifyDomainDoesNotExist();
     DateTime now = tm().getTransactionTime();
     DomainCommand.Create command = cloneAndLinkReferences((Create) resourceCommand, now);
     Period period = command.getPeriod();
     verifyUnitIsYears(period);
     int years = period.getValue();
     validateRegistrationPeriod(years);
-    verifyResourceDoesNotExist(Domain.class, targetId, now, registrarId);
     // Validate that this is actually a legal domain name on a TLD that the registrar has access to.
     InternetDomainName domainName = validateDomainName(command.getDomainName());
-    String domainLabel = domainName.parts().get(0);
+    String domainLabel = domainName.parts().getFirst();
     Tld tld = Tld.get(domainName.parent().toString());
     validateCreateCommandContactsAndNameservers(command, tld, domainName);
     TldState tldState = tld.getTldState(now);
@@ -280,7 +279,7 @@ public final class DomainCreateFlow implements MutatingFlow {
       checkAllowedAccessToTld(registrarId, tld.getTldStr());
       checkHasBillingAccount(registrarId, tld.getTldStr());
       boolean isValidReservedCreate = isValidReservedCreate(domainName, allocationToken);
-      ClaimsList claimsList = ClaimsListDao.get();
+      ClaimsList claimsList = ClaimsListDao.get(tld.getTldStr());
       verifyIsGaOrSpecialCase(
           tld,
           claimsList,
@@ -312,7 +311,8 @@ public final class DomainCreateFlow implements MutatingFlow {
       // at this point so that we can verify it before the "after validation" extension point.
       signedMarkId =
           tmchUtils
-              .verifySignedMarks(launchCreate.get().getSignedMarks(), domainLabel, now)
+              .verifySignedMarks(
+                  tld.getTldStr(), launchCreate.get().getSignedMarks(), domainLabel, now)
               .getId();
     }
     verifyNotBlockedByBsa(domainName, tld, now, allocationToken);
@@ -353,11 +353,11 @@ public final class DomainCreateFlow implements MutatingFlow {
             domainHistoryId, registrationExpirationTime, isAnchorTenant, allocationToken);
     PollMessage.Autorenew autorenewPollMessage =
         createAutorenewPollMessage(domainHistoryId, registrationExpirationTime);
-    ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
-    entitiesToSave.add(createBillingEvent, autorenewBillingEvent, autorenewPollMessage);
+    ImmutableSet.Builder<ImmutableObject> entitiesToInsert = new ImmutableSet.Builder<>();
+    entitiesToInsert.add(createBillingEvent, autorenewBillingEvent, autorenewPollMessage);
     // Bill for EAP cost, if any.
     if (!feesAndCredits.getEapCost().isZero()) {
-      entitiesToSave.add(createEapBillingEvent(feesAndCredits, createBillingEvent));
+      entitiesToInsert.add(createEapBillingEvent(feesAndCredits, createBillingEvent));
     }
 
     ImmutableSet<ReservationType> reservationTypes = getReservationTypes(domainName);
@@ -377,12 +377,10 @@ public final class DomainCreateFlow implements MutatingFlow {
             .setLaunchNotice(hasClaimsNotice ? launchCreate.get().getNotice() : null)
             .setSmdId(signedMarkId)
             .setDsData(secDnsCreate.map(SecDnsCreateExtension::getDsData).orElse(null))
-            .setRegistrant(command.getRegistrant())
             .setAuthInfo(command.getAuthInfo())
             .setDomainName(targetId)
             .setNameservers(command.getNameservers().stream().collect(toImmutableSet()))
             .setStatusValues(statuses)
-            .setContacts(command.getContacts())
             .addGracePeriod(
                 GracePeriod.forBillingEvent(GracePeriodStatus.ADD, repoId, createBillingEvent))
             .setLordnPhase(
@@ -400,12 +398,13 @@ public final class DomainCreateFlow implements MutatingFlow {
     DomainHistory domainHistory =
         buildDomainHistory(domain, tld, now, period, tld.getAddGracePeriodLength());
     if (reservationTypes.contains(NAME_COLLISION)) {
-      entitiesToSave.add(
+      entitiesToInsert.add(
           createNameCollisionOneTimePollMessage(targetId, domainHistory, registrarId, now));
     }
-    entitiesToSave.add(domain, domainHistory);
+    entitiesToInsert.add(domain, domainHistory);
+    ImmutableSet.Builder<ImmutableObject> entitiesToUpdate = new ImmutableSet.Builder<>();
     if (allocationToken.isPresent() && allocationToken.get().getTokenType().isOneTimeUse()) {
-      entitiesToSave.add(
+      entitiesToUpdate.add(
           AllocationTokenFlowUtils.redeemToken(
               allocationToken.get(), domainHistory.getHistoryEntryId()));
     }
@@ -418,7 +417,10 @@ public final class DomainCreateFlow implements MutatingFlow {
                 .setNewDomain(domain)
                 .setHistoryEntry(domainHistory)
                 .setEntityChanges(
-                    EntityChanges.newBuilder().setSaves(entitiesToSave.build()).build())
+                    EntityChanges.newBuilder()
+                        .setInserts(entitiesToInsert.build())
+                        .setUpdates(entitiesToUpdate.build())
+                        .build())
                 .setYears(years)
                 .build());
     persistEntityChanges(entityChanges);
@@ -643,6 +645,15 @@ public final class DomainCreateFlow implements MutatingFlow {
         .setMsg("Domain was auto-renewed.")
         .setDomainHistoryId(domainHistoryId)
         .build();
+  }
+
+  private void verifyDomainDoesNotExist() throws ResourceCreateContentionException {
+    Optional<DateTime> previousDeletionTime =
+        domainDeletionTimeCache.getDeletionTimeForDomain(targetId);
+    if (previousDeletionTime.isPresent()
+        && !tm().getTransactionTime().isAfter(previousDeletionTime.get())) {
+      throw new ResourceCreateContentionException(targetId);
+    }
   }
 
   private static BillingEvent createEapBillingEvent(

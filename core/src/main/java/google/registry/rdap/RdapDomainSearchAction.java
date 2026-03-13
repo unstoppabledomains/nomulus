@@ -15,7 +15,6 @@
 package google.registry.rdap;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static google.registry.model.EppResourceUtils.loadByForeignKeyCached;
 import static google.registry.persistence.transaction.TransactionManagerFactory.replicaTm;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.HEAD;
@@ -43,7 +42,6 @@ import google.registry.rdap.RdapMetrics.WildcardType;
 import google.registry.rdap.RdapSearchResults.DomainSearchResponse;
 import google.registry.rdap.RdapSearchResults.IncompletenessWarningType;
 import google.registry.request.Action;
-import google.registry.request.Action.GaeService;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.request.HttpException.UnprocessableEntityException;
@@ -51,6 +49,7 @@ import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.util.NonFinalForTesting;
 import jakarta.inject.Inject;
+import jakarta.persistence.Query;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import java.net.InetAddress;
 import java.util.Comparator;
@@ -58,21 +57,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.hibernate.Hibernate;
+import org.joda.time.DateTime;
 
 /**
- * RDAP (new WHOIS) action for domain search requests.
+ * RDAP action for domain search requests.
  *
- * <p>All commands and responses conform to the RDAP spec as defined in RFCs 7480 through 7485.
+ * <p>All commands and responses conform to the RDAP spec as defined in STD 95 and its RFCs.
  *
  * @see <a href="http://tools.ietf.org/html/rfc9082">RFC 9082: Registration Data Access Protocol
  *     (RDAP) Query Format</a>
  * @see <a href="http://tools.ietf.org/html/rfc9083">RFC 9083: JSON Responses for the Registration
  *     Data Access Protocol (RDAP)</a>
  */
-// TODO: This isn't required by the RDAP Technical Implementation Guide, and hence should be
-// deleted, at least until it's actually required.
 @Action(
-    service = GaeService.PUBAPI,
+    service = Action.Service.PUBAPI,
     path = "/rdap/domains",
     method = {GET, HEAD},
     auth = Auth.AUTH_PUBLIC)
@@ -184,7 +182,7 @@ public class RdapDomainSearchAction extends RdapSearchActionBase {
   private DomainSearchResponse searchByDomainNameWithoutWildcard(
       final RdapSearchPattern partialStringQuery) {
     Optional<Domain> domain =
-        loadByForeignKeyCached(
+        ForeignKeyUtils.loadResourceByCache(
             Domain.class, partialStringQuery.getInitialString(), getRequestTime());
     return makeSearchResults(
         shouldBeVisible(domain) ? ImmutableList.of(domain.get()) : ImmutableList.of());
@@ -334,40 +332,35 @@ public class RdapDomainSearchAction extends RdapSearchActionBase {
   /** Assembles a list of {@link Host} keys by name when the pattern has no wildcard. */
   private ImmutableList<VKey<Host>> getNameserverRefsByLdhNameWithoutWildcard(
       final RdapSearchPattern partialStringQuery) {
+    DateTime timeToQuery = shouldIncludeDeleted() ? START_OF_TIME : getRequestTime();
     // If we need to check the sponsoring registrar, we need to load the resource rather than just
     // the key.
     Optional<String> desiredRegistrar = getDesiredRegistrar();
+    String queryString = partialStringQuery.getInitialString();
     if (desiredRegistrar.isPresent()) {
       Optional<Host> host =
-          loadByForeignKeyCached(
-              Host.class,
-              partialStringQuery.getInitialString(),
-              shouldIncludeDeleted() ? START_OF_TIME : getRequestTime());
+          ForeignKeyUtils.loadResourceByCache(Host.class, queryString, timeToQuery);
       return (host.isEmpty()
               || !desiredRegistrar.get().equals(host.get().getPersistedCurrentSponsorRegistrarId()))
           ? ImmutableList.of()
           : ImmutableList.of(host.get().createVKey());
     } else {
-      VKey<Host> hostKey =
-          ForeignKeyUtils.load(
-              Host.class,
-              partialStringQuery.getInitialString(),
-              shouldIncludeDeleted() ? START_OF_TIME : getRequestTime());
-      return (hostKey == null) ? ImmutableList.of() : ImmutableList.of(hostKey);
+      Optional<VKey<Host>> hostKey =
+          ForeignKeyUtils.loadKeyByCache(Host.class, queryString, timeToQuery);
+      return hostKey.map(ImmutableList::of).orElseGet(ImmutableList::of);
     }
   }
 
   /** Assembles a list of {@link Host} keys by name using a superordinate domain suffix. */
   private ImmutableList<VKey<Host>> getNameserverRefsByLdhNameWithSuffix(
-      final RdapSearchPattern partialStringQuery) {
+      RdapSearchPattern partialStringQuery) {
+    DateTime timeToQuery = shouldIncludeDeleted() ? START_OF_TIME : getRequestTime();
     // The suffix must be a domain that we manage. That way, we can look up the domain and search
     // through the subordinate hosts. This is more efficient, and lets us permit wildcard searches
     // with no initial string.
     Domain domain =
-        loadByForeignKeyCached(
-                Domain.class,
-                partialStringQuery.getSuffix(),
-                shouldIncludeDeleted() ? START_OF_TIME : getRequestTime())
+        ForeignKeyUtils.loadResourceByCache(
+                Domain.class, partialStringQuery.getSuffix(), timeToQuery)
             .orElseThrow(
                 () ->
                     new UnprocessableEntityException(
@@ -380,9 +373,7 @@ public class RdapDomainSearchAction extends RdapSearchActionBase {
       // then the query ns.exam*.example.com would match against nameserver ns.example.com.
       if (partialStringQuery.matches(fqhn)) {
         if (desiredRegistrar.isPresent()) {
-          Optional<Host> host =
-              loadByForeignKeyCached(
-                  Host.class, fqhn, shouldIncludeDeleted() ? START_OF_TIME : getRequestTime());
+          Optional<Host> host = ForeignKeyUtils.loadResourceByCache(Host.class, fqhn, timeToQuery);
           if (host.isPresent()
               && desiredRegistrar
                   .get()
@@ -390,14 +381,10 @@ public class RdapDomainSearchAction extends RdapSearchActionBase {
             builder.add(host.get().createVKey());
           }
         } else {
-          VKey<Host> hostKey =
-              ForeignKeyUtils.load(
-                  Host.class, fqhn, shouldIncludeDeleted() ? START_OF_TIME : getRequestTime());
-          if (hostKey != null) {
-            builder.add(hostKey);
-          } else {
-            logger.atWarning().log("Host key unexpectedly null.");
-          }
+          Optional<VKey<Host>> hostKey =
+              ForeignKeyUtils.loadKeyByCache(Host.class, fqhn, timeToQuery);
+          hostKey.ifPresentOrElse(
+              builder::add, () -> logger.atWarning().log("Host key unexpectedly null."));
         }
       }
     }
@@ -442,7 +429,7 @@ public class RdapDomainSearchAction extends RdapSearchActionBase {
         replicaTm()
             .transact(
                 () -> {
-                  jakarta.persistence.Query query =
+                  Query query =
                       replicaTm()
                           .getEntityManager()
                           .createNativeQuery(queryBuilder.toString())

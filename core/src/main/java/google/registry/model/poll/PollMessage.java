@@ -26,22 +26,18 @@ import google.registry.model.ImmutableObject;
 import google.registry.model.UnsafeSerializable;
 import google.registry.model.annotations.ExternalMessagingName;
 import google.registry.model.annotations.IdAllocation;
-import google.registry.model.contact.Contact;
-import google.registry.model.contact.ContactHistory;
 import google.registry.model.domain.Domain;
 import google.registry.model.domain.DomainHistory;
 import google.registry.model.domain.DomainRenewData;
 import google.registry.model.eppoutput.EppResponse.ResponseData;
 import google.registry.model.host.Host;
 import google.registry.model.host.HostHistory;
-import google.registry.model.poll.PendingActionNotificationResponse.ContactPendingActionNotificationResponse;
 import google.registry.model.poll.PendingActionNotificationResponse.DomainPendingActionNotificationResponse;
 import google.registry.model.poll.PendingActionNotificationResponse.HostPendingActionNotificationResponse;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.reporting.HistoryEntry.HistoryEntryId;
-import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
+import google.registry.model.transfer.DomainTransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferResponse;
-import google.registry.model.transfer.TransferResponse.ContactTransferResponse;
 import google.registry.model.transfer.TransferResponse.DomainTransferResponse;
 import google.registry.persistence.VKey;
 import google.registry.persistence.WithVKey;
@@ -99,7 +95,7 @@ public abstract class PollMessage extends ImmutableObject
   /** Indicates the type of entity the poll message is for. */
   public enum Type {
     DOMAIN(1L, Domain.class),
-    CONTACT(2L, Contact.class),
+    // Contacts would be 2L but have since been removed. Host is kept at 3 for consistency.
     HOST(3L, Host.class);
 
     private final long id;
@@ -181,16 +177,6 @@ public abstract class PollMessage extends ImmutableObject
   }
 
   /**
-   * Returns the contact repo id.
-   *
-   * <p>This may only be used on a {@link Contact} poll event.
-   */
-  public String getContactRepoId() {
-    checkArgument(getType() == Type.CONTACT);
-    return contactRepoId;
-  }
-
-  /**
    * Returns the host repo id.
    *
    * <p>This may only be used on a Host poll event.
@@ -216,7 +202,7 @@ public abstract class PollMessage extends ImmutableObject
   }
 
   public Type getType() {
-    return domainRepoId != null ? Type.DOMAIN : contactRepoId != null ? Type.CONTACT : Type.HOST;
+    return domainRepoId != null ? Type.DOMAIN : Type.HOST;
   }
 
   @Override
@@ -272,12 +258,6 @@ public abstract class PollMessage extends ImmutableObject
       return thisCastToDerived();
     }
 
-    public B setContactHistoryId(HistoryEntryId historyId) {
-      getInstance().contactRepoId = historyId.getRepoId();
-      getInstance().contactHistoryRevisionId = historyId.getRevisionId();
-      return thisCastToDerived();
-    }
-
     public B setHostHistoryId(HistoryEntryId historyId) {
       getInstance().hostRepoId = historyId.getRepoId();
       getInstance().hostHistoryRevisionId = historyId.getRevisionId();
@@ -289,9 +269,6 @@ public abstract class PollMessage extends ImmutableObject
       // Set the appropriate field based on the history entry type.
       if (history instanceof DomainHistory) {
         return setDomainHistoryId(historyId);
-      }
-      if (history instanceof ContactHistory) {
-        return setContactHistoryId(historyId);
       }
       if (history instanceof HostHistory) {
         return setHostHistoryId(historyId);
@@ -427,12 +404,8 @@ public abstract class PollMessage extends ImmutableObject
       if (pendingActionNotificationResponse != null) {
         // Promote the pending action notification response to its specialized type.
         if (contactId != null) {
-          pendingActionNotificationResponse =
-              ContactPendingActionNotificationResponse.create(
-                  pendingActionNotificationResponse.nameOrId.value,
-                  pendingActionNotificationResponse.getActionResult(),
-                  pendingActionNotificationResponse.getTrid(),
-                  pendingActionNotificationResponse.processedDate);
+          // Contacts are no longer supported
+          pendingActionNotificationResponse = null;
         } else if (domainName != null) {
           pendingActionNotificationResponse =
               DomainPendingActionNotificationResponse.create(
@@ -453,16 +426,8 @@ public abstract class PollMessage extends ImmutableObject
         // The transferResponse is currently an unspecialized TransferResponse instance, create the
         // appropriate subclass so that the value is consistently specialized
         if (contactId != null) {
-          transferResponse =
-              new ContactTransferResponse.Builder()
-                  .setContactId(contactId)
-                  .setGainingRegistrarId(transferResponse.getGainingRegistrarId())
-                  .setLosingRegistrarId(transferResponse.getLosingRegistrarId())
-                  .setTransferStatus(transferResponse.getTransferStatus())
-                  .setTransferRequestTime(transferResponse.getTransferRequestTime())
-                  .setPendingTransferExpirationTime(
-                      transferResponse.getPendingTransferExpirationTime())
-                  .build();
+          // Contacts are no longer supported
+          transferResponse = null;
         } else if (domainName != null) {
           transferResponse =
               new DomainTransferResponse.Builder()
@@ -509,9 +474,6 @@ public abstract class PollMessage extends ImmutableObject
 
         // Set identifier fields based on the type of the notification response.
         if (instance.pendingActionNotificationResponse
-            instanceof ContactPendingActionNotificationResponse) {
-          instance.contactId = instance.pendingActionNotificationResponse.nameOrId.value;
-        } else if (instance.pendingActionNotificationResponse
             instanceof DomainPendingActionNotificationResponse) {
           instance.domainName = instance.pendingActionNotificationResponse.nameOrId.value;
         } else if (instance.pendingActionNotificationResponse
@@ -528,9 +490,7 @@ public abstract class PollMessage extends ImmutableObject
                 .orElse(null);
 
         // Set the identifier according to the TransferResponse type.
-        if (instance.transferResponse instanceof ContactTransferResponse) {
-          instance.contactId = ((ContactTransferResponse) instance.transferResponse).getContactId();
-        } else if (instance.transferResponse instanceof DomainTransferResponse response) {
+        if (instance.transferResponse instanceof DomainTransferResponse response) {
           instance.domainName = response.getDomainName();
           instance.extendedRegistrationExpirationTime =
               response.getExtendedRegistrationExpirationTime();

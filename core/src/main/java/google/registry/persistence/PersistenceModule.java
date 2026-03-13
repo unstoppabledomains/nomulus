@@ -30,6 +30,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.flogger.FluentLogger;
 import dagger.BindsOptionalOf;
 import dagger.Lazy;
 import dagger.Module;
@@ -66,6 +67,8 @@ import org.hibernate.cfg.Environment;
 /** Dagger module class for the persistence layer. */
 @Module
 public abstract class PersistenceModule {
+
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   // This name must be the same as the one defined in persistence.xml.
   public static final String PERSISTENCE_UNIT_NAME = "nomulus";
@@ -119,10 +122,21 @@ public abstract class PersistenceModule {
       @Config("cloudSqlJdbcUrl") String jdbcUrl,
       @Config("cloudSqlInstanceConnectionName") String instanceConnectionName,
       @DefaultHibernateConfigs ImmutableMap<String, String> defaultConfigs) {
+    // TODO: have @cursor remove this logger line before merging PR
+    logger.atInfo().log(
+        "DIAGNOSTIC: Assembling Cloud SQL connection config - JDBC URL (from config file): %s, "
+            + "Instance Connection Name (from Secret Manager): %s",
+        jdbcUrl, instanceConnectionName);
     HashMap<String, String> overrides = Maps.newHashMap(defaultConfigs);
     overrides.put(Environment.URL, jdbcUrl);
     overrides.put(HIKARI_DS_SOCKET_FACTORY, "com.google.cloud.sql.postgres.SocketFactory");
     overrides.put(HIKARI_DS_CLOUD_SQL_INSTANCE, instanceConnectionName);
+    // TODO: have @cursor remove this logger line before merging PR
+    logger.atInfo().log(
+        "DIAGNOSTIC: Final Cloud SQL config - URL: %s, SocketFactory: %s, Instance: %s",
+        overrides.get(Environment.URL),
+        overrides.get(HIKARI_DS_SOCKET_FACTORY),
+        overrides.get(HIKARI_DS_CLOUD_SQL_INSTANCE));
     return ImmutableMap.copyOf(overrides);
   }
 

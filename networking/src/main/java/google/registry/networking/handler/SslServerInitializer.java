@@ -54,8 +54,8 @@ import javax.net.ssl.SSLSession;
  * <p>The ssl handler added can require client authentication, but it uses an {@link
  * InsecureTrustManagerFactory}, which accepts any ssl certificate presented by the client, as long
  * as the client uses the corresponding private key to establish SSL handshake. The client
- * certificate hash will be passed along to GAE as an HTTP header for verification (not handled by
- * this handler).
+ * certificate hash will be passed along to the service as an HTTP header for verification (not
+ * handled by this handler).
  */
 @Sharable
 public class SslServerInitializer<C extends Channel> extends ChannelInitializer<C> {
@@ -139,6 +139,8 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
 
     logger.atInfo().log("Available Cipher Suites: %s", sslContext.cipherSuites());
     SslHandler sslHandler = sslContext.newHandler(channel.alloc());
+    sslHandler.setHandshakeTimeoutMillis(20000);
+
     if (requireClientCert) {
       Promise<X509Certificate> clientCertificatePromise = channel.eventLoop().newPromise();
       Future<Channel> unusedFuture =
@@ -159,15 +161,15 @@ public class SslServerInitializer<C extends Channel> extends ChannelInitializer<
                       }
                       logger.atInfo().log(
                           """
-                              --SSL Information--
-                              Client Certificate Hash: %s
-                              SSL Protocol: %s
-                              Cipher Suite: %s
-                              Not Before: %s
-                              Not After: %s
-                              Client Certificate Type: %s
-                              Client Certificate Length: %s
-                              """,
+                          --SSL Information--
+                          Client Certificate Hash: %s
+                          SSL Protocol: %s
+                          Cipher Suite: %s
+                          Not Before: %s
+                          Not After: %s
+                          Client Certificate Type: %s
+                          Client Certificate Length: %s
+                          """,
                           getCertificateHash(clientCertificate),
                           sslSession.getProtocol(),
                           sslSession.getCipherSuite(),

@@ -1,0 +1,26 @@
+graph TD
+    GATEWAY_IP["GCP Static IP Address<br/>(Global)<br/>Name: nomulus-ipv4-address<br/>Type: EXTERNAL, IPv4, Global"]
+    
+    GATEWAY_FR["GCP Global Forwarding Rule<br/>Type: HTTP(S) Load Balancer<br/>Ports: 80, 443<br/>Created by: GKE Gateway Controller"]
+    
+    GATEWAY_URLMAP["GCP URL Map<br/>Created by: GKE Gateway Controller<br/><br/>Routes:<br/>- frontend.BASE_DOMAIN/_dr/epp<br/>- backend.BASE_DOMAIN/_dr/{task,cron,admin,<br/>  epptool,loadtest,mosapi}<br/>- console.BASE_DOMAIN/{console-api,console}<br/>- pubapi.BASE_DOMAIN/{check,rdap}"]
+    
+    BS_FRONTEND["GCP Backend Service<br/>(Service: frontend)"]
+    
+    BS_BACKEND["GCP Backend Service<br/>(Service: backend)"]
+    
+    BS_CONSOLE["GCP Backend Service<br/>(Service: console)"]
+    
+    BS_PUBAPI["GCP Backend Service<br/>(Service: pubapi)"]
+    
+    GATEWAY_IP --> GATEWAY_FR
+    GATEWAY_FR --> GATEWAY_URLMAP
+    GATEWAY_URLMAP --> BS_FRONTEND
+    GATEWAY_URLMAP --> BS_BACKEND
+    GATEWAY_URLMAP --> BS_CONSOLE
+    GATEWAY_URLMAP --> BS_PUBAPI
+    
+    %% Color scheme 4: Unstoppable Domains inspired gradient - GCP resources
+    classDef gcp fill:#4A7FFF,stroke:#37B2E3,stroke-width:2px,color:#ffffff
+    
+    class GATEWAY_IP,GATEWAY_FR,GATEWAY_URLMAP,BS_FRONTEND,BS_BACKEND,BS_CONSOLE,BS_PUBAPI gcp

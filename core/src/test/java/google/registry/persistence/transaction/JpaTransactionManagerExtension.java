@@ -17,7 +17,7 @@ package google.registry.persistence.transaction;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static google.registry.testing.DatabaseHelper.insertSimpleResources;
+import static google.registry.testing.DatabaseHelper.persistResources;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
@@ -379,6 +379,7 @@ public abstract class JpaTransactionManagerExtension
         .setPassword("foo-BAR2")
         .setPhoneNumber("+1.3334445555")
         .setPhonePasscode("12345")
+        .setRdapBaseUrls(ImmutableSet.of("https://rdap.newregistrar.com/"))
         .setRegistryLockAllowed(false)
         .build();
   }
@@ -393,6 +394,7 @@ public abstract class JpaTransactionManagerExtension
         .setPassword("password2")
         .setPhoneNumber("+1.2223334444")
         .setPhonePasscode("22222")
+        .setRdapBaseUrls(ImmutableSet.of("https://rdap.theregistrar.com/"))
         .setRegistryLockAllowed(true)
         .build();
   }
@@ -405,8 +407,8 @@ public abstract class JpaTransactionManagerExtension
     return new RegistrarPoc.Builder()
         .setRegistrar(makeRegistrar1())
         .setName("Jane Doe")
-        .setVisibleInWhoisAsAdmin(true)
-        .setVisibleInWhoisAsTech(false)
+        .setVisibleInRdapAsAdmin(true)
+        .setVisibleInRdapAsTech(false)
         .setEmailAddress("janedoe@theregistrar.com")
         .setPhoneNumber("+1.1234567890")
         .setTypes(ImmutableSet.of(RegistrarPoc.Type.ADMIN))
@@ -432,17 +434,14 @@ public abstract class JpaTransactionManagerExtension
         .setRegistrar(makeRegistrar2())
         .setName("Marla Singer")
         .setEmailAddress("Marla.Singer@crr.com")
-        .setRegistryLockEmailAddress("Marla.Singer.RegistryLock@crr.com")
         .setPhoneNumber("+1.2128675309")
         .setTypes(ImmutableSet.of(RegistrarPoc.Type.TECH))
-        .setAllowedToSetRegistryLockPassword(true)
-        .setRegistryLockPassword("hi")
         .build();
   }
 
   /** Create some fake registrars. */
   public static void loadInitialData() {
-    insertSimpleResources(
+    persistResources(
         ImmutableList.of(
             makeRegistrar1(),
             makeRegistrarContact1(),

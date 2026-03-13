@@ -20,7 +20,9 @@ import static google.registry.util.DateTimeUtils.isBeforeOrAt;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.FluentLogger;
 import google.registry.model.ImmutableObject;
+import google.registry.tmch.RstTmchUtils;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -47,6 +49,8 @@ import org.joda.time.DateTime;
 @Entity
 public class SignedMarkRevocationList extends ImmutableObject {
 
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   Long revisionId;
@@ -71,6 +75,20 @@ public class SignedMarkRevocationList extends ImmutableObject {
     return CACHE.get();
   }
 
+  // TODO(b/412715713): remove the tld parameter when RST completes.
+  public static SignedMarkRevocationList get(String tld) {
+    logger.atInfo().log("SignedMarkRevocationList.get() called for TLD '%s'", tld);
+    var rstSmdrList = RstTmchUtils.getSmdrList(tld);
+    if (rstSmdrList.isPresent()) {
+      logger.atInfo().log(
+          "Using RST SMDRL for TLD '%s': size=%d, creationTime=%s",
+          tld, rstSmdrList.get().size(), rstSmdrList.get().getCreationTime());
+      return rstSmdrList.get();
+    }
+    logger.atInfo().log("RST SMDRL not found for TLD '%s', using database SMDRL", tld);
+    return SignedMarkRevocationList.get();
+  }
+
   /** Create a new {@link SignedMarkRevocationList} without saving it. */
   public static SignedMarkRevocationList create(
       DateTime creationTime, ImmutableMap<String, DateTime> revokes) {
@@ -83,7 +101,15 @@ public class SignedMarkRevocationList extends ImmutableObject {
   /** Returns {@code true} if the SMD ID has been revoked at the given point in time. */
   public boolean isSmdRevoked(String smdId, DateTime now) {
     DateTime revoked = revokes.get(checkNotNull(smdId, "smdId"));
-    return revoked != null && isBeforeOrAt(revoked, now);
+    boolean isRevoked = revoked != null && isBeforeOrAt(revoked, now);
+    logger.atInfo().log(
+        "isSmdRevoked: smdId='%s', now=%s, revokedAt=%s, isRevoked=%s, listSize=%d, listCreationTime=%s",
+        smdId, now, revoked, isRevoked, revokes.size(), creationTime);
+    if (isRevoked) {
+      logger.atWarning().log(
+          "SMD '%s' IS REVOKED: revocationTime=%s, checkTime=%s", smdId, revoked, now);
+    }
+    return isRevoked;
   }
 
   /** Returns the creation timestamp specified at the top of the SMDRL CSV file. */
@@ -94,11 +120,5 @@ public class SignedMarkRevocationList extends ImmutableObject {
   /** Returns the number of revocations. */
   public int size() {
     return revokes.size();
-  }
-
-  /** Save this list to Cloud SQL. Returns {@code this}. */
-  public SignedMarkRevocationList save() {
-    SignedMarkRevocationListDao.save(this);
-    return this;
   }
 }
