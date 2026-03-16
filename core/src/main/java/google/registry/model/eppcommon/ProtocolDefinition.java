@@ -58,7 +58,6 @@ public class ProtocolDefinition {
   /** Enum representing which environments should have which service extensions enabled. */
   private enum ServiceExtensionVisibility {
     ALL,
-    FEE_1_DOT_0_EXTENSION_VISIBILITY,
     NONE
   }
 
@@ -82,7 +81,7 @@ public class ProtocolDefinition {
     FEE_1_00(
         FeeCheckCommandExtensionStdV1.class,
         FeeCheckResponseExtensionStdV1.class,
-        ServiceExtensionVisibility.FEE_1_DOT_0_EXTENSION_VISIBILITY),
+        ServiceExtensionVisibility.ALL),
     METADATA_1_0(MetadataExtension.class, null, ServiceExtensionVisibility.NONE);
 
     private final Class<? extends CommandExtension> commandExtensionClass;
@@ -138,8 +137,6 @@ public class ProtocolDefinition {
     public boolean isVisible() {
       return switch (visibility) {
         case ALL -> true;
-        case FEE_1_DOT_0_EXTENSION_VISIBILITY ->
-            !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
         case NONE -> false;
       };
     }
