@@ -16,14 +16,11 @@ package google.registry.model.eppcommon;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.uniqueIndex;
-import static google.registry.model.common.FeatureFlag.FeatureName.FEE_EXTENSION_1_DOT_0_IN_PROD;
-import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import google.registry.model.common.FeatureFlag;
 import google.registry.model.domain.fee06.FeeCheckCommandExtensionV06;
 import google.registry.model.domain.fee06.FeeCheckResponseExtensionV06;
 import google.registry.model.domain.fee11.FeeCheckCommandExtensionV11;
@@ -142,8 +139,7 @@ public class ProtocolDefinition {
       return switch (visibility) {
         case ALL -> true;
         case FEE_1_DOT_0_EXTENSION_VISIBILITY ->
-            !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION)
-                || tm().transact(() -> FeatureFlag.isActiveNow(FEE_EXTENSION_1_DOT_0_IN_PROD));
+            !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
         case NONE -> false;
       };
     }
