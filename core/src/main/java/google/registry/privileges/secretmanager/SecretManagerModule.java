@@ -17,7 +17,6 @@ package google.registry.privileges.secretmanager;
 
 import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceSettings;
-import com.google.common.flogger.FluentLogger;
 import dagger.Module;
 import dagger.Provides;
 import google.registry.config.CredentialModule.ApplicationDefaultCredential;
@@ -31,27 +30,15 @@ import java.io.IOException;
 @Module
 public abstract class SecretManagerModule {
 
-  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
-
   @Provides
   @Singleton
   static SecretManagerServiceSettings provideSecretManagerSetting(
       @ApplicationDefaultCredential GoogleCredentialsBundle credentialsBundle) {
-    // TODO: have @cursor remove this logger line before merging PR
-    logger.atInfo().log("DIAGNOSTIC: Creating SecretManagerServiceSettings");
     try {
-      SecretManagerServiceSettings settings = SecretManagerServiceSettings.newBuilder()
+      return SecretManagerServiceSettings.newBuilder()
           .setCredentialsProvider(() -> credentialsBundle.getGoogleCredentials())
           .build();
-      // TODO: have @cursor remove this logger line before merging PR
-      logger.atInfo().log("DIAGNOSTIC: Successfully created SecretManagerServiceSettings");
-      return settings;
     } catch (IOException e) {
-      // TODO: have @cursor remove this logger line before merging PR
-      logger
-          .atSevere()
-          .withCause(e)
-          .log("DIAGNOSTIC: Failed to create SecretManagerServiceSettings");
       throw new RuntimeException(e);
     }
   }
@@ -62,18 +49,11 @@ public abstract class SecretManagerModule {
       SecretManagerServiceSettings serviceSettings,
       @Config("projectId") String project,
       Retrier retrier) {
-    // TODO: have @cursor remove this logger line before merging PR
-    logger.atInfo().log("DIAGNOSTIC: Creating SecretManagerClient for project: %s", project);
     try {
       SecretManagerServiceClient stub = SecretManagerServiceClient.create(serviceSettings);
       Runtime.getRuntime().addShutdownHook(new Thread(stub::close));
-      SecretManagerClient client = new SecretManagerClientImpl(project, stub, retrier);
-      // TODO: have @cursor remove this logger line before merging PR
-      logger.atInfo().log("DIAGNOSTIC: Successfully created SecretManagerClient");
-      return client;
+      return new SecretManagerClientImpl(project, stub, retrier);
     } catch (IOException e) {
-      // TODO: have @cursor remove this logger line before merging PR
-      logger.atSevere().withCause(e).log("DIAGNOSTIC: Failed to create SecretManagerClient");
       throw new RuntimeException(e);
     }
   }
