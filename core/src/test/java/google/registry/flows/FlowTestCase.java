@@ -107,6 +107,12 @@ public abstract class FlowTestCase<F extends Flow> {
         difference(sessionMetadata.getServiceExtensionUris(), ImmutableSet.of(uri)));
   }
 
+  protected void addServiceExtensionUri(String uri) {
+    sessionMetadata.setServiceExtensionUris(
+        com.google.common.collect.Sets.union(
+            sessionMetadata.getServiceExtensionUris(), ImmutableSet.of(uri)));
+  }
+
   protected void setEppInput(String inputFilename) {
     eppLoader = new EppLoader(this, inputFilename);
   }
