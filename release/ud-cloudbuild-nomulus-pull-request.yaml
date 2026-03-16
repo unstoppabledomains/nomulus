@@ -38,6 +38,7 @@ steps:
     cp -rf nomulus-internal/* .
     rm -rf nomulus-internal
 # Build the builder image and pull the base images, them upload them to GCR.
+# TODO: figure out why this wont actually build
 - id: Build-Builder-Base-Image-And-Push
   name: 'gcr.io/cloud-builders/docker'
   entrypoint: /bin/bash
