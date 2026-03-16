@@ -198,7 +198,12 @@ public class SecretManagerKeyring implements Keyring {
       logger.atInfo().log("DIAGNOSTIC: Attempting to retrieve secret: %s", keyName);
       byte[] result = secretStore.getSecret(keyName);
       // TODO: have @cursor remove this logger line before merging PR
-      logger.atInfo().log("DIAGNOSTIC: Successfully retrieved secret: %s (length: %d bytes)", keyName, result.length);
+      logger
+          .atInfo()
+          .log(
+              "DIAGNOSTIC: Successfully retrieved secret: %s (length: %d bytes)",
+              keyName,
+              result.length);
       return result;
     } catch (Exception e) {
       // TODO: have @cursor remove this logger line before merging PR

@@ -46,7 +46,10 @@ public abstract class KeyringModule {
       return result;
     } catch (Exception e) {
       // TODO: have @cursor remove this logger line before merging PR
-      logger.atSevere().withCause(e).log("DIAGNOSTIC: Failed to get SQL primary connection name from Keyring");
+      logger
+          .atSevere()
+          .withCause(e)
+          .log("DIAGNOSTIC: Failed to get SQL primary connection name from Keyring");
       throw e;
     }
   }

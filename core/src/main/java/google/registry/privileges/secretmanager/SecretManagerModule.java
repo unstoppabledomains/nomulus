@@ -48,7 +48,10 @@ public abstract class SecretManagerModule {
       return settings;
     } catch (IOException e) {
       // TODO: have @cursor remove this logger line before merging PR
-      logger.atSevere().withCause(e).log("DIAGNOSTIC: Failed to create SecretManagerServiceSettings");
+      logger
+          .atSevere()
+          .withCause(e)
+          .log("DIAGNOSTIC: Failed to create SecretManagerServiceSettings");
       throw new RuntimeException(e);
     }
   }

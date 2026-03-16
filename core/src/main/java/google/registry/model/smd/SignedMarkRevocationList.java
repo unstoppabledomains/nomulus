@@ -102,9 +102,12 @@ public class SignedMarkRevocationList extends ImmutableObject {
   public boolean isSmdRevoked(String smdId, DateTime now) {
     DateTime revoked = revokes.get(checkNotNull(smdId, "smdId"));
     boolean isRevoked = revoked != null && isBeforeOrAt(revoked, now);
-    logger.atInfo().log(
-        "isSmdRevoked: smdId='%s', now=%s, revokedAt=%s, isRevoked=%s, listSize=%d, listCreationTime=%s",
-        smdId, now, revoked, isRevoked, revokes.size(), creationTime);
+    logger
+        .atInfo()
+        .log(
+            "isSmdRevoked: smdId='%s', now=%s, revokedAt=%s, isRevoked=%s, listSize=%d,"
+                + " listCreationTime=%s",
+            smdId, now, revoked, isRevoked, revokes.size(), creationTime);
     if (isRevoked) {
       logger.atWarning().log(
           "SMD '%s' IS REVOKED: revocationTime=%s, checkTime=%s", smdId, revoked, now);
