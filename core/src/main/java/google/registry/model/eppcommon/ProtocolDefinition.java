@@ -16,11 +16,14 @@ package google.registry.model.eppcommon;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static google.registry.model.common.FeatureFlag.FeatureName.FEE_EXTENSION_1_DOT_0_IN_PROD;
+import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import google.registry.model.common.FeatureFlag;
 import google.registry.model.domain.fee06.FeeCheckCommandExtensionV06;
 import google.registry.model.domain.fee06.FeeCheckResponseExtensionV06;
 import google.registry.model.domain.fee11.FeeCheckCommandExtensionV11;
@@ -58,7 +61,7 @@ public class ProtocolDefinition {
   /** Enum representing which environments should have which service extensions enabled. */
   private enum ServiceExtensionVisibility {
     ALL,
-    ONLY_IN_NON_PRODUCTION,
+    FEE_1_DOT_0_EXTENSION_VISIBILITY,
     NONE
   }
 
@@ -67,9 +70,6 @@ public class ProtocolDefinition {
     LAUNCH_EXTENSION_1_0(LaunchCreateExtension.class, null, ServiceExtensionVisibility.ALL),
     REDEMPTION_GRACE_PERIOD_1_0(RgpUpdateExtension.class, null, ServiceExtensionVisibility.ALL),
     SECURE_DNS_1_1(SecDnsCreateExtension.class, null, ServiceExtensionVisibility.ALL),
-    // START OF UD CUSTOM CODE UPDATES
-    // epp-02: Only advertise IANA-registered fee-1.0 extension in greeting,
-    // hide draft fee extensions (0.6, 0.11, 0.12) that cause IANA registry warnings
     FEE_0_6(
         FeeCheckCommandExtensionV06.class,
         FeeCheckResponseExtensionV06.class,
@@ -85,8 +85,7 @@ public class ProtocolDefinition {
     FEE_1_00(
         FeeCheckCommandExtensionStdV1.class,
         FeeCheckResponseExtensionStdV1.class,
-        ServiceExtensionVisibility.ALL),
-    // END OF UD CUSTOM CODE UPDATES
+        ServiceExtensionVisibility.FEE_1_DOT_0_EXTENSION_VISIBILITY),
     METADATA_1_0(MetadataExtension.class, null, ServiceExtensionVisibility.NONE);
 
     private final Class<? extends CommandExtension> commandExtensionClass;
@@ -142,8 +141,9 @@ public class ProtocolDefinition {
     public boolean isVisible() {
       return switch (visibility) {
         case ALL -> true;
-        case ONLY_IN_NON_PRODUCTION ->
-            !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
+        case FEE_1_DOT_0_EXTENSION_VISIBILITY ->
+            !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION)
+                || tm().transact(() -> FeatureFlag.isActiveNow(FEE_EXTENSION_1_DOT_0_IN_PROD));
         case NONE -> false;
       };
     }
