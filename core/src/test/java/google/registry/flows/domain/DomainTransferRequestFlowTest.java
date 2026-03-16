@@ -1136,6 +1136,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_premiumNotBlocked_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("rich", "example");
     clock.advanceOneMilli();
     // We don't verify the results; just check that the flow doesn't fail.
@@ -1818,24 +1819,28 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_wrongFeeAmount_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     runWrongFeeAmountTest(FEE_06_MAP);
   }
 
   @Test
   void testFailure_wrongFeeAmount_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     runWrongFeeAmountTest(FEE_11_MAP);
   }
 
   @Test
   void testFailure_wrongFeeAmount_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     runWrongFeeAmountTest(FEE_12_MAP);
   }
 
   @Test
   void testFailure_appliedFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1846,6 +1851,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_appliedFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1856,6 +1862,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_appliedFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1866,6 +1873,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_gracePeriodFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1876,6 +1884,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_gracePeriodFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1886,6 +1895,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_gracePeriodFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1896,6 +1906,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee_defaults.xml",
@@ -1905,6 +1916,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee_defaults.xml",
@@ -1914,6 +1926,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee_defaults.xml",
@@ -1923,6 +1936,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_refundableFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1933,6 +1947,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_refundableFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1943,6 +1958,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_refundableFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1953,21 +1969,25 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_wrongCurrency_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     runWrongCurrencyTest(FEE_06_MAP);
   }
 
   @Test
   void testFailure_wrongCurrency_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     runWrongCurrencyTest(FEE_11_MAP);
   }
 
   @Test
   void testFailure_wrongCurrency_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     runWrongCurrencyTest(FEE_12_MAP);
   }
 
   @Test
   void testFailure_feeGivenInWrongScale_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1978,6 +1998,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_feeGivenInWrongScale_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1988,6 +2009,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_feeGivenInWrongScale_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     EppException thrown =
         assertThrows(
@@ -1998,6 +2020,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee.xml", "domain_transfer_request_response_fee.xml", FEE_06_MAP);
@@ -2005,6 +2028,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee.xml", "domain_transfer_request_response_fee.xml", FEE_11_MAP);
@@ -2012,6 +2036,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_fee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     doSuccessfulTest(
         "domain_transfer_request_fee.xml", "domain_transfer_request_response_fee.xml", FEE_12_MAP);
@@ -2019,6 +2044,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_customLogicFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDomain("expensive-domain", "foo");
     clock.advanceOneMilli();
     doSuccessfulTest(
@@ -2038,6 +2064,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testSuccess_premiumNotBlocked_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("rich", "example");
     clock.advanceOneMilli();
     // We don't verify the results; just check that the flow doesn't fail.
@@ -2046,6 +2073,7 @@ class DomainTransferRequestFlowTest
 
   @Test
   void testFailure_superuserExtension_zeroPeriod_feeTransferExtension_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDomain("example", "tld");
     eppRequestSource = EppRequestSource.TOOL;
     clock.advanceOneMilli();

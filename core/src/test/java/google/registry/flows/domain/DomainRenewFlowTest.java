@@ -1570,6 +1570,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmount_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistResource(
         Tld.get("tld")
@@ -1583,6 +1584,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmount_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee.xml", FEE_11_MAP);
     persistResource(
         Tld.get("tld")
@@ -1596,6 +1598,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmount_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee.xml", FEE_12_MAP);
     persistResource(
         Tld.get("tld")
@@ -1609,6 +1612,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongCurrency_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistResource(
         Tld.get("tld")
@@ -1629,6 +1633,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongCurrency_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee.xml", FEE_11_MAP);
     persistResource(
         Tld.get("tld")
@@ -1649,6 +1654,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongCurrency_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee.xml", FEE_12_MAP);
     persistResource(
         Tld.get("tld")
@@ -1669,6 +1675,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_feeGivenInWrongScale_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee_bad_scale.xml", FEE_06_MAP);
     persistDomain();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -1677,6 +1684,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_feeGivenInWrongScale_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee_bad_scale.xml", FEE_11_MAP);
     persistDomain();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -1685,6 +1693,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_feeGivenInWrongScale_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee_bad_scale.xml", FEE_12_MAP);
     persistDomain();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -1693,6 +1702,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_doesNotApplyNonPremiumDefaultTokenToPremiumName_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     ImmutableMap<String, String> customFeeMap = updateSubstitutions(FEE_06_MAP, "FEE", "500");
     setEppInput("domain_renew_fee.xml", customFeeMap);
     persistDomain();
@@ -1737,6 +1747,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_internalRegiration_premiumDomain_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1759,6 +1770,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1797,6 +1809,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1820,6 +1833,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee.xml", FEE_11_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1858,6 +1872,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee.xml", FEE_11_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1881,6 +1896,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee.xml", FEE_12_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1919,6 +1935,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
@@ -1942,6 +1959,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_refundableFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee_refundable.xml", FEE_06_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1950,6 +1968,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_refundableFee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee_refundable.xml", FEE_11_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1958,6 +1977,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_refundableFee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee_refundable.xml", FEE_12_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1966,6 +1986,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_gracePeriodFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee_grace_period.xml", FEE_06_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1974,6 +1995,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_gracePeriodFee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee_grace_period.xml", FEE_11_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1982,6 +2004,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_gracePeriodFee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee_grace_period.xml", FEE_12_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1990,6 +2013,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_appliedFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee_applied.xml", FEE_06_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -1998,6 +2022,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_appliedFee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee_applied.xml", FEE_11_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -2006,6 +2031,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testFailure_appliedFee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee_applied.xml", FEE_12_MAP);
     persistDomain();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -2014,6 +2040,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee.xml", FEE_06_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_06_MAP);
@@ -2021,6 +2048,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee.xml", FEE_11_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_11_MAP);
@@ -2028,6 +2056,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee.xml", FEE_12_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_12_MAP);
@@ -2035,6 +2064,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_renew_fee_defaults.xml", FEE_06_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_06_MAP);
@@ -2042,6 +2072,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_renew_fee_defaults.xml", FEE_11_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_11_MAP);
@@ -2049,6 +2080,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_renew_fee_defaults.xml", FEE_12_MAP);
     persistDomain();
     doSuccessfulTest("domain_renew_response_fee.xml", 5, FEE_12_MAP);
@@ -2056,6 +2088,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_anchorTenant_premiumDomain_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -2078,6 +2111,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
 
   @Test
   void testSuccess_customLogicFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     // The "costly-renew" domain has an additional RENEW fee of 100 from custom logic on top of the
     // normal $11 standard renew price for this TLD.
     ImmutableMap<String, String> customFeeMap =
