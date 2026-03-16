@@ -14,8 +14,74 @@
 
 package google.registry.flows.domain;
 
-import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
+import static com.google.common.truth.Truth.assertThat;
+import static google.registry.testing.DatabaseHelper.assertBillingEvents;
+import static google.registry.testing.DatabaseHelper.assertDomainDnsRequests;
+import static google.registry.testing.DatabaseHelper.assertPollMessages;
+import static google.registry.testing.DatabaseHelper.createTld;
+import static google.registry.testing.DatabaseHelper.getOnlyHistoryEntryOfType;
+import static google.registry.testing.DatabaseHelper.getPollMessages;
+import static google.registry.testing.DatabaseHelper.loadByKey;
+import static google.registry.testing.DatabaseHelper.loadRegistrar;
+import static google.registry.testing.DatabaseHelper.persistActiveDomain;
+import static google.registry.testing.DatabaseHelper.persistDeletedDomain;
+import static google.registry.testing.DatabaseHelper.persistReservedList;
+import static google.registry.testing.DatabaseHelper.persistResource;
+import static google.registry.testing.DomainSubject.assertAboutDomains;
+import static google.registry.testing.EppExceptionSubject.assertAboutEppExceptions;
+import static google.registry.util.DateTimeUtils.END_OF_TIME;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
+import static org.joda.money.CurrencyUnit.EUR;
+import static org.joda.money.CurrencyUnit.JPY;
+import static org.joda.money.CurrencyUnit.USD;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedMap;
+import google.registry.flows.EppException;
+import google.registry.flows.EppException.UnimplementedExtensionException;
+import google.registry.flows.FlowUtils.NotLoggedInException;
+import google.registry.flows.FlowUtils.UnknownCurrencyEppException;
+import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
+import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
+import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
+import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
+import google.registry.flows.domain.DomainFlowUtils.DomainReservedException;
+import google.registry.flows.domain.DomainFlowUtils.FeesMismatchException;
+import google.registry.flows.domain.DomainFlowUtils.FeesRequiredForPremiumNameException;
+import google.registry.flows.domain.DomainFlowUtils.MissingBillingAccountMapException;
+import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
+import google.registry.flows.domain.DomainFlowUtils.PremiumNameBlockedException;
+import google.registry.flows.domain.DomainFlowUtils.RegistrarMustBeActiveForThisOperationException;
+import google.registry.flows.domain.DomainFlowUtils.UnsupportedFeeAttributeException;
+import google.registry.flows.domain.DomainRestoreRequestFlow.DomainNotEligibleForRestoreException;
+import google.registry.flows.domain.DomainRestoreRequestFlow.RestoreCommandIncludesChangesException;
+import google.registry.model.billing.BillingBase.Flag;
+import google.registry.model.billing.BillingBase.Reason;
+import google.registry.model.billing.BillingEvent;
+import google.registry.model.billing.BillingRecurrence;
+import google.registry.model.domain.Domain;
+import google.registry.model.domain.DomainHistory;
+import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.rgp.GracePeriodStatus;
+import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.poll.PollMessage;
+import google.registry.model.registrar.Registrar;
+import google.registry.model.registrar.Registrar.State;
+import google.registry.model.reporting.DomainTransactionRecord;
+import google.registry.model.reporting.DomainTransactionRecord.TransactionReportField;
+import google.registry.model.reporting.HistoryEntry;
+import google.registry.model.tld.Tld;
+import google.registry.persistence.VKey;
+import google.registry.testing.DatabaseHelper;
+import java.util.Map;
+import java.util.Optional;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link DomainRestoreRequestFlow}. */
 class DomainRestoreRequestFlowTest extends ResourceFlowTestCase<DomainRestoreRequestFlow, Domain> {
