@@ -83,6 +83,7 @@ import google.registry.model.domain.fee.FeeQueryCommandExtensionItem.CommandName
 import google.registry.model.domain.feestdv1.FeeCheckCommandExtensionStdV1.MultipleCurrenciesCannotBeCheckedException;
 import google.registry.model.domain.token.AllocationToken;
 import google.registry.model.domain.token.AllocationToken.TokenStatus;
+import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.registrar.Registrar;
