@@ -2098,7 +2098,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_periodNotInYears_v12() {
-    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_bad_period_v12.xml");
     EppException thrown = assertThrows(BadPeriodUnitException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
