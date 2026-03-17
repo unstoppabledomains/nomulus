@@ -113,9 +113,12 @@ public abstract class FlowTestCase<F extends Flow> {
   // at login time. This method adds the extension URI to the EPP session metadata.
   // See FEE_EXTENSION_CUSTOMIZATION.md for details.
   protected void addServiceExtensionUri(String uri) {
-    sessionMetadata.setServiceExtensionUris(
-        com.google.common.collect.Sets.union(
-            sessionMetadata.getServiceExtensionUris(), ImmutableSet.of(uri)));
+    // Build a proper ImmutableSet instead of using Sets.union() which returns a read-only view.
+    // Sets.union() creates a SetView that doesn't persist properly when used with sessionMetadata.
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    builder.addAll(sessionMetadata.getServiceExtensionUris());
+    builder.add(uri);
+    sessionMetadata.setServiceExtensionUris(builder.build());
   }
 
   protected void setEppInput(String inputFilename) {
