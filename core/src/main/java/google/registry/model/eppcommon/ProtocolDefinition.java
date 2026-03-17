@@ -36,6 +36,7 @@ import google.registry.model.domain.secdns.SecDnsCreateExtension;
 import google.registry.model.eppinput.EppInput.CommandExtension;
 import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.util.NonFinalForTesting;
+import google.registry.util.RegistryEnvironment;
 import jakarta.xml.bind.annotation.XmlSchema;
 import java.util.EnumSet;
 
