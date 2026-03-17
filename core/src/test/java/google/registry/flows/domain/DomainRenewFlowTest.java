@@ -1937,7 +1937,7 @@ class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, Domain> 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v12() throws Exception {
     addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
-    setEppInput("domain_renew_fee.xml", FEE_06_MAP);
+    setEppInput("domain_renew_fee.xml", FEE_12_MAP);
     persistDomain();
     AllocationToken defaultToken1 =
         persistResource(

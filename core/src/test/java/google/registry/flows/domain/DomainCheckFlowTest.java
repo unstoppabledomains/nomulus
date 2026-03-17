@@ -1593,6 +1593,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v06_withRestoreRenewals()
       throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1898,6 +1899,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multipleReservations() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1998,6 +2000,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   // This test is only relevant for v06, since domain names are not specified after.
   @Test
   void testFeeExtension_feeCheckNotInAvailabilityCheck() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_not_in_avail.xml");
     EppException thrown =
         assertThrows(OnlyCheckedNamesCanBeFeeCheckedException.class, this::runFlow);
@@ -2202,6 +2205,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Test
   void testSuccess_allocationTokenPromotion_doesNotUseValidDefaultToken_singleYear_v06()
       throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setUpDefaultToken();
     createTld("example");
     persistResource(
