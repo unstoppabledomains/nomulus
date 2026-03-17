@@ -64,16 +64,17 @@ public class ProductionSimulatingFeeExtensionsTest {
   void testProdEnvironment() {
     RegistryEnvironment.PRODUCTION.setup();
     ProtocolDefinition.reloadServiceExtensionUris();
-    // UD customization: only advertise fee-1.0 extension
+    // UD customization: hide all fee extensions in production
     // Pre-1.0 fee extensions (0.6, 0.11, 0.12) are hidden to avoid IANA registry warnings
+    // Fee-1.0 is only advertised in non-production environments
     assertThat(ProtocolDefinition.getVisibleServiceExtensionUris())
         .containsExactly(
             "urn:ietf:params:xml:ns:launch-1.0",
             "urn:ietf:params:xml:ns:rgp-1.0",
-            "urn:ietf:params:xml:ns:secDNS-1.1",
+            "urn:ietf:params:xml:ns:secDNS-1.1");
             // "urn:ietf:params:xml:ns:fee-0.6",
             // "urn:ietf:params:xml:ns:fee-0.11",
             // "urn:ietf:params:xml:ns:fee-0.12",
-            "urn:ietf:params:xml:ns:epp:fee-1.0");
+            // "urn:ietf:params:xml:ns:epp:fee-1.0");
   }
 }
