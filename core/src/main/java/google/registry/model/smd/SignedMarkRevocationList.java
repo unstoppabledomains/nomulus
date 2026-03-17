@@ -21,6 +21,7 @@ import static google.registry.util.DateTimeUtils.isBeforeOrAt;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import google.registry.model.ImmutableObject;
+// UD CUSTOMIZATION: RST support - per-TLD SMDR list retrieval for ICANN Registry Services Technical
 import google.registry.tmch.RstTmchUtils;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -72,6 +73,8 @@ public class SignedMarkRevocationList extends ImmutableObject {
     return CACHE.get();
   }
 
+  // UD CUSTOMIZATION: RST support (ICANN Registry Services Technical)
+  // Allows per-TLD configuration of SMDR lists via RstTmchUtils.
   // TODO(b/412715713): remove the tld parameter when RST completes.
   public static SignedMarkRevocationList get(String tld) {
     return RstTmchUtils.getSmdrList(tld).orElseGet(SignedMarkRevocationList::get);

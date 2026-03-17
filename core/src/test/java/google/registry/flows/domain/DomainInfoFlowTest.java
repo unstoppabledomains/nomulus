@@ -82,6 +82,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link DomainInfoFlow}. */
+// UD CUSTOMIZATION: Fee extension declarations in fee-related tests.
+// Tests that use fee extensions must call addServiceExtensionUri() because UD hides
+// draft fee versions (0.6, 0.11, 0.12) to avoid IANA registry warnings. The test XML
+// files use these draft namespaces, so tests must explicitly declare them.
+// See FEE_EXTENSION_CUSTOMIZATION.md for details.
 class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   /**

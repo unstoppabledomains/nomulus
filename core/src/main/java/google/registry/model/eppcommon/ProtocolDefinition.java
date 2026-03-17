@@ -17,6 +17,10 @@ package google.registry.model.eppcommon;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.uniqueIndex;
 
+// UD CUSTOMIZATION: Removed static imports for FeatureFlag and TransactionManagerFactory
+// These were used for FEE_1_00 conditional logic in upstream. UD simplifies this to just
+// check RegistryEnvironment (non-prod vs production). See FEE_EXTENSION_CUSTOMIZATION.md.
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableMap;
@@ -63,6 +67,10 @@ public class ProtocolDefinition {
   }
 
   /** Enum representing valid service extensions that are recognized by the server. */
+  // UD CUSTOMIZATION: Fee extension visibility differs from upstream.
+  // Upstream: FEE_0_6/0_11/0_12 are ALL (always visible)
+  // UD: FEE_0_6/0_11/0_12 are NONE (hidden to avoid IANA registry warnings about draft versions)
+  // See FEE_EXTENSION_CUSTOMIZATION.md for details.
   public enum ServiceExtension {
     LAUNCH_EXTENSION_1_0(LaunchCreateExtension.class, null, ServiceExtensionVisibility.ALL),
     REDEMPTION_GRACE_PERIOD_1_0(RgpUpdateExtension.class, null, ServiceExtensionVisibility.ALL),
@@ -70,15 +78,17 @@ public class ProtocolDefinition {
     FEE_0_6(
         FeeCheckCommandExtensionV06.class,
         FeeCheckResponseExtensionV06.class,
-        ServiceExtensionVisibility.NONE),
+        ServiceExtensionVisibility.NONE), // UD: Hidden (was ALL in upstream)
     FEE_0_11(
         FeeCheckCommandExtensionV11.class,
         FeeCheckResponseExtensionV11.class,
-        ServiceExtensionVisibility.NONE),
+        ServiceExtensionVisibility.NONE), // UD: Hidden (was ALL in upstream)
     FEE_0_12(
         FeeCheckCommandExtensionV12.class,
         FeeCheckResponseExtensionV12.class,
-        ServiceExtensionVisibility.NONE),
+        ServiceExtensionVisibility.NONE), // UD: Hidden (was ALL in upstream)
+    // UD CUSTOMIZATION: FEE_1_00 uses conditional visibility (non-prod only).
+    // Upstream uses FeatureFlag to optionally enable in production. UD always hides in prod.
     FEE_1_00(
         FeeCheckCommandExtensionStdV1.class,
         FeeCheckResponseExtensionStdV1.class,
@@ -138,6 +148,10 @@ public class ProtocolDefinition {
     public boolean isVisible() {
       return switch (visibility) {
         case ALL -> true;
+        // UD CUSTOMIZATION: Simplified FEE_1_00 logic.
+        // Upstream: non-prod OR if FeatureFlag enabled in prod (requires DB transaction)
+        // UD: non-prod only (simpler, more predictable, no DB dependency)
+        // This ensures production never advertises FEE_1_00 unless explicitly wanted.
         case FEE_1_DOT_0_EXTENSION_VISIBILITY ->
             !RegistryEnvironment.get().equals(RegistryEnvironment.PRODUCTION);
         case NONE -> false;

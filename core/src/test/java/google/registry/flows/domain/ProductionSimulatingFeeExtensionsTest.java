@@ -23,6 +23,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Class for testing the XML extension definitions loaded in the prod environment. */
+// UD CUSTOMIZATION: Fee extension visibility behavior differs from upstream.
+// This test validates that draft fee versions (0.6, 0.11, 0.12) are hidden in all environments
+// to avoid IANA registry warnings, and that FEE_1_00 is only visible in non-production.
+// See FEE_EXTENSION_CUSTOMIZATION.md for the rationale.
 public class ProductionSimulatingFeeExtensionsTest {
 
   private RegistryEnvironment previousEnvironment;
