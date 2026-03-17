@@ -23,6 +23,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Class for testing the XML extension definitions loaded in the prod environment. */
+// UD CUSTOMIZATION: Fee extension visibility behavior differs from upstream.
+// This test validates that draft fee versions (0.6, 0.11, 0.12) are hidden in all environments
+// to avoid IANA registry warnings, and that FEE_1_00 is only visible in non-production.
+// See FEE_EXTENSION_CUSTOMIZATION.md for the rationale.
 public class ProductionSimulatingFeeExtensionsTest {
 
   private RegistryEnvironment previousEnvironment;
@@ -51,9 +55,11 @@ public class ProductionSimulatingFeeExtensionsTest {
               "urn:ietf:params:xml:ns:launch-1.0",
               "urn:ietf:params:xml:ns:rgp-1.0",
               "urn:ietf:params:xml:ns:secDNS-1.1",
-              "urn:ietf:params:xml:ns:fee-0.6",
-              "urn:ietf:params:xml:ns:fee-0.11",
-              "urn:ietf:params:xml:ns:fee-0.12",
+              // UD customization: hide pre-1.0 fee extensions (0.6, 0.11, 0.12)
+              // to avoid IANA registry warnings. Only advertise fee-1.0.
+              // "urn:ietf:params:xml:ns:fee-0.6",
+              // "urn:ietf:params:xml:ns:fee-0.11",
+              // "urn:ietf:params:xml:ns:fee-0.12",
               "urn:ietf:params:xml:ns:epp:fee-1.0");
     }
   }
@@ -62,14 +68,17 @@ public class ProductionSimulatingFeeExtensionsTest {
   void testProdEnvironment() {
     RegistryEnvironment.PRODUCTION.setup();
     ProtocolDefinition.reloadServiceExtensionUris();
-    // prod shouldn't have the fee extension version 1.0
+    // UD customization: hide all fee extensions in production
+    // Pre-1.0 fee extensions (0.6, 0.11, 0.12) are hidden to avoid IANA registry warnings
+    // Fee-1.0 is only advertised in non-production environments
     assertThat(ProtocolDefinition.getVisibleServiceExtensionUris())
         .containsExactly(
             "urn:ietf:params:xml:ns:launch-1.0",
             "urn:ietf:params:xml:ns:rgp-1.0",
-            "urn:ietf:params:xml:ns:secDNS-1.1",
-            "urn:ietf:params:xml:ns:fee-0.6",
-            "urn:ietf:params:xml:ns:fee-0.11",
-            "urn:ietf:params:xml:ns:fee-0.12");
+            "urn:ietf:params:xml:ns:secDNS-1.1");
+            // "urn:ietf:params:xml:ns:fee-0.6",
+            // "urn:ietf:params:xml:ns:fee-0.11",
+            // "urn:ietf:params:xml:ns:fee-0.12",
+            // "urn:ietf:params:xml:ns:epp:fee-1.0");
   }
 }

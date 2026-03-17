@@ -83,6 +83,7 @@ import google.registry.model.domain.fee.FeeQueryCommandExtensionItem.CommandName
 import google.registry.model.domain.feestdv1.FeeCheckCommandExtensionStdV1.MultipleCurrenciesCannotBeCheckedException;
 import google.registry.model.domain.token.AllocationToken;
 import google.registry.model.domain.token.AllocationToken.TokenStatus;
+import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.registrar.Registrar;
@@ -1224,6 +1225,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   /** Test the same as {@link #testFeeExtension_multipleCommands_v06} with premium labels. */
   @Test
   void testFeeExtension_premiumLabels_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v06.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v06.xml"));
@@ -1232,6 +1234,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   /** Test the same as {@link #testFeeExtension_multipleCommands_v06} with premium labels. */
   @Test
   void testFeeExtension_premiumLabels_doesNotApplyDefaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1301,6 +1304,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premium_eap_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v06.xml");
     clock.setTo(DateTime.parse("2010-01-01T10:00:00Z"));
@@ -1321,6 +1325,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premium_eap_v06_withRenewalOnRestore() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     DateTime startTime = DateTime.parse("2010-01-01T10:00:00Z");
     clock.setTo(startTime);
@@ -1349,6 +1354,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_create() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v11_create.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v11_create.xml"));
@@ -1356,6 +1362,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_doesNotApplyDefaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1378,6 +1385,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_renew() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v11_renew.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v11_renew.xml"));
@@ -1385,6 +1393,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_transfer() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v11_transfer.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v11_transfer.xml"));
@@ -1392,6 +1401,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_restore() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v11_restore.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v11_restore.xml"));
@@ -1399,6 +1409,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_restore_withRenewal() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_premium_v11_restore.xml");
     createTld("example");
     persistPendingDeleteDomain("rich.example");
@@ -1408,6 +1419,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v11_update() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v11_update.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v11_update.xml"));
@@ -1415,6 +1427,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v12.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_premium_response_v12.xml"));
@@ -1422,6 +1435,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multipleCommands_defaultTokenOnlyOnCreate_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setUpDefaultToken();
     setEppInput("domain_check_fee_multiple_commands_v12.xml");
     runFlowAssertResponse(
@@ -1431,6 +1445,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Disabled("TODO(b/454680236): broken test")
   @Test
   void testFeeExtension_defaultToken_notValidForAllLabels_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1455,6 +1470,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Disabled("TODO(b/454680236): broken")
   @Test
   void testFeeExtension_defaultToken_notValidForAllLabels_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1479,6 +1495,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Disabled("TODO(b/454680236): broken test")
   @Test
   void testFeeExtension_defaultToken_notValidForAllLabels_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1506,12 +1523,14 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
    */
   @Test
   void testFeeExtension_multipleCommands_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_multiple_commands_v06.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_multiple_commands_response_v06.xml"));
   }
 
   @Test
   void testFeeExtension_multipleCommands_tokenNotValidForSome_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         new AllocationToken.Builder()
             .setToken("abc123")
@@ -1526,6 +1545,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multipleCommands_defaultTokenOnlyOnCreate_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setUpDefaultToken();
     setEppInput("domain_check_fee_multiple_commands_v06.xml");
     runFlowAssertResponse(
@@ -1536,12 +1556,14 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multipleCommands_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_multiple_commands_v12.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_multiple_commands_response_v12.xml"));
   }
 
   @Test
   void testFeeExtension_multipleCommands_tokenNotValidForSome_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistResource(
         new AllocationToken.Builder()
             .setToken("abc123")
@@ -1556,6 +1578,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1570,6 +1593,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v06_withRestoreRenewals()
       throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1588,6 +1612,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v11_create() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1601,6 +1626,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v11_renew() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1614,6 +1640,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v11_transfer() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1627,6 +1654,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v11_restore() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1640,6 +1668,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_feesNotOmittedOnReservedNamesInSunrise_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("tld", START_DATE_SUNRISE);
     persistResource(
         Tld.get("tld")
@@ -1653,6 +1682,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_wrongCurrency_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_euro_v06.xml");
     EppException thrown = assertThrows(CurrencyUnitMismatchException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1660,6 +1690,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_wrongCurrency_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_euro_v11.xml");
     EppException thrown = assertThrows(CurrencyUnitMismatchException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1667,6 +1698,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_invalidCommand_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_invalid_command_v06.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1674,6 +1706,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_invalidCommand_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_invalid_command_v11.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1681,6 +1714,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_invalidCommand_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_invalid_command_v12.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1688,6 +1722,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1700,6 +1735,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_restoreFeeWithDupes_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1715,6 +1751,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   /** The tests must be split up for version 11, which allows only one command at a time. */
   @Test
   void testFeeExtension_reservedName_v11_create() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1727,6 +1764,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v11_renew() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1739,6 +1777,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v11_transfer() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1751,6 +1790,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v11_restore() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1763,6 +1803,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v11_restore_withRenewals() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1780,6 +1821,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1792,6 +1834,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_reservedName_restoreFeeWithDupes_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1806,6 +1849,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_periodNotInYears_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_bad_period_v06.xml");
     EppException thrown = assertThrows(BadPeriodUnitException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1813,6 +1857,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_periodNotInYears_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_bad_period_v11.xml");
     EppException thrown = assertThrows(BadPeriodUnitException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1820,6 +1865,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_unknownCommand_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_unknown_command_v06.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1827,6 +1873,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_unknownCommand_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_unknown_command_v11.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1835,6 +1882,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   /** Test multiyear periods and explicitly correct currency and that the avail extension is ok. */
   @Test
   void testFeeExtension_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v06.xml", ImmutableMap.of("CURRENCY", "USD"));
     runFlowAssertResponse(loadFile("domain_check_fee_response_v06.xml"));
@@ -1842,6 +1890,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_defaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setUpDefaultToken();
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v06.xml", ImmutableMap.of("CURRENCY", "USD"));
@@ -1850,6 +1899,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multipleReservations() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     persistResource(
         Tld.get("tld")
             .asBuilder()
@@ -1863,6 +1913,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v11.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_response_v11.xml"));
@@ -1870,6 +1921,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_defaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setUpDefaultToken();
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v11.xml", ImmutableMap.of("CURRENCY", "USD"));
@@ -1878,6 +1930,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v12.xml");
     runFlowAssertResponse(loadFile("domain_check_fee_response_v12.xml"));
@@ -1885,6 +1938,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_defaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setUpDefaultToken();
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v12.xml", ImmutableMap.of("CURRENCY", "USD"));
@@ -1893,6 +1947,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v12_specifiedPriceRenewal_renewPriceOnly() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     persistBillingRecurrenceForDomain(
         persistActiveDomain("rich.example"), SPECIFIED, Money.of(USD, new BigDecimal("27.74")));
@@ -1905,6 +1960,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_doesNotApplyDefaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     AllocationToken defaultToken =
         persistResource(
@@ -1927,6 +1983,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandSubphase_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_command_subphase_v06.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1934,6 +1991,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandSubphase_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_command_subphase_v11.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1942,6 +2000,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   // This test is only relevant for v06, since domain names are not specified after.
   @Test
   void testFeeExtension_feeCheckNotInAvailabilityCheck() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_not_in_avail.xml");
     EppException thrown =
         assertThrows(OnlyCheckedNamesCanBeFeeCheckedException.class, this::runFlow);
@@ -1950,6 +2009,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearRestore_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_multiyear_restore_v06.xml");
     EppException thrown = assertThrows(RestoresAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1957,6 +2017,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearRestore_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_multiyear_restore_v11.xml");
     EppException thrown = assertThrows(RestoresAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1964,6 +2025,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearTransfer_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_multiyear_transfer_v06.xml");
     EppException thrown = assertThrows(TransfersAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1971,6 +2033,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearTransfer_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_multiyear_transfer_v11.xml");
     EppException thrown = assertThrows(TransfersAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1978,6 +2041,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_premiumLabels_v12_withRenewalOnRestore() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     setEppInput("domain_check_fee_premium_v12.xml");
     persistPendingDeleteDomain("rich.example");
@@ -1986,6 +2050,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandWithPhase_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_command_phase_v06.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -1993,6 +2058,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandWithPhase_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_check_fee_command_phase_v11.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2000,6 +2066,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearRestore_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_multiyear_restore_v12.xml");
     EppException thrown = assertThrows(RestoresAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2007,6 +2074,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_multiyearTransfer_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_multiyear_transfer_v12.xml");
     EppException thrown = assertThrows(TransfersAreAlwaysForOneYearException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2014,6 +2082,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_unknownCommand_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_unknown_command_v12.xml");
     EppException thrown = assertThrows(UnknownFeeCommandException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2021,6 +2090,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_wrongCurrency_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_euro_v12.xml");
     EppException thrown = assertThrows(CurrencyUnitMismatchException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2028,6 +2098,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_periodNotInYears_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_fee_bad_period_v12.xml");
     EppException thrown = assertThrows(BadPeriodUnitException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2035,6 +2106,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandWithPhase_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_command_phase_v12.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2042,6 +2114,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_commandSubphase_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_check_fee_command_subphase_v12.xml");
     EppException thrown = assertThrows(FeeChecksDontSupportPhasesException.class, this::runFlow);
     assertAboutEppExceptions().that(thrown).marshalsToXml();
@@ -2049,6 +2122,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_multipleCurencies_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistResource(
         createTld("example")
             .asBuilder()
@@ -2074,6 +2148,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testTieredPricingPromoResponse_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     sessionMetadata.setRegistrarId("NewRegistrar");
     setUpDefaultToken("NewRegistrar");
     persistActiveDomain("example1.tld");
@@ -2083,6 +2158,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testTieredPricingPromo_registrarNotIncluded_standardResponse_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setUpDefaultToken("NewRegistrar");
     persistActiveDomain("example1.tld");
     setEppInput("domain_check_fee_v12.xml");
@@ -2091,6 +2167,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testTieredPricingPromo_registrarIncluded_noTokenActive_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     sessionMetadata.setRegistrarId("NewRegistrar");
     persistActiveDomain("example1.tld");
 
@@ -2111,6 +2188,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testFeeExtension_fractionalCost_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     // Note that the response xml expects to see "11.10" with two digits after the decimal point.
     // This works because Money.getAmount(), used in the flow, returns a BigDecimal that is set to
     // display the number of digits that is conventional for the given currency.
@@ -2127,6 +2205,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
   @Test
   void testSuccess_allocationTokenPromotion_doesNotUseValidDefaultToken_singleYear_v06()
       throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setUpDefaultToken();
     createTld("example");
     persistResource(
@@ -2149,6 +2228,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_thirtyDomains_restoreFees_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     // Note that 30 is more than 25, which is the maximum # of entity groups you can enlist in a
     // single database transaction (each Domain entity is in a separate entity group).
     // It's also pretty common for registrars to send large domain checks.
@@ -2162,6 +2242,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_allocationTokenPromotion_multiYear_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     persistResource(
         new AllocationToken.Builder()
@@ -2196,6 +2277,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_allocationTokenPromotion_multiYearAndPremiums_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         new AllocationToken.Builder()
@@ -2229,6 +2311,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_allocationToken_premiumAnchorTenant_noFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         Tld.get("tld")
@@ -2248,6 +2331,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_promotionNotActive_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         new AllocationToken.Builder()
@@ -2275,6 +2359,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_allocationTokenPromotion_singleYear_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         new AllocationToken.Builder()
@@ -2296,6 +2381,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_promoTokenNotValidForTld_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         new AllocationToken.Builder()
@@ -2324,6 +2410,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_promoTokenNotValidForRegistrar_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistResource(
         new AllocationToken.Builder()
@@ -2352,6 +2439,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_allocationTokenForReservedDomain_showsFee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_check_allocationtoken_fee_specificuse_v06.xml");
     createTld("example");
     persistResource(
@@ -2368,6 +2456,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_eapFeeCheck_date_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     runEapFeeCheckTestWithXmlInputOutput(
         loadFile("domain_check_fee_date_v12.xml", ImmutableMap.of("CURRENCY", "USD")),
         loadFile("domain_check_eap_fee_response_date_v12.xml"));
@@ -2375,6 +2464,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_eapFeeCheck_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     runEapFeeCheckTestWithXmlInputOutput(
         loadFile("domain_check_fee_v06.xml", ImmutableMap.of("CURRENCY", "USD")),
         loadFile("domain_check_eap_fee_response_v06.xml"));
@@ -2382,6 +2472,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_eapFeeCheck_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     runEapFeeCheckTestWithXmlInputOutput(
         loadFile("domain_check_fee_v11.xml", ImmutableMap.of("CURRENCY", "USD")),
         loadFile("domain_check_eap_fee_response_v11.xml"));
@@ -2389,6 +2480,7 @@ class DomainCheckFlowTest extends ResourceCheckFlowTestCase<DomainCheckFlow, Dom
 
   @Test
   void testSuccess_eapFeeCheck_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     runEapFeeCheckTestWithXmlInputOutput(
         loadFile("domain_check_fee_v12.xml", ImmutableMap.of("CURRENCY", "USD")),
         loadFile("domain_check_eap_fee_response_v12.xml"));

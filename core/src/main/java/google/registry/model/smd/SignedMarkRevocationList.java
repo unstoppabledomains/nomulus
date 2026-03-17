@@ -20,8 +20,8 @@ import static google.registry.util.DateTimeUtils.isBeforeOrAt;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.flogger.FluentLogger;
 import google.registry.model.ImmutableObject;
+// UD CUSTOMIZATION: RST support - per-TLD SMDR list retrieval for ICANN Registry Services Technical
 import google.registry.tmch.RstTmchUtils;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -49,8 +49,6 @@ import org.joda.time.DateTime;
 @Entity
 public class SignedMarkRevocationList extends ImmutableObject {
 
-  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
-
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   Long revisionId;
@@ -75,18 +73,11 @@ public class SignedMarkRevocationList extends ImmutableObject {
     return CACHE.get();
   }
 
+  // UD CUSTOMIZATION: RST support (ICANN Registry Services Technical)
+  // Allows per-TLD configuration of SMDR lists via RstTmchUtils.
   // TODO(b/412715713): remove the tld parameter when RST completes.
   public static SignedMarkRevocationList get(String tld) {
-    logger.atInfo().log("SignedMarkRevocationList.get() called for TLD '%s'", tld);
-    var rstSmdrList = RstTmchUtils.getSmdrList(tld);
-    if (rstSmdrList.isPresent()) {
-      logger.atInfo().log(
-          "Using RST SMDRL for TLD '%s': size=%d, creationTime=%s",
-          tld, rstSmdrList.get().size(), rstSmdrList.get().getCreationTime());
-      return rstSmdrList.get();
-    }
-    logger.atInfo().log("RST SMDRL not found for TLD '%s', using database SMDRL", tld);
-    return SignedMarkRevocationList.get();
+    return RstTmchUtils.getSmdrList(tld).orElseGet(SignedMarkRevocationList::get);
   }
 
   /** Create a new {@link SignedMarkRevocationList} without saving it. */
@@ -101,15 +92,7 @@ public class SignedMarkRevocationList extends ImmutableObject {
   /** Returns {@code true} if the SMD ID has been revoked at the given point in time. */
   public boolean isSmdRevoked(String smdId, DateTime now) {
     DateTime revoked = revokes.get(checkNotNull(smdId, "smdId"));
-    boolean isRevoked = revoked != null && isBeforeOrAt(revoked, now);
-    logger.atInfo().log(
-        "isSmdRevoked: smdId='%s', now=%s, revokedAt=%s, isRevoked=%s, listSize=%d, listCreationTime=%s",
-        smdId, now, revoked, isRevoked, revokes.size(), creationTime);
-    if (isRevoked) {
-      logger.atWarning().log(
-          "SMD '%s' IS REVOKED: revocationTime=%s, checkTime=%s", smdId, revoked, now);
-    }
-    return isRevoked;
+    return revoked != null && isBeforeOrAt(revoked, now);
   }
 
   /** Returns the creation timestamp specified at the top of the SMDRL CSV file. */

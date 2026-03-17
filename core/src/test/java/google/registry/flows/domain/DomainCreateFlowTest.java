@@ -154,6 +154,7 @@ import google.registry.model.domain.secdns.DomainDsData;
 import google.registry.model.domain.token.AllocationToken;
 import google.registry.model.domain.token.AllocationToken.RegistrationBehavior;
 import google.registry.model.domain.token.AllocationToken.TokenStatus;
+import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.eppoutput.EppResponse;
@@ -3298,6 +3299,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmount_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee.xml", FEE_06_MAP);
     persistResource(
         Tld.get("tld")
@@ -3312,6 +3314,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmount_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee.xml", FEE_11_MAP);
     persistResource(
         Tld.get("tld")
@@ -3326,6 +3329,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmount_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee.xml", FEE_12_MAP);
     persistResource(
         Tld.get("tld")
@@ -3340,6 +3344,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3355,6 +3360,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3370,6 +3376,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_wrongFeeAmountTooHigh_defaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3385,6 +3392,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_omitFeeExtensionOnLogin_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     for (String uri : FEE_EXTENSION_URIS) {
       removeServiceExtensionUri(uri);
     }
@@ -3397,6 +3405,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_omitFeeExtensionOnLogin_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     for (String uri : FEE_EXTENSION_URIS) {
       removeServiceExtensionUri(uri);
     }
@@ -3409,6 +3418,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_omitFeeExtensionOnLogin_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     for (String uri : FEE_EXTENSION_URIS) {
       removeServiceExtensionUri(uri);
     }
@@ -3421,6 +3431,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFeeApplied_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3435,6 +3446,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFeeApplied_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3449,6 +3461,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFeeApplied_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3463,6 +3476,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_feeGivenInWrongScale_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee_bad_scale.xml", FEE_06_MAP);
     persistHosts();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -3471,6 +3485,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_feeGivenInWrongScale_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee_bad_scale.xml", FEE_11_MAP);
     persistHosts();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -3479,6 +3494,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_feeGivenInWrongScale_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee_bad_scale.xml", FEE_12_MAP);
     persistHosts();
     EppException thrown = assertThrows(CurrencyValueScaleException.class, this::runFlow);
@@ -3487,6 +3503,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_appliedFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee_applied.xml", FEE_06_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3495,6 +3512,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_appliedFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee_applied.xml", FEE_11_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3503,6 +3521,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_appliedFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee_applied.xml", FEE_12_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3511,6 +3530,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3527,6 +3547,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3543,6 +3564,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongFeeAmountTooLow_defaultToken_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDefaultTokenWithDiscount();
     persistResource(
         Tld.get("tld")
@@ -3559,6 +3581,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongCurrency_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_fee.xml", ImmutableMap.of("FEE_VERSION", "fee-0.6", "CURRENCY", "EUR"));
     persistHosts();
@@ -3568,6 +3591,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongCurrency_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput(
         "domain_create_fee.xml", ImmutableMap.of("FEE_VERSION", "fee-0.11", "CURRENCY", "EUR"));
     persistHosts();
@@ -3577,6 +3601,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_wrongCurrency_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput(
         "domain_create_fee.xml", ImmutableMap.of("FEE_VERSION", "fee-0.12", "CURRENCY", "EUR"));
     persistHosts();
@@ -3586,6 +3611,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_gracePeriodFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee_grace_period.xml", FEE_06_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3594,6 +3620,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_gracePeriodFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee_grace_period.xml", FEE_11_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3602,6 +3629,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_gracePeriodFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee_grace_period.xml", FEE_12_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3610,6 +3638,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee_defaults.xml", FEE_06_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3620,6 +3649,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee_defaults.xml", FEE_11_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3630,6 +3660,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_withDefaultAttributes_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee_defaults.xml", FEE_12_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3640,6 +3671,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_refundableFee_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee_refundable.xml", FEE_06_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3648,6 +3680,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_refundableFee_v11() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee_refundable.xml", FEE_11_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3656,6 +3689,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_refundableFee_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee_refundable.xml", FEE_12_MAP);
     persistHosts();
     EppException thrown = assertThrows(UnsupportedFeeAttributeException.class, this::runFlow);
@@ -3664,6 +3698,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_fee.xml", FEE_06_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3674,6 +3709,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_v11() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     setEppInput("domain_create_fee.xml", FEE_11_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3684,6 +3720,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_fee_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput("domain_create_fee.xml", FEE_12_MAP);
     persistHosts();
     doSuccessfulTest(
@@ -3694,6 +3731,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_eapFee_description_multipleMatch_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         ImmutableMap.of(
@@ -3712,6 +3750,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_unknownCurrency_v12() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setEppInput(
         "domain_create_fee.xml", ImmutableMap.of("FEE_VERSION", "fee-0.12", "CURRENCY", "BAD"));
     persistHosts();
@@ -3721,6 +3760,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testTieredPricingPromoResponse_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     sessionMetadata.setRegistrarId("NewRegistrar");
     setupDefaultTokenWithDiscount("NewRegistrar");
     setEppInput("domain_create_fee.xml", FEE_12_MAP);
@@ -3739,6 +3779,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFee_multipleEAPfees_doNotAddToExpectedValue_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_extra_fees.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3759,6 +3800,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_eapFee_description_swapped_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         ImmutableMap.of(
@@ -3777,6 +3819,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_doesNotApplyNonPremiumDefaultTokenToPremiumName_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     persistHosts();
     createTld("example");
     persistResource(
@@ -3795,6 +3838,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_superuserOverridesPremiumNameBlock_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     createTld("example");
     setEppInput("domain_create_premium.xml", FEE_12_MAP);
     persistHosts("net");
@@ -3812,6 +3856,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_eapFee_combined_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_create_eap_combined_fee.xml", FEE_06_MAP);
     persistHosts();
     setEapForTld("tld");
@@ -3822,6 +3867,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_nonpremiumCreateToken_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistHosts();
     persistResource(
@@ -3839,6 +3885,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFee_fullDescription_includingArbitraryExpiryTime_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_eap_fee.xml",
         ImmutableMap.of(
@@ -3855,6 +3902,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_allocationToken_multiYearDiscount_worksForPremiums_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistHosts();
     persistResource(
@@ -3890,6 +3938,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_eapFee_multipleEAPfees_addToExpectedValue_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_extra_fees.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3908,6 +3957,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_eapFee_totalAmountNotMatched_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_create_extra_fees.xml",
         new ImmutableMap.Builder<String, String>()
@@ -3928,6 +3978,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_premiumAndEap_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput("domain_create_premium_eap.xml", FEE_06_MAP);
     persistHosts("net");
@@ -3954,6 +4005,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testFailure_premiumBlocked_v06() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput("domain_create_premium.xml", FEE_06_MAP);
     persistHosts("net");
@@ -3965,6 +4017,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_allocationToken_singleYearDiscount_worksForPremiums_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     persistHosts();
     persistResource(
@@ -3999,6 +4052,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testTieredPricingPromo_registrarIncluded_noTokenActive_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     sessionMetadata.setRegistrarId("NewRegistrar");
     persistActiveDomain("example1.tld");
 
@@ -4027,6 +4081,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testTieredPricingPromo_registrarNotIncluded_standardResponse_v12() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     setupDefaultTokenWithDiscount("NewRegistrar");
     setEppInput("domain_create_fee.xml", FEE_12_MAP);
     persistHosts();
@@ -4042,6 +4097,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_nonAnchorTenant_nonPremiumRenewal_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     AllocationToken token =
         persistResource(
@@ -4062,6 +4118,7 @@ class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow, Domain
 
   @Test
   void testSuccess_specifiedRenewalPriceToken_specifiedRecurrencePrice_v06() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     AllocationToken token =
         persistResource(

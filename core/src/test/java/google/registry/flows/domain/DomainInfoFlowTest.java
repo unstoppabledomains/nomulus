@@ -64,6 +64,7 @@ import google.registry.model.domain.secdns.DomainDsData;
 import google.registry.model.domain.token.AllocationToken;
 import google.registry.model.domain.token.AllocationToken.TokenType;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
+import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.host.Host;
@@ -81,6 +82,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link DomainInfoFlow}. */
+// UD CUSTOMIZATION: Fee extension declarations in fee-related tests.
+// Tests that use fee extensions must call addServiceExtensionUri() because UD hides
+// draft fee versions (0.6, 0.11, 0.12) to avoid IANA registry warnings. The test XML
+// files use these draft namespaces, so tests must explicitly declare them.
+// See FEE_EXTENSION_CUSTOMIZATION.md for details.
 class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   /**
@@ -662,6 +668,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   // For now, we still support old versions.
   @Test
   void testFeeExtension_restoreCommand_pendingDelete_withRenewal() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput(
         "domain_info_fee.xml",
@@ -686,6 +693,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
    */
   @Test
   void testFeeExtension_createCommand() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "create", "PERIOD", "2"));
@@ -705,6 +713,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test renew command. */
   @Test
   void testFeeExtension_renewCommand() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "renew", "PERIOD", "2"));
@@ -724,6 +733,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test transfer command. */
   @Test
   void testFeeExtension_transferCommand() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "transfer", "PERIOD", "1"));
@@ -743,6 +753,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test restore command. */
   @Test
   void testFeeExtension_restoreCommand() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "restore", "PERIOD", "1"));
@@ -753,6 +764,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_restoreCommand_pendingDelete_noRenewal() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "restore", "PERIOD", "1"));
@@ -771,6 +783,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test create command on a premium label. */
   @Test
   void testFeeExtension_createCommandPremium() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput(
         "domain_info_fee.xml",
@@ -788,6 +801,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test renew command on a premium label. */
   @Test
   void testFeeExtension_renewCommandPremium() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput(
         "domain_info_fee.xml",
@@ -804,6 +818,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_renewCommandPremium_anchorTenant() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     persistResource(
         Tld.get("tld")
@@ -824,6 +839,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_renewCommandPremium_internalRegistration() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     persistResource(
         Tld.get("tld")
@@ -844,6 +860,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_renewCommandPremium_anchorTenant_multiYear() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     persistResource(
         Tld.get("tld")
@@ -864,6 +881,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_renewCommandPremium_internalRegistration_multiYear() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     persistResource(
         Tld.get("tld")
@@ -884,6 +902,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_renewCommandStandard_internalRegistration() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("tld");
     setEppInput(
         "domain_info_fee.xml",
@@ -900,6 +919,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test transfer command on a premium label. */
   @Test
   void testFeeExtension_transferCommandPremium() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput(
         "domain_info_fee.xml",
@@ -917,6 +937,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test restore command on a premium label. */
   @Test
   void testFeeExtension_restoreCommandPremium() throws Exception {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     createTld("example");
     setEppInput(
         "domain_info_fee.xml",
@@ -931,6 +952,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test setting the currency explicitly to a wrong value. */
   @Test
   void testFeeExtension_wrongCurrency() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
@@ -944,6 +966,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test requesting a period that isn't in years. */
   @Test
   void testFeeExtension_periodNotInYears() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "create", "PERIOD", "2", "UNIT", "m"));
@@ -956,6 +979,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test a command that specifies a phase. */
   @Test
   void testFeeExtension_commandPhase() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_info_fee_command_phase.xml");
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
@@ -966,6 +990,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test a command that specifies a subphase. */
   @Test
   void testFeeExtension_commandSubphase() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput("domain_info_fee_command_subphase.xml");
     persistTestEntities(false);
     setUpBillingEventForExistingDomain();
@@ -976,6 +1001,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test a restore for more than one year. */
   @Test
   void testFeeExtension_multiyearRestore() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "restore", "PERIOD", "2"));
@@ -988,6 +1014,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
   /** Test a transfer for more than one year. */
   @Test
   void testFeeExtension_multiyearTransfer() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(SUBSTITUTION_BASE, "COMMAND", "transfer", "PERIOD", "2"));
@@ -999,6 +1026,7 @@ class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Domain> {
 
   @Test
   void testFeeExtension_unknownCurrency() {
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     setEppInput(
         "domain_info_fee.xml",
         updateSubstitutions(
