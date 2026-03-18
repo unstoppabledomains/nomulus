@@ -131,12 +131,10 @@ steps:
   - -c
   - |
     set -e
-    if [ ${_ENV} == production ]; then
-      project_id="ud-registry"
-    elif [ ${_ENV} == sandbox ]; then
-      project_id="ud-registry-sandbox-gke"
+    if [[ "${_ENV}" == production ]]; then
+      project_id="ud-registry-prod-gke"
     else
-      project_id="ud-registry-${_ENV}"
+      project_id="ud-registry-${_ENV}-gke"
     fi
     echo "Deploying Cloud Scheduler and Cloud Tasks"
     deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-${_ENV}.xml $project_id
