@@ -131,13 +131,13 @@ steps:
   - -c
   - |
     set -e
-    if [ ${_ENV} == production ]; then
+    if [[ "${_ENV}" == production ]]; then
       project_id="ud-registry-prod-gke"
-    elif [ ${_ENV} == sandbox ]; then
+    elif [[ "${_ENV}" == sandbox ]]; then
       project_id="ud-registry-sandbox-gke"
-    elif [ ${_ENV} == alpha ]; then
+    elif [[ "${_ENV}" == alpha ]]; then
       project_id="ud-registry-alpha-gke"
-    elif [ ${_ENV} == crash ]; then
+    elif [[ "${_ENV}" == crash ]]; then
       project_id="ud-registry-crash-gke"
     else
       project_id="ud-registry-${_ENV}"
