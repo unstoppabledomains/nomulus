@@ -135,6 +135,8 @@ steps:
       project_id="ud-registry"
     elif [ ${_ENV} == sandbox ]; then
       project_id="ud-registry-sandbox-gke"
+    elif [ ${_ENV} == alpha ]; then
+      project_id="ud-registry-alpha-gke"
     else
       project_id="ud-registry-${_ENV}"
     fi
