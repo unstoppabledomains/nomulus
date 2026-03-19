@@ -22,15 +22,17 @@
 # Abort on error.
 set -e
 
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 alpha|crash|qa [base_domain]}"
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 alpha|crash|qa <base_domain> <gcr_hostname>"
   exit 1
 fi
 
 environment=${1}
 base_domain=${2}
+gcr_hostname=${3}
 echo "Environment: ${environment}"
 echo "Base domain: ${base_domain}"
+echo "GCR hostname: ${gcr_hostname}"
 if [ "${environment}" == "production" ]; then
   project="ud-registry"
 else
@@ -77,7 +79,8 @@ for service in frontend backend pubapi console
 do
   echo "Deploying ${service} service..."
   set +e
-  sed s/GCP_PROJECT/"${project}"/g "./kubernetes/nomulus-${service}.yaml" | \
+  sed "s|gcr.io/GCP_PROJECT/|${gcr_hostname}/GCP_PROJECT/nomulus/|g" "./kubernetes/nomulus-${service}.yaml" | \
+    sed s/GCP_PROJECT/"${project}"/g | \
     sed s/ENVIRONMENT/"${environment}"/g | \
     sed s/PROXY_ENV/"${environment}"/g | \
     sed s/EPP/"epp"/g | \
@@ -99,7 +102,8 @@ do
   # canary
   echo "Deploying ${service}-canary service..."
   set +e
-  sed s/GCP_PROJECT/"${project}"/g "./kubernetes/nomulus-${service}.yaml" | \
+  sed "s|gcr.io/GCP_PROJECT/|${gcr_hostname}/GCP_PROJECT/nomulus/|g" "./kubernetes/nomulus-${service}.yaml" | \
+    sed s/GCP_PROJECT/"${project}"/g | \
     sed s/ENVIRONMENT/"${environment}"/g | \
     sed s/PROXY_ENV/"${environment}_canary"/g | \
     sed s/EPP/"epp-canary"/g | \

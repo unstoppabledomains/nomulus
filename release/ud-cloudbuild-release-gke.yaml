@@ -130,7 +130,6 @@ steps:
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-deploy.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-schema-verify.yaml
     sed -i s/builder:latest/builder@$builder_digest/g release/cloudbuild-restart-proxies.yaml
-    sed -i s/GCP_PROJECT/${PROJECT_ID}/ proxy/kubernetes/proxy-*.yaml
     sed -i s/'$${COMMIT_SHA}'/${COMMIT_SHA}/g release/cloudbuild-sync-and-tag.yaml
     sed -i s/'$${COMMIT_SHA}'/${COMMIT_SHA}/g release/cloudbuild-deploy-gke.yaml
     for environment in alpha crash qa sandbox production; do

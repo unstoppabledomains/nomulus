@@ -17,13 +17,18 @@
 # kills all running pods to force k8s to create new pods using the just-pushed
 # manifest.
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 alpha|crash|qa"
+if [[ $# -ne 2 ]]; then
+  echo "Usage: $0 alpha|crash|qa <gcr_hostname>"
   exit 1
 fi
 
 environment=${1}
-project="domain-registry-"${environment}
+gcr_hostname=${2}
+if [ "${environment}" == "production" ]; then
+  project="ud-registry"
+else
+  project="ud-registry-${environment}-gke"
+fi
 current_context=$(kubectl config current-context)
 while read line
 do
@@ -31,12 +36,14 @@ do
   echo "Updating cluster ${parts[0]} in zone ${parts[1]}..."
   gcloud container clusters get-credentials "${parts[0]}" \
     --project "${project}" --zone "${parts[1]}"
-  sed s/GCP_PROJECT/${project}/g "./kubernetes/proxy-deployment-${environment}.yaml" | \
+  sed "s|gcr.io/GCP_PROJECT/|${gcr_hostname}/GCP_PROJECT/nomulus/|g" "./kubernetes/proxy-deployment-${environment}.yaml" | \
+  sed s/GCP_PROJECT/${project}/g | \
   kubectl apply -f -
   kubectl apply -f "./kubernetes/proxy-service.yaml" --force
   # Alpha does not have canary
   if [[ ${environment} != "alpha" ]]; then
-    sed s/GCP_PROJECT/${project}/g "./kubernetes/proxy-deployment-${environment}-canary.yaml" | \
+    sed "s|gcr.io/GCP_PROJECT/|${gcr_hostname}/GCP_PROJECT/nomulus/|g" "./kubernetes/proxy-deployment-${environment}-canary.yaml" | \
+    sed s/GCP_PROJECT/${project}/g | \
     kubectl apply -f -
     kubectl apply -f "./kubernetes/proxy-service-canary.yaml" --force
   fi
