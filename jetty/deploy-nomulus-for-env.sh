@@ -23,7 +23,7 @@
 set -e
 
 if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 alpha|crash|qa <base_domain> <gcr_hostname>"
+  echo "Usage: $0 alpha|crash|qa|sandbox|production <base_domain> <gcr_hostname>"
   exit 1
 fi
 

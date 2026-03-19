@@ -18,7 +18,7 @@
 # manifest.
 
 if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 alpha|crash|qa <gcr_hostname>"
+  echo "Usage: $0 alpha|crash|qa|sandbox|production <gcr_hostname>"
   exit 1
 fi
 
