@@ -25,7 +25,7 @@ fi
 environment=${1}
 gcr_hostname=${2}
 if [ "${environment}" == "production" ]; then
-  project="ud-registry"
+  project="ud-registry-prod-gke"
 else
   project="ud-registry-${environment}-gke"
 fi

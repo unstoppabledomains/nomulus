@@ -34,7 +34,7 @@ echo "Environment: ${environment}"
 echo "Base domain: ${base_domain}"
 echo "GCR hostname: ${gcr_hostname}"
 if [ "${environment}" == "production" ]; then
-  project="ud-registry"
+  project="ud-registry-prod-gke"
 else
   project="ud-registry-${environment}-gke"
 fi
