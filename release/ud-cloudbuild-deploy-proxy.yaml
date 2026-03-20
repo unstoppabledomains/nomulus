@@ -38,7 +38,7 @@ steps:
   args:
   - -c
   - |
-    ./deploy-proxy-for-env.sh ${_ENV}
+    ./deploy-proxy-for-env.sh ${_ENV} ${_GCR_HOSTNAME}
   dir: 'proxy'
 timeout: 3600s
 options:
