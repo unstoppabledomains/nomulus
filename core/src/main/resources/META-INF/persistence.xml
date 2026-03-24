@@ -81,6 +81,9 @@
     <class>google.registry.model.tmch.ClaimsEntry</class>
     <class>google.registry.model.tmch.TmchCrl</class>
     <class>google.registry.model.domain.RegistryLock</class>
+    <class>google.registry.model.registrydash.RegistryDashboardRoRegistrarMapping</class>
+    <class>google.registry.model.registrydash.RegistryDashboardRegistrarPricing</class>
+    <class>google.registry.model.registrydash.RegistryDashboardCostBasis</class>
 
     <!-- Customized type converters -->
     <class>google.registry.persistence.converter.BloomFilterConverter</class>
