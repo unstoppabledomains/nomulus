@@ -62,8 +62,8 @@ export class PricingComponent {
       Validators.min(0),
     ]),
     priceCurrency: new FormControl('USD', [Validators.required]),
-    effectiveDate: new FormControl(''),
-    expiryDate: new FormControl(''),
+    effectiveDate: new FormControl<Date | null>(null),
+    expiryDate: new FormControl<Date | null>(null),
     isActive: new FormControl(true),
   });
 
@@ -97,8 +97,8 @@ export class PricingComponent {
       operation: rule.operation,
       priceAmount: rule.priceAmount,
       priceCurrency: rule.priceCurrency,
-      effectiveDate: rule.effectiveDate,
-      expiryDate: rule.expiryDate || '',
+      effectiveDate: rule.effectiveDate ? new Date(rule.effectiveDate) : null,
+      expiryDate: rule.expiryDate ? new Date(rule.expiryDate) : null,
       isActive: rule.isActive,
     });
     this.showForm.set(true);
@@ -113,14 +113,16 @@ export class PricingComponent {
     if (!this.pricingForm.valid) return;
 
     const formValue = this.pricingForm.value;
+    const effectiveDate = formValue.effectiveDate;
+    const expiryDate = formValue.expiryDate;
     const rule: PricingRule = {
       registrarId: formValue.registrarId!,
       tld: formValue.tld!,
       operation: formValue.operation!,
       priceAmount: formValue.priceAmount!,
       priceCurrency: formValue.priceCurrency!,
-      effectiveDate: formValue.effectiveDate || '',
-      expiryDate: formValue.expiryDate || undefined,
+      effectiveDate: effectiveDate instanceof Date ? effectiveDate.toISOString() : (effectiveDate || ''),
+      expiryDate: expiryDate instanceof Date ? expiryDate.toISOString() : (expiryDate || undefined),
       isActive: formValue.isActive ?? true,
     };
 

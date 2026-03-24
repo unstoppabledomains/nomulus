@@ -60,15 +60,27 @@
           </mat-form-field>
           <mat-form-field>
             <mat-label>Currency</mat-label>
-            <input matInput formControlName="priceCurrency">
+            <mat-select formControlName="priceCurrency">
+              <mat-option value="USD">USD</mat-option>
+              <mat-option value="EUR">EUR</mat-option>
+              <mat-option value="GBP">GBP</mat-option>
+              <mat-option value="JPY">JPY</mat-option>
+              <mat-option value="CAD">CAD</mat-option>
+              <mat-option value="AUD">AUD</mat-option>
+              <mat-option value="CHF">CHF</mat-option>
+            </mat-select>
           </mat-form-field>
           <mat-form-field>
             <mat-label>Effective Date</mat-label>
-            <input matInput type="datetime-local" formControlName="effectiveDate">
+            <input matInput [matDatepicker]="effectivePicker" formControlName="effectiveDate">
+            <mat-datepicker-toggle matIconSuffix [for]="effectivePicker"></mat-datepicker-toggle>
+            <mat-datepicker #effectivePicker></mat-datepicker>
           </mat-form-field>
           <mat-form-field>
             <mat-label>Expiry Date</mat-label>
-            <input matInput type="datetime-local" formControlName="expiryDate">
+            <input matInput [matDatepicker]="expiryPicker" formControlName="expiryDate">
+            <mat-datepicker-toggle matIconSuffix [for]="expiryPicker"></mat-datepicker-toggle>
+            <mat-datepicker #expiryPicker></mat-datepicker>
           </mat-form-field>
           <mat-checkbox formControlName="isActive">Active</mat-checkbox>
           <div class="form-actions">
