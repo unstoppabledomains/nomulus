@@ -27,7 +27,6 @@ import {
   PricingRule,
   CostBasisEntry,
   AdminData,
-  RoMapping,
 } from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
@@ -400,16 +399,7 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<AdminData>(err)));
   }
 
-  createRegistryDashMapping(mapping: RoMapping): Observable<RoMapping> {
-    return this.http.post<RoMapping>(
-      '/console-api/registry-dash/admin',
-      mapping
-    );
-  }
-
-  deleteRegistryDashMapping(id: number): Observable<void> {
-    return this.http.delete<void>('/console-api/registry-dash/admin', {
-      body: { id },
-    });
+  postRegistryDashAdmin(payload: unknown): Observable<unknown> {
+    return this.http.post('/console-api/registry-dash/admin', payload);
   }
 }

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, computed } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { MaterialModule } from '../../material.module';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, RoRegistry } from '../registry-dash.service';
 
 @Component({
   selector: 'app-admin',
@@ -26,16 +26,24 @@ import { RegistryDashService } from '../registry-dash.service';
   styleUrls: ['./admin.component.scss'],
 })
 export class AdminComponent implements OnInit {
-  mappingColumns = ['userEmailAddress', 'tld', 'createdAt', 'actions'];
   registrarColumns = ['registrarId', 'registrarName', 'allowedTlds'];
 
-  addForm = new FormGroup({
-    userEmailAddress: new FormControl('', [Validators.required, Validators.email]),
+  registries = computed(() => this.dashService.adminData()?.registries || []);
+  systemInfo = computed(() => this.dashService.adminData()?.systemInfo);
+
+  selectedRegistry = signal<RoRegistry | undefined>(undefined);
+
+  registryForm = new FormGroup({
+    name: new FormControl('', [Validators.required]),
+  });
+
+  tldForm = new FormGroup({
     tld: new FormControl('', [Validators.required]),
   });
 
-  mappings = computed(() => this.dashService.adminData()?.mappings || []);
-  systemInfo = computed(() => this.dashService.adminData()?.systemInfo);
+  userForm = new FormGroup({
+    userEmail: new FormControl('', [Validators.required, Validators.email]),
+  });
 
   constructor(public dashService: RegistryDashService) {}
 
@@ -43,17 +51,88 @@ export class AdminComponent implements OnInit {
     this.dashService.getAdminData().subscribe();
   }
 
-  onAddMapping() {
-    if (this.addForm.invalid) return;
-    const { userEmailAddress, tld } = this.addForm.value;
+  onCreateRegistry() {
+    if (this.registryForm.invalid) return;
+    const name = this.registryForm.value.name!;
     this.dashService
-      .createMapping({ userEmailAddress: userEmailAddress!, tld: tld! })
+      .adminAction({ action: 'createRegistry', registryName: name })
       .subscribe(() => {
-        this.addForm.reset();
+        this.registryForm.reset();
       });
   }
 
-  onDeleteMapping(id: number) {
-    this.dashService.deleteMapping(id).subscribe();
+  onDeleteRegistry(id: number) {
+    this.dashService
+      .adminAction({ action: 'deleteRegistry', registryId: id })
+      .subscribe(() => {
+        if (this.selectedRegistry()?.id === id) {
+          this.selectedRegistry.set(undefined);
+        }
+      });
   }
+
+  onSelectRegistry(registry: RoRegistry) {
+    this.selectedRegistry.set(registry);
+  }
+
+  onAddTld() {
+    if (this.tldForm.invalid || !this.selectedRegistry()) return;
+    const tld = this.tldForm.value.tld!;
+    this.dashService
+      .adminAction({
+        action: 'addTld',
+        registryId: this.selectedRegistry()!.id,
+        tld,
+      })
+      .subscribe(() => {
+        this.tldForm.reset();
+        this.refreshSelectedRegistry();
+      });
+  }
+
+  onRemoveTld(id: number) {
+    this.dashService
+      .adminAction({ action: 'removeTld', id })
+      .subscribe(() => this.refreshSelectedRegistry());
+  }
+
+  onAddUser() {
+    if (this.userForm.invalid || !this.selectedRegistry()) return;
+    const userEmail = this.userForm.value.userEmail!;
+    this.dashService
+      .adminAction({
+        action: 'addUser',
+        registryId: this.selectedRegistry()!.id,
+        userEmail,
+      })
+      .subscribe(() => {
+        this.userForm.reset();
+        this.refreshSelectedRegistry();
+      });
+  }
+
+  onRemoveUser(id: number) {
+    this.dashService
+      .adminAction({ action: 'removeUser', id })
+      .subscribe(() => this.refreshSelectedRegistry());
+  }
+
+  /** After admin data refreshes, update the selected registry reference. */
+  private refreshSelectedRegistry() {
+    const currentId = this.selectedRegistry()?.id;
+    if (currentId) {
+      // adminAction already triggers getAdminData refresh; update selection on next tick
+      setTimeout(() => {
+        const updated = this.registries().find((r) => r.id === currentId);
+        this.selectedRegistry.set(updated);
+      }, 500);
+    }
+  }
+
+  /** TLDs available for assignment (not already assigned to this registry). */
+  availableTlds = computed(() => {
+    const all = this.systemInfo()?.tlds || [];
+    const assigned = (this.selectedRegistry()?.tlds || []).map((t) => t.tld);
+    return all.filter((t) => !assigned.includes(t));
+  });
 }

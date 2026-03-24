@@ -59,11 +59,22 @@ export interface CostBasisEntry {
   notes?: string;
 }
 
-export interface RoMapping {
+export interface RoRegistryTld {
   id?: number;
-  userEmailAddress: string;
   tld: string;
+}
+
+export interface RoRegistryUser {
+  id?: number;
+  userEmail: string;
+}
+
+export interface RoRegistry {
+  id?: number;
+  name: string;
   createdAt?: string;
+  tlds: RoRegistryTld[];
+  users: RoRegistryUser[];
 }
 
 export interface SystemRegistrar {
@@ -78,7 +89,7 @@ export interface SystemInfo {
 }
 
 export interface AdminData {
-  mappings: RoMapping[];
+  registries: RoRegistry[];
   systemInfo: SystemInfo;
 }
 
@@ -92,7 +103,6 @@ export class RegistryDashService {
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
-  mappings = computed(() => this.adminData()?.mappings || []);
   systemInfo = computed(() => this.adminData()?.systemInfo);
 
   constructor(private backend: BackendService) {}
@@ -223,23 +233,19 @@ export class RegistryDashService {
       );
   }
 
-  createMapping(mapping: RoMapping): Observable<RoMapping> {
-    return this.backend.createRegistryDashMapping(mapping).pipe(
-      tap((created) => {
-        // Refresh admin data to get updated mappings
-        this.getAdminData().subscribe();
-      }),
-      catchError((err) => this.handleError<RoMapping>(err))
-    );
-  }
-
-  deleteMapping(id: number): Observable<void> {
-    return this.backend.deleteRegistryDashMapping(id).pipe(
+  adminAction(payload: {
+    action: string;
+    registryId?: number;
+    registryName?: string;
+    tld?: string;
+    userEmail?: string;
+    id?: number;
+  }): Observable<unknown> {
+    return this.backend.postRegistryDashAdmin(payload).pipe(
       tap(() => {
-        // Refresh admin data to get updated mappings
         this.getAdminData().subscribe();
       }),
-      catchError((err) => this.handleError<void>(err))
+      catchError((err) => this.handleError<unknown>(err))
     );
   }
 }

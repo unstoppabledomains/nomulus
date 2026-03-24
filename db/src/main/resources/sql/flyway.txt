@@ -220,3 +220,4 @@ V219__domain_history_package_token_idx.sql
 V220__domain_package_token_idx.sql
 V221__registry_dashboard_tables.sql
 V222__registry_dashboard_tld_mapping.sql
+V223__registry_scoping_refactor.sql

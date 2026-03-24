@@ -1209,65 +1209,48 @@ ALTER SEQUENCE public."RegistryDashboardRegistrarPricing_id_seq" OWNED BY public
 
 
 --
--- Name: RegistryDashboardRoRegistrarMapping; Type: TABLE; Schema: public; Owner: -
+-- Name: RoRegistry; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public."RegistryDashboardRoRegistrarMapping" (
-    id bigint NOT NULL,
-    user_email_address text NOT NULL,
-    registrar_id text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+CREATE TABLE public."RoRegistry" (
+    id bigserial NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (name)
 );
 
 
 --
--- Name: RegistryDashboardRoRegistrarMapping_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: RoRegistryTld; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public."RegistryDashboardRoRegistrarMapping_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: RegistryDashboardRoRegistrarMapping_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public."RegistryDashboardRoRegistrarMapping_id_seq" OWNED BY public."RegistryDashboardRoRegistrarMapping".id;
-
-
---
--- Name: RegistryDashboardRoTldMapping; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public."RegistryDashboardRoTldMapping" (
-    id bigint NOT NULL,
-    user_email_address text NOT NULL,
+CREATE TABLE public."RoRegistryTld" (
+    id bigserial NOT NULL,
+    registry_id bigint NOT NULL REFERENCES public."RoRegistry"(id) ON DELETE CASCADE,
     tld text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (registry_id, tld)
 );
 
-
---
--- Name: RegistryDashboardRoTldMapping_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public."RegistryDashboardRoTldMapping_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+CREATE INDEX idx_ro_registry_tld_registry ON public."RoRegistryTld" (registry_id);
 
 
 --
--- Name: RegistryDashboardRoTldMapping_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: RoRegistryUser; Type: TABLE; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public."RegistryDashboardRoTldMapping_id_seq" OWNED BY public."RegistryDashboardRoTldMapping".id;
+CREATE TABLE public."RoRegistryUser" (
+    id bigserial NOT NULL,
+    registry_id bigint NOT NULL REFERENCES public."RoRegistry"(id) ON DELETE CASCADE,
+    user_email text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (registry_id, user_email)
+);
+
+CREATE INDEX idx_ro_registry_user_email ON public."RoRegistryUser" (user_email);
 
 
 --
@@ -1623,17 +1606,8 @@ ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing" ALTER COLUMN id SET 
 
 
 --
--- Name: RegistryDashboardRoRegistrarMapping id; Type: DEFAULT; Schema: public; Owner: -
+-- Note: RoRegistry, RoRegistryTld, RoRegistryUser use bigserial (no separate DEFAULT needed)
 --
-
-ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardRoRegistrarMapping_id_seq"'::regclass);
-
-
---
--- Name: RegistryDashboardRoTldMapping id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."RegistryDashboardRoTldMapping" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardRoTldMapping_id_seq"'::regclass);
 
 
 --
@@ -1993,35 +1967,8 @@ ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing"
 
 
 --
--- Name: RegistryDashboardRoRegistrarMapping RegistryDashboardRoRegistrarM_user_email_address_registrar__key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Note: RoRegistry, RoRegistryTld, RoRegistryUser constraints are defined inline in CREATE TABLE
 --
-
-ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping"
-    ADD CONSTRAINT "RegistryDashboardRoRegistrarM_user_email_address_registrar__key" UNIQUE (user_email_address, registrar_id);
-
-
---
--- Name: RegistryDashboardRoRegistrarMapping RegistryDashboardRoRegistrarMapping_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping"
-    ADD CONSTRAINT "RegistryDashboardRoRegistrarMapping_pkey" PRIMARY KEY (id);
-
-
---
--- Name: RegistryDashboardRoTldMapping RegistryDashboardRoTldMapping_user_email_address_tld_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."RegistryDashboardRoTldMapping"
-    ADD CONSTRAINT "RegistryDashboardRoTldMapping_user_email_address_tld_key" UNIQUE (user_email_address, tld);
-
-
---
--- Name: RegistryDashboardRoTldMapping RegistryDashboardRoTldMapping_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public."RegistryDashboardRoTldMapping"
-    ADD CONSTRAINT "RegistryDashboardRoTldMapping_pkey" PRIMARY KEY (id);
 
 
 --
@@ -2558,17 +2505,8 @@ CREATE INDEX idx_registry_lock_verification_code ON public."RegistryLock" USING 
 
 
 --
--- Name: idx_ro_mapping_user; Type: INDEX; Schema: public; Owner: -
+-- Note: RoRegistry indexes are defined inline in CREATE TABLE section
 --
-
-CREATE INDEX idx_ro_mapping_user ON public."RegistryDashboardRoRegistrarMapping" USING btree (user_email_address);
-
-
---
--- Name: idx_ro_tld_mapping_user; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_ro_tld_mapping_user ON public."RegistryDashboardRoTldMapping" USING btree (user_email_address);
 
 
 --

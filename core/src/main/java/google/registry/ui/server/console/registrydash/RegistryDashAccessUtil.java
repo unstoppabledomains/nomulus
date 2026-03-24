@@ -18,38 +18,41 @@ import static google.registry.persistence.transaction.TransactionManagerFactory.
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.registrar.Registrar;
-import google.registry.model.registrydash.RegistryDashboardRoTldMapping;
+import google.registry.model.registrydash.RoRegistryTld;
 import java.util.List;
 
-/** Utility for scoping registry dashboard data access via TLD mappings. */
+/**
+ * Utility for scoping registry dashboard data access.
+ *
+ * <p>Access chain: user -> RoRegistryUser -> RoRegistry -> RoRegistryTld -> TLDs -> Registrars.
+ */
 public final class RegistryDashAccessUtil {
 
-  private static final String TLD_MAPPING_QUERY =
+  private static final String TLDS_FOR_USER =
       """
-      SELECT m FROM RegistryDashboardRoTldMapping m
-      WHERE m.userEmailAddress = :email
+      SELECT rt FROM RoRegistryTld rt
+      WHERE rt.registryId IN (
+        SELECT ru.registryId FROM RoRegistryUser ru
+        WHERE ru.userEmail = :email
+      )
       """;
 
-  private static final String REGISTRARS_BY_TLD =
-      """
-      SELECT r FROM Registrar r
-      WHERE r.type = :type
-      """;
+  private static final String REGISTRARS_BY_TYPE =
+      "SELECT r FROM Registrar r WHERE r.type = :type";
 
   private RegistryDashAccessUtil() {}
 
-  /** Returns the set of TLDs that the given user email is mapped to. */
+  /** Returns the set of TLDs accessible to the given user via their registry memberships. */
   public static ImmutableSet<String> getMappedTlds(String userEmail) {
     return tm().transact(
         () -> {
-          @SuppressWarnings("unchecked")
-          List<RegistryDashboardRoTldMapping> mappings =
+          List<RoRegistryTld> tldMappings =
               tm().getEntityManager()
-                  .createQuery(TLD_MAPPING_QUERY, RegistryDashboardRoTldMapping.class)
+                  .createQuery(TLDS_FOR_USER, RoRegistryTld.class)
                   .setParameter("email", userEmail)
                   .getResultList();
-          return mappings.stream()
-              .map(RegistryDashboardRoTldMapping::getTld)
+          return tldMappings.stream()
+              .map(RoRegistryTld::getTld)
               .collect(ImmutableSet.toImmutableSet());
         });
   }
@@ -63,7 +66,7 @@ public final class RegistryDashAccessUtil {
         () -> {
           List<Registrar> registrars =
               tm().getEntityManager()
-                  .createQuery(REGISTRARS_BY_TLD, Registrar.class)
+                  .createQuery(REGISTRARS_BY_TYPE, Registrar.class)
                   .setParameter("type", Registrar.Type.REAL)
                   .getResultList();
           return registrars.stream()

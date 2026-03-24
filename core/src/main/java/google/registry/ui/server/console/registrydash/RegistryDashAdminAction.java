@@ -15,7 +15,6 @@
 package google.registry.ui.server.console.registrydash;
 
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
-import static google.registry.request.Action.Method.DELETE;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.POST;
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
@@ -25,7 +24,9 @@ import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
-import google.registry.model.registrydash.RegistryDashboardRoTldMapping;
+import google.registry.model.registrydash.RoRegistry;
+import google.registry.model.registrydash.RoRegistryTld;
+import google.registry.model.registrydash.RoRegistryUser;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
@@ -39,21 +40,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Handles admin CRUD for TLD mappings and provides system reference data. */
+/** Handles admin CRUD for registries, TLD assignments, and user assignments. */
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashAdminAction.PATH,
-    method = {GET, POST, DELETE},
+    method = {GET, POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
 public class RegistryDashAdminAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/admin";
 
-  private static final String ALL_TLD_MAPPINGS =
-      """
-      SELECT m FROM RegistryDashboardRoTldMapping m
-      ORDER BY m.userEmailAddress, m.tld
-      """;
+  private static final String ALL_REGISTRIES =
+      "SELECT r FROM RoRegistry r ORDER BY r.name";
+
+  private static final String TLDS_FOR_REGISTRY =
+      "SELECT t FROM RoRegistryTld t WHERE t.registryId = :registryId ORDER BY t.tld";
+
+  private static final String USERS_FOR_REGISTRY =
+      "SELECT u FROM RoRegistryUser u WHERE u.registryId = :registryId ORDER BY u.userEmail";
 
   private static final String ALL_TLDS =
       "SELECT t.tldStr FROM Tld t ORDER BY t.tldStr";
@@ -80,17 +84,54 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
 
     tm().transact(
         () -> {
-          List<RegistryDashboardRoTldMapping> mappings =
+          // Load all registries with their TLDs and users
+          List<RoRegistry> registries =
               tm().getEntityManager()
-                  .createQuery(ALL_TLD_MAPPINGS, RegistryDashboardRoTldMapping.class)
+                  .createQuery(ALL_REGISTRIES, RoRegistry.class)
                   .getResultList();
-          List<Map<String, Object>> mappingList = new ArrayList<>();
-          for (RegistryDashboardRoTldMapping m : mappings) {
-            mappingList.add(mappingToMap(m));
+
+          List<Map<String, Object>> registryList = new ArrayList<>();
+          for (RoRegistry reg : registries) {
+            Map<String, Object> regMap = new HashMap<>();
+            regMap.put("id", reg.getId());
+            regMap.put("name", reg.getName());
+            regMap.put("createdAt",
+                reg.getCreatedAt() != null ? reg.getCreatedAt().toString() : null);
+
+            List<RoRegistryTld> tlds =
+                tm().getEntityManager()
+                    .createQuery(TLDS_FOR_REGISTRY, RoRegistryTld.class)
+                    .setParameter("registryId", reg.getId())
+                    .getResultList();
+            List<Map<String, Object>> tldList = new ArrayList<>();
+            for (RoRegistryTld t : tlds) {
+              Map<String, Object> tMap = new HashMap<>();
+              tMap.put("id", t.getId());
+              tMap.put("tld", t.getTld());
+              tldList.add(tMap);
+            }
+            regMap.put("tlds", tldList);
+
+            List<RoRegistryUser> users =
+                tm().getEntityManager()
+                    .createQuery(USERS_FOR_REGISTRY, RoRegistryUser.class)
+                    .setParameter("registryId", reg.getId())
+                    .getResultList();
+            List<Map<String, Object>> userList = new ArrayList<>();
+            for (RoRegistryUser u : users) {
+              Map<String, Object> uMap = new HashMap<>();
+              uMap.put("id", u.getId());
+              uMap.put("userEmail", u.getUserEmail());
+              userList.add(uMap);
+            }
+            regMap.put("users", userList);
+
+            registryList.add(regMap);
           }
 
+          // System reference data
           @SuppressWarnings("unchecked")
-          List<String> tlds =
+          List<String> systemTlds =
               tm().getEntityManager()
                   .createQuery(ALL_TLDS)
                   .getResultList();
@@ -110,11 +151,11 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
           }
 
           Map<String, Object> systemInfo = new HashMap<>();
-          systemInfo.put("tlds", tlds);
+          systemInfo.put("tlds", systemTlds);
           systemInfo.put("registrars", registrarList);
 
           Map<String, Object> response = new HashMap<>();
-          response.put("mappings", mappingList);
+          response.put("registries", registryList);
           response.put("systemInfo", systemInfo);
 
           consoleApiParams.response().setPayload(
@@ -134,47 +175,44 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
         adminPayload.orElseThrow(
             () -> new IllegalArgumentException("Request body is required"));
 
-    if (payload.userEmailAddress() == null || payload.userEmailAddress().isBlank()) {
-      setFailedResponse("userEmailAddress is required", SC_BAD_REQUEST);
-      return;
-    }
-    if (payload.tld() == null || payload.tld().isBlank()) {
-      setFailedResponse("tld is required", SC_BAD_REQUEST);
+    String action = payload.action();
+    if (action == null || action.isBlank()) {
+      setFailedResponse("action is required", SC_BAD_REQUEST);
       return;
     }
 
-    RegistryDashboardRoTldMapping mapping =
-        new RegistryDashboardRoTldMapping(payload.userEmailAddress(), payload.tld());
+    switch (action) {
+      case "createRegistry" -> handleCreateRegistry(payload);
+      case "deleteRegistry" -> handleDeleteRegistry(payload);
+      case "addTld" -> handleAddTld(payload);
+      case "removeTld" -> handleRemoveTld(payload);
+      case "addUser" -> handleAddUser(payload);
+      case "removeUser" -> handleRemoveUser(payload);
+      default -> setFailedResponse("Unknown action: " + action, SC_BAD_REQUEST);
+    }
+  }
 
-    tm().transact(() -> tm().getEntityManager().persist(mapping));
-    consoleApiParams.response().setPayload(
-        consoleApiParams.gson().toJson(mappingToMap(mapping)));
+  private void handleCreateRegistry(AdminPayload payload) {
+    if (payload.registryName() == null || payload.registryName().isBlank()) {
+      setFailedResponse("registryName is required", SC_BAD_REQUEST);
+      return;
+    }
+    RoRegistry registry = new RoRegistry(payload.registryName());
+    tm().transact(() -> tm().getEntityManager().persist(registry));
     consoleApiParams.response().setStatus(SC_OK);
   }
 
-  @Override
-  protected void deleteHandler(User user) {
-    if (!user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
-      consoleApiParams.response().setStatus(SC_FORBIDDEN);
+  private void handleDeleteRegistry(AdminPayload payload) {
+    if (payload.registryId() == null) {
+      setFailedResponse("registryId is required", SC_BAD_REQUEST);
       return;
     }
-
-    AdminPayload payload =
-        adminPayload.orElseThrow(
-            () -> new IllegalArgumentException("Request body is required"));
-
-    if (payload.id() == null) {
-      setFailedResponse("id is required for delete", SC_BAD_REQUEST);
-      return;
-    }
-
     tm().transact(
         () -> {
-          RegistryDashboardRoTldMapping existing =
-              tm().getEntityManager()
-                  .find(RegistryDashboardRoTldMapping.class, payload.id());
+          RoRegistry existing =
+              tm().getEntityManager().find(RoRegistry.class, payload.registryId());
           if (existing == null) {
-            setFailedResponse("Mapping not found", SC_BAD_REQUEST);
+            setFailedResponse("Registry not found", SC_BAD_REQUEST);
             return;
           }
           tm().getEntityManager().remove(existing);
@@ -182,15 +220,76 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
         });
   }
 
-  private static Map<String, Object> mappingToMap(RegistryDashboardRoTldMapping m) {
-    Map<String, Object> map = new HashMap<>();
-    map.put("id", m.getId());
-    map.put("userEmailAddress", m.getUserEmailAddress());
-    map.put("tld", m.getTld());
-    map.put("createdAt", m.getCreatedAt() != null ? m.getCreatedAt().toString() : null);
-    return map;
+  private void handleAddTld(AdminPayload payload) {
+    if (payload.registryId() == null) {
+      setFailedResponse("registryId is required", SC_BAD_REQUEST);
+      return;
+    }
+    if (payload.tld() == null || payload.tld().isBlank()) {
+      setFailedResponse("tld is required", SC_BAD_REQUEST);
+      return;
+    }
+    RoRegistryTld tldMapping = new RoRegistryTld(payload.registryId(), payload.tld());
+    tm().transact(() -> tm().getEntityManager().persist(tldMapping));
+    consoleApiParams.response().setStatus(SC_OK);
   }
 
-  /** Payload record for POST (create) and DELETE operations. */
-  public record AdminPayload(String userEmailAddress, String tld, Long id) {}
+  private void handleRemoveTld(AdminPayload payload) {
+    if (payload.id() == null) {
+      setFailedResponse("id is required", SC_BAD_REQUEST);
+      return;
+    }
+    tm().transact(
+        () -> {
+          RoRegistryTld existing =
+              tm().getEntityManager().find(RoRegistryTld.class, payload.id());
+          if (existing == null) {
+            setFailedResponse("TLD assignment not found", SC_BAD_REQUEST);
+            return;
+          }
+          tm().getEntityManager().remove(existing);
+          consoleApiParams.response().setStatus(SC_OK);
+        });
+  }
+
+  private void handleAddUser(AdminPayload payload) {
+    if (payload.registryId() == null) {
+      setFailedResponse("registryId is required", SC_BAD_REQUEST);
+      return;
+    }
+    if (payload.userEmail() == null || payload.userEmail().isBlank()) {
+      setFailedResponse("userEmail is required", SC_BAD_REQUEST);
+      return;
+    }
+    RoRegistryUser userMapping = new RoRegistryUser(payload.registryId(), payload.userEmail());
+    tm().transact(() -> tm().getEntityManager().persist(userMapping));
+    consoleApiParams.response().setStatus(SC_OK);
+  }
+
+  private void handleRemoveUser(AdminPayload payload) {
+    if (payload.id() == null) {
+      setFailedResponse("id is required", SC_BAD_REQUEST);
+      return;
+    }
+    tm().transact(
+        () -> {
+          RoRegistryUser existing =
+              tm().getEntityManager().find(RoRegistryUser.class, payload.id());
+          if (existing == null) {
+            setFailedResponse("User assignment not found", SC_BAD_REQUEST);
+            return;
+          }
+          tm().getEntityManager().remove(existing);
+          consoleApiParams.response().setStatus(SC_OK);
+        });
+  }
+
+  /** Payload record for all admin POST operations. */
+  public record AdminPayload(
+      String action,
+      Long registryId,
+      String registryName,
+      String tld,
+      String userEmail,
+      Long id) {}
 }

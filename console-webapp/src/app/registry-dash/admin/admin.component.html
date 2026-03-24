@@ -9,58 +9,94 @@
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
-  <!-- TLD Mappings Section -->
+  <!-- Registries Section -->
   <mat-card class="admin-card">
     <mat-card-header>
-      <mat-card-title>TLD Mappings</mat-card-title>
-      <mat-card-subtitle>Manage which TLDs each registry user can access. Registrar access is derived from TLD assignments.</mat-card-subtitle>
+      <mat-card-title>Registries</mat-card-title>
+      <mat-card-subtitle>Each registry owns a set of TLDs. Users assigned to a registry can see all its TLD data.</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
-      <!-- Add Mapping Form -->
-      <form [formGroup]="addForm" (ngSubmit)="onAddMapping()" class="add-form">
+      <!-- Create Registry Form -->
+      <form [formGroup]="registryForm" (ngSubmit)="onCreateRegistry()" class="add-form">
         <mat-form-field>
-          <mat-label>User Email</mat-label>
-          <input matInput formControlName="userEmailAddress" type="email" placeholder="user@example.com">
+          <mat-label>Registry Name</mat-label>
+          <input matInput formControlName="name" placeholder="e.g. registryXYZ">
         </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="registryForm.invalid">
+          Create Registry
+        </button>
+      </form>
+
+      <!-- Registry List -->
+      <div class="registry-list">
+        <div *ngFor="let reg of registries()"
+             class="registry-item"
+             [class.selected]="selectedRegistry()?.id === reg.id"
+             (click)="onSelectRegistry(reg)">
+          <div class="registry-info">
+            <span class="registry-name">{{ reg.name }}</span>
+            <span class="registry-meta">
+              {{ reg.tlds.length }} TLD{{ reg.tlds.length !== 1 ? 's' : '' }} &middot;
+              {{ reg.users.length }} user{{ reg.users.length !== 1 ? 's' : '' }}
+            </span>
+          </div>
+          <button mat-icon-button color="warn" (click)="onDeleteRegistry(reg.id!); $event.stopPropagation()">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+        <p *ngIf="registries().length === 0" class="empty-state">No registries created yet.</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Selected Registry Detail -->
+  <mat-card *ngIf="selectedRegistry()" class="admin-card detail-card">
+    <mat-card-header>
+      <mat-card-title>{{ selectedRegistry()!.name }}</mat-card-title>
+      <mat-card-subtitle>Manage TLDs and users for this registry</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- TLD Assignments -->
+      <h3>TLDs</h3>
+      <form [formGroup]="tldForm" (ngSubmit)="onAddTld()" class="add-form">
         <mat-form-field>
           <mat-label>TLD</mat-label>
           <mat-select formControlName="tld">
-            <mat-option *ngFor="let tld of systemInfo()?.tlds || []" [value]="tld">
+            <mat-option *ngFor="let tld of availableTlds()" [value]="tld">
               {{ tld }}
             </mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-raised-button color="primary" type="submit" [disabled]="addForm.invalid">
-          Add Mapping
+        <button mat-raised-button color="primary" type="submit" [disabled]="tldForm.invalid">
+          Add TLD
         </button>
       </form>
+      <mat-chip-set>
+        <mat-chip *ngFor="let t of selectedRegistry()!.tlds" [removable]="true" (removed)="onRemoveTld(t.id!)">
+          {{ t.tld }}
+          <mat-icon matChipRemove>cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-set>
+      <p *ngIf="selectedRegistry()!.tlds.length === 0" class="empty-state">No TLDs assigned yet.</p>
 
-      <!-- Mappings Table -->
-      <table mat-table [dataSource]="mappings()" class="mappings-table">
-        <ng-container matColumnDef="userEmailAddress">
-          <th mat-header-cell *matHeaderCellDef>User Email</th>
-          <td mat-cell *matCellDef="let row">{{ row.userEmailAddress }}</td>
-        </ng-container>
-        <ng-container matColumnDef="tld">
-          <th mat-header-cell *matHeaderCellDef>TLD</th>
-          <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
-        </ng-container>
-        <ng-container matColumnDef="createdAt">
-          <th mat-header-cell *matHeaderCellDef>Created</th>
-          <td mat-cell *matCellDef="let row">{{ row.createdAt | date:'medium' }}</td>
-        </ng-container>
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef></th>
-          <td mat-cell *matCellDef="let row">
-            <button mat-icon-button color="warn" (click)="onDeleteMapping(row.id)">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="mappingColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: mappingColumns;"></tr>
-      </table>
-      <p *ngIf="mappings().length === 0" class="empty-state">No TLD mappings configured yet.</p>
+      <!-- User Assignments -->
+      <h3>Users</h3>
+      <form [formGroup]="userForm" (ngSubmit)="onAddUser()" class="add-form">
+        <mat-form-field>
+          <mat-label>User Email</mat-label>
+          <input matInput formControlName="userEmail" type="email" placeholder="user@example.com">
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="userForm.invalid">
+          Add User
+        </button>
+      </form>
+      <mat-chip-set>
+        <mat-chip *ngFor="let u of selectedRegistry()!.users" [removable]="true" (removed)="onRemoveUser(u.id!)">
+          {{ u.userEmail }}
+          <mat-icon matChipRemove>cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-set>
+      <p *ngIf="selectedRegistry()!.users.length === 0" class="empty-state">No users assigned yet.</p>
     </mat-card-content>
   </mat-card>
 
@@ -71,13 +107,11 @@
       <mat-card-subtitle>Available TLDs and registrars in the system (read-only)</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
-      <!-- TLDs -->
       <h3>TLDs</h3>
       <mat-chip-set>
         <mat-chip *ngFor="let tld of systemInfo()?.tlds || []">{{ tld }}</mat-chip>
       </mat-chip-set>
 
-      <!-- Registrars -->
       <h3>Registrars</h3>
       <table mat-table [dataSource]="systemInfo()?.registrars || []" class="registrars-table">
         <ng-container matColumnDef="registrarId">

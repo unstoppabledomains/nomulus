@@ -59,19 +59,54 @@ class RegistryDashboardEntitiesTest {
   }
 
   @Test
-  void testRoRegistrarMapping_persistAndLoad() {
-    RegistryDashboardRoRegistrarMapping mapping =
-        new RegistryDashboardRoRegistrarMapping("ro@example.com", "registrar1");
-    tm().transact(() -> tm().getEntityManager().persist(mapping));
+  void testRoRegistry_persistAndLoad() {
+    RoRegistry registry = new RoRegistry("testRegistry");
+    tm().transact(() -> tm().getEntityManager().persist(registry));
 
     tm().transact(
         () -> {
-          RegistryDashboardRoRegistrarMapping loaded =
-              tm().getEntityManager()
-                  .find(RegistryDashboardRoRegistrarMapping.class, mapping.getId());
+          RoRegistry loaded =
+              tm().getEntityManager().find(RoRegistry.class, registry.getId());
           assertThat(loaded).isNotNull();
-          assertThat(loaded.getUserEmailAddress()).isEqualTo("ro@example.com");
-          assertThat(loaded.getRegistrarId()).isEqualTo("registrar1");
+          assertThat(loaded.getName()).isEqualTo("testRegistry");
+          assertThat(loaded.getCreatedAt()).isNotNull();
+        });
+  }
+
+  @Test
+  void testRoRegistryTld_persistAndLoad() {
+    RoRegistry registry = new RoRegistry("testRegistry");
+    tm().transact(() -> tm().getEntityManager().persist(registry));
+
+    RoRegistryTld tldMapping = new RoRegistryTld(registry.getId(), "tld");
+    tm().transact(() -> tm().getEntityManager().persist(tldMapping));
+
+    tm().transact(
+        () -> {
+          RoRegistryTld loaded =
+              tm().getEntityManager().find(RoRegistryTld.class, tldMapping.getId());
+          assertThat(loaded).isNotNull();
+          assertThat(loaded.getRegistryId()).isEqualTo(registry.getId());
+          assertThat(loaded.getTld()).isEqualTo("tld");
+          assertThat(loaded.getCreatedAt()).isNotNull();
+        });
+  }
+
+  @Test
+  void testRoRegistryUser_persistAndLoad() {
+    RoRegistry registry = new RoRegistry("testRegistry");
+    tm().transact(() -> tm().getEntityManager().persist(registry));
+
+    RoRegistryUser userMapping = new RoRegistryUser(registry.getId(), "ro@example.com");
+    tm().transact(() -> tm().getEntityManager().persist(userMapping));
+
+    tm().transact(
+        () -> {
+          RoRegistryUser loaded =
+              tm().getEntityManager().find(RoRegistryUser.class, userMapping.getId());
+          assertThat(loaded).isNotNull();
+          assertThat(loaded.getRegistryId()).isEqualTo(registry.getId());
+          assertThat(loaded.getUserEmail()).isEqualTo("ro@example.com");
           assertThat(loaded.getCreatedAt()).isNotNull();
         });
   }
@@ -186,44 +221,43 @@ class RegistryDashboardEntitiesTest {
   // --- Schema constraint tests (V221 migration) ---
 
   @Test
-  void testMapping_duplicateEmailRegistrarPair_throwsException() {
+  void testRoRegistry_duplicateName_throwsException() {
     tm().transact(
-        () -> tm().getEntityManager().persist(
-            new RegistryDashboardRoRegistrarMapping(
-                "dup@example.com", "registrar1")));
+        () -> tm().getEntityManager().persist(new RoRegistry("dupRegistry")));
 
     assertThrows(
         PersistenceException.class,
         () ->
             tm().transact(
-                () -> tm().getEntityManager().persist(
-                    new RegistryDashboardRoRegistrarMapping(
-                        "dup@example.com", "registrar1"))));
+                () -> tm().getEntityManager().persist(new RoRegistry("dupRegistry"))));
   }
 
   @Test
-  void testMapping_sameUserDifferentRegistrars_succeeds() {
-    persistNewRegistrar("registrar2");
+  void testRoRegistryUser_sameUserDifferentRegistries_succeeds() {
+    RoRegistry registry1 = new RoRegistry("registry1");
+    RoRegistry registry2 = new RoRegistry("registry2");
+    tm().transact(
+        () -> {
+          tm().getEntityManager().persist(registry1);
+          tm().getEntityManager().persist(registry2);
+        });
+
     tm().transact(
         () -> tm().getEntityManager().persist(
-            new RegistryDashboardRoRegistrarMapping(
-                "multi@example.com", "registrar1")));
+            new RoRegistryUser(registry1.getId(), "multi@example.com")));
     tm().transact(
         () -> tm().getEntityManager().persist(
-            new RegistryDashboardRoRegistrarMapping(
-                "multi@example.com", "registrar2")));
+            new RoRegistryUser(registry2.getId(), "multi@example.com")));
 
     tm().transact(
         () -> {
           @SuppressWarnings("unchecked")
-          List<RegistryDashboardRoRegistrarMapping> results =
+          List<RoRegistryUser> results =
               tm().getEntityManager()
                   .createQuery(
-                      "SELECT m FROM"
-                          + " RegistryDashboardRoRegistrarMapping m"
-                          + " WHERE m.userEmailAddress"
-                          + " = :email",
-                      RegistryDashboardRoRegistrarMapping.class)
+                      "SELECT u FROM RoRegistryUser u"
+                          + " WHERE u.userEmail = :email",
+                      RoRegistryUser.class)
                   .setParameter("email", "multi@example.com")
                   .getResultList();
           assertThat(results).hasSize(2);
@@ -372,14 +406,36 @@ class RegistryDashboardEntitiesTest {
   }
 
   @Test
-  void testMapping_autoGeneratesIdAndTimestamp() {
-    RegistryDashboardRoRegistrarMapping mapping =
-        new RegistryDashboardRoRegistrarMapping(
-            "ts@example.com", "registrar1");
-    assertThat(mapping.getId()).isNull();
-    tm().transact(() -> tm().getEntityManager().persist(mapping));
-    assertThat(mapping.getId()).isNotNull();
-    assertThat(mapping.getCreatedAt()).isNotNull();
+  void testRoRegistry_autoGeneratesIdAndTimestamp() {
+    RoRegistry registry = new RoRegistry("autoIdRegistry");
+    assertThat(registry.getId()).isNull();
+    tm().transact(() -> tm().getEntityManager().persist(registry));
+    assertThat(registry.getId()).isNotNull();
+    assertThat(registry.getCreatedAt()).isNotNull();
+  }
+
+  @Test
+  void testRoRegistryTld_autoGeneratesIdAndTimestamp() {
+    RoRegistry registry = new RoRegistry("tldAutoIdRegistry");
+    tm().transact(() -> tm().getEntityManager().persist(registry));
+
+    RoRegistryTld tldMapping = new RoRegistryTld(registry.getId(), "tld");
+    assertThat(tldMapping.getId()).isNull();
+    tm().transact(() -> tm().getEntityManager().persist(tldMapping));
+    assertThat(tldMapping.getId()).isNotNull();
+    assertThat(tldMapping.getCreatedAt()).isNotNull();
+  }
+
+  @Test
+  void testRoRegistryUser_autoGeneratesIdAndTimestamp() {
+    RoRegistry registry = new RoRegistry("userAutoIdRegistry");
+    tm().transact(() -> tm().getEntityManager().persist(registry));
+
+    RoRegistryUser userMapping = new RoRegistryUser(registry.getId(), "ts@example.com");
+    assertThat(userMapping.getId()).isNull();
+    tm().transact(() -> tm().getEntityManager().persist(userMapping));
+    assertThat(userMapping.getId()).isNotNull();
+    assertThat(userMapping.getCreatedAt()).isNotNull();
   }
 
   @Test
