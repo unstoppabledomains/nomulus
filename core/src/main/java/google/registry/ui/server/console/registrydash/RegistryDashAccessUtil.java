@@ -17,33 +17,65 @@ package google.registry.ui.server.console.registrydash;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.common.collect.ImmutableSet;
-import google.registry.model.registrydash.RegistryDashboardRoRegistrarMapping;
+import google.registry.model.registrar.Registrar;
+import google.registry.model.registrydash.RegistryDashboardRoTldMapping;
 import java.util.List;
 
-/** Utility for scoping registry dashboard data access to an RO user's mapped registrars. */
+/** Utility for scoping registry dashboard data access via TLD mappings. */
 public final class RegistryDashAccessUtil {
 
-  private static final String MAPPING_QUERY =
+  private static final String TLD_MAPPING_QUERY =
       """
-      SELECT m FROM RegistryDashboardRoRegistrarMapping m
+      SELECT m FROM RegistryDashboardRoTldMapping m
       WHERE m.userEmailAddress = :email
+      """;
+
+  private static final String REGISTRARS_BY_TLD =
+      """
+      SELECT r FROM Registrar r
+      WHERE r.type = :type
       """;
 
   private RegistryDashAccessUtil() {}
 
-  /** Returns the set of registrar IDs that the given user email is mapped to. */
-  public static ImmutableSet<String> getMappedRegistrarIds(String userEmail) {
+  /** Returns the set of TLDs that the given user email is mapped to. */
+  public static ImmutableSet<String> getMappedTlds(String userEmail) {
     return tm().transact(
         () -> {
           @SuppressWarnings("unchecked")
-          List<RegistryDashboardRoRegistrarMapping> mappings =
+          List<RegistryDashboardRoTldMapping> mappings =
               tm().getEntityManager()
-                  .createQuery(MAPPING_QUERY, RegistryDashboardRoRegistrarMapping.class)
+                  .createQuery(TLD_MAPPING_QUERY, RegistryDashboardRoTldMapping.class)
                   .setParameter("email", userEmail)
                   .getResultList();
           return mappings.stream()
-              .map(RegistryDashboardRoRegistrarMapping::getRegistrarId)
+              .map(RegistryDashboardRoTldMapping::getTld)
               .collect(ImmutableSet.toImmutableSet());
         });
+  }
+
+  /** Returns registrar IDs that have at least one allowedTld overlapping with the given TLDs. */
+  public static ImmutableSet<String> getRegistrarIdsForTlds(ImmutableSet<String> tlds) {
+    if (tlds.isEmpty()) {
+      return ImmutableSet.of();
+    }
+    return tm().transact(
+        () -> {
+          List<Registrar> registrars =
+              tm().getEntityManager()
+                  .createQuery(REGISTRARS_BY_TLD, Registrar.class)
+                  .setParameter("type", Registrar.Type.REAL)
+                  .getResultList();
+          return registrars.stream()
+              .filter(r -> r.getAllowedTlds().stream().anyMatch(tlds::contains))
+              .map(Registrar::getRegistrarId)
+              .collect(ImmutableSet.toImmutableSet());
+        });
+  }
+
+  /** Convenience: get registrar IDs for a user by looking up their TLDs first. */
+  public static ImmutableSet<String> getMappedRegistrarIds(String userEmail) {
+    ImmutableSet<String> tlds = getMappedTlds(userEmail);
+    return getRegistrarIdsForTlds(tlds);
   }
 }

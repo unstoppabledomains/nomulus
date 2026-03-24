@@ -9,11 +9,11 @@
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
-  <!-- User-Registrar Mappings Section -->
+  <!-- TLD Mappings Section -->
   <mat-card class="admin-card">
     <mat-card-header>
-      <mat-card-title>User-Registrar Mappings</mat-card-title>
-      <mat-card-subtitle>Manage which registrars each Registry Operator user can view</mat-card-subtitle>
+      <mat-card-title>TLD Mappings</mat-card-title>
+      <mat-card-subtitle>Manage which TLDs each registry user can access. Registrar access is derived from TLD assignments.</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
       <!-- Add Mapping Form -->
@@ -23,10 +23,10 @@
           <input matInput formControlName="userEmailAddress" type="email" placeholder="user@example.com">
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Registrar</mat-label>
-          <mat-select formControlName="registrarId">
-            <mat-option *ngFor="let r of systemInfo()?.registrars || []" [value]="r.registrarId">
-              {{ r.registrarId }} — {{ r.registrarName }}
+          <mat-label>TLD</mat-label>
+          <mat-select formControlName="tld">
+            <mat-option *ngFor="let tld of systemInfo()?.tlds || []" [value]="tld">
+              {{ tld }}
             </mat-option>
           </mat-select>
         </mat-form-field>
@@ -41,9 +41,9 @@
           <th mat-header-cell *matHeaderCellDef>User Email</th>
           <td mat-cell *matCellDef="let row">{{ row.userEmailAddress }}</td>
         </ng-container>
-        <ng-container matColumnDef="registrarId">
-          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
-          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+        <ng-container matColumnDef="tld">
+          <th mat-header-cell *matHeaderCellDef>TLD</th>
+          <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
         </ng-container>
         <ng-container matColumnDef="createdAt">
           <th mat-header-cell *matHeaderCellDef>Created</th>
@@ -60,7 +60,7 @@
         <tr mat-header-row *matHeaderRowDef="mappingColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: mappingColumns;"></tr>
       </table>
-      <p *ngIf="mappings().length === 0" class="empty-state">No mappings configured yet.</p>
+      <p *ngIf="mappings().length === 0" class="empty-state">No TLD mappings configured yet.</p>
     </mat-card-content>
   </mat-card>
 

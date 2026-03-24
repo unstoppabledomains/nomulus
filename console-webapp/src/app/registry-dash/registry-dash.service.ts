@@ -62,7 +62,7 @@ export interface CostBasisEntry {
 export interface RoMapping {
   id?: number;
   userEmailAddress: string;
-  registrarId: string;
+  tld: string;
   createdAt?: string;
 }
 

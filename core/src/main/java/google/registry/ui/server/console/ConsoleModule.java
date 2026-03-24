@@ -365,7 +365,7 @@ public final class ConsoleModule {
           JsonObject obj = e.getAsJsonObject();
           return new RegistryDashAdminAction.AdminPayload(
               obj.has("userEmailAddress") ? obj.get("userEmailAddress").getAsString() : null,
-              obj.has("registrarId") ? obj.get("registrarId").getAsString() : null,
+              obj.has("tld") ? obj.get("tld").getAsString() : null,
               obj.has("id") ? obj.get("id").getAsLong() : null);
         });
   }

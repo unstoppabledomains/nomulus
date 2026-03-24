@@ -25,7 +25,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
-import google.registry.model.registrydash.RegistryDashboardRoRegistrarMapping;
+import google.registry.model.registrydash.RegistryDashboardRoTldMapping;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
@@ -39,7 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Handles admin CRUD for RO registrar mappings and provides system reference data. */
+/** Handles admin CRUD for TLD mappings and provides system reference data. */
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashAdminAction.PATH,
@@ -49,10 +49,10 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/admin";
 
-  private static final String ALL_MAPPINGS =
+  private static final String ALL_TLD_MAPPINGS =
       """
-      SELECT m FROM RegistryDashboardRoRegistrarMapping m
-      ORDER BY m.userEmailAddress, m.registrarId
+      SELECT m FROM RegistryDashboardRoTldMapping m
+      ORDER BY m.userEmailAddress, m.tld
       """;
 
   private static final String ALL_TLDS =
@@ -80,24 +80,21 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
 
     tm().transact(
         () -> {
-          // Load all RO registrar mappings
-          List<RegistryDashboardRoRegistrarMapping> mappings =
+          List<RegistryDashboardRoTldMapping> mappings =
               tm().getEntityManager()
-                  .createQuery(ALL_MAPPINGS, RegistryDashboardRoRegistrarMapping.class)
+                  .createQuery(ALL_TLD_MAPPINGS, RegistryDashboardRoTldMapping.class)
                   .getResultList();
           List<Map<String, Object>> mappingList = new ArrayList<>();
-          for (RegistryDashboardRoRegistrarMapping m : mappings) {
+          for (RegistryDashboardRoTldMapping m : mappings) {
             mappingList.add(mappingToMap(m));
           }
 
-          // Load all TLD names
           @SuppressWarnings("unchecked")
           List<String> tlds =
               tm().getEntityManager()
                   .createQuery(ALL_TLDS)
                   .getResultList();
 
-          // Load all real registrars with their allowed TLDs
           List<Registrar> registrars =
               tm().getEntityManager()
                   .createQuery(ALL_REAL_REGISTRARS, Registrar.class)
@@ -112,12 +109,10 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
             registrarList.add(rMap);
           }
 
-          // Build system info
           Map<String, Object> systemInfo = new HashMap<>();
           systemInfo.put("tlds", tlds);
           systemInfo.put("registrars", registrarList);
 
-          // Build response
           Map<String, Object> response = new HashMap<>();
           response.put("mappings", mappingList);
           response.put("systemInfo", systemInfo);
@@ -143,14 +138,13 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       setFailedResponse("userEmailAddress is required", SC_BAD_REQUEST);
       return;
     }
-    if (payload.registrarId() == null || payload.registrarId().isBlank()) {
-      setFailedResponse("registrarId is required", SC_BAD_REQUEST);
+    if (payload.tld() == null || payload.tld().isBlank()) {
+      setFailedResponse("tld is required", SC_BAD_REQUEST);
       return;
     }
 
-    RegistryDashboardRoRegistrarMapping mapping =
-        new RegistryDashboardRoRegistrarMapping(
-            payload.userEmailAddress(), payload.registrarId());
+    RegistryDashboardRoTldMapping mapping =
+        new RegistryDashboardRoTldMapping(payload.userEmailAddress(), payload.tld());
 
     tm().transact(() -> tm().getEntityManager().persist(mapping));
     consoleApiParams.response().setPayload(
@@ -176,9 +170,9 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
 
     tm().transact(
         () -> {
-          RegistryDashboardRoRegistrarMapping existing =
+          RegistryDashboardRoTldMapping existing =
               tm().getEntityManager()
-                  .find(RegistryDashboardRoRegistrarMapping.class, payload.id());
+                  .find(RegistryDashboardRoTldMapping.class, payload.id());
           if (existing == null) {
             setFailedResponse("Mapping not found", SC_BAD_REQUEST);
             return;
@@ -188,15 +182,15 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
         });
   }
 
-  private static Map<String, Object> mappingToMap(RegistryDashboardRoRegistrarMapping m) {
+  private static Map<String, Object> mappingToMap(RegistryDashboardRoTldMapping m) {
     Map<String, Object> map = new HashMap<>();
     map.put("id", m.getId());
     map.put("userEmailAddress", m.getUserEmailAddress());
-    map.put("registrarId", m.getRegistrarId());
+    map.put("tld", m.getTld());
     map.put("createdAt", m.getCreatedAt() != null ? m.getCreatedAt().toString() : null);
     return map;
   }
 
   /** Payload record for POST (create) and DELETE operations. */
-  public record AdminPayload(String userEmailAddress, String registrarId, Long id) {}
+  public record AdminPayload(String userEmailAddress, String tld, Long id) {}
 }

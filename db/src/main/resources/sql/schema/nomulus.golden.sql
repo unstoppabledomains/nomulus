@@ -1240,6 +1240,37 @@ ALTER SEQUENCE public."RegistryDashboardRoRegistrarMapping_id_seq" OWNED BY publ
 
 
 --
+-- Name: RegistryDashboardRoTldMapping; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RegistryDashboardRoTldMapping" (
+    id bigint NOT NULL,
+    user_email_address text NOT NULL,
+    tld text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RegistryDashboardRoTldMapping_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RegistryDashboardRoTldMapping_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RegistryDashboardRoTldMapping_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RegistryDashboardRoTldMapping_id_seq" OWNED BY public."RegistryDashboardRoTldMapping".id;
+
+
+--
 -- Name: RegistryLock; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1596,6 +1627,13 @@ ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing" ALTER COLUMN id SET 
 --
 
 ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardRoRegistrarMapping_id_seq"'::regclass);
+
+
+--
+-- Name: RegistryDashboardRoTldMapping id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRoTldMapping" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardRoTldMapping_id_seq"'::regclass);
 
 
 --
@@ -1968,6 +2006,22 @@ ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping"
 
 ALTER TABLE ONLY public."RegistryDashboardRoRegistrarMapping"
     ADD CONSTRAINT "RegistryDashboardRoRegistrarMapping_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RegistryDashboardRoTldMapping RegistryDashboardRoTldMapping_user_email_address_tld_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRoTldMapping"
+    ADD CONSTRAINT "RegistryDashboardRoTldMapping_user_email_address_tld_key" UNIQUE (user_email_address, tld);
+
+
+--
+-- Name: RegistryDashboardRoTldMapping RegistryDashboardRoTldMapping_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRoTldMapping"
+    ADD CONSTRAINT "RegistryDashboardRoTldMapping_pkey" PRIMARY KEY (id);
 
 
 --
@@ -2508,6 +2562,13 @@ CREATE INDEX idx_registry_lock_verification_code ON public."RegistryLock" USING 
 --
 
 CREATE INDEX idx_ro_mapping_user ON public."RegistryDashboardRoRegistrarMapping" USING btree (user_email_address);
+
+
+--
+-- Name: idx_ro_tld_mapping_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_tld_mapping_user ON public."RegistryDashboardRoTldMapping" USING btree (user_email_address);
 
 
 --

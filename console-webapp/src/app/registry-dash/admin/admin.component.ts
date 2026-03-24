@@ -26,12 +26,12 @@ import { RegistryDashService } from '../registry-dash.service';
   styleUrls: ['./admin.component.scss'],
 })
 export class AdminComponent implements OnInit {
-  mappingColumns = ['userEmailAddress', 'registrarId', 'createdAt', 'actions'];
+  mappingColumns = ['userEmailAddress', 'tld', 'createdAt', 'actions'];
   registrarColumns = ['registrarId', 'registrarName', 'allowedTlds'];
 
   addForm = new FormGroup({
     userEmailAddress: new FormControl('', [Validators.required, Validators.email]),
-    registrarId: new FormControl('', [Validators.required]),
+    tld: new FormControl('', [Validators.required]),
   });
 
   mappings = computed(() => this.dashService.adminData()?.mappings || []);
@@ -45,9 +45,9 @@ export class AdminComponent implements OnInit {
 
   onAddMapping() {
     if (this.addForm.invalid) return;
-    const { userEmailAddress, registrarId } = this.addForm.value;
+    const { userEmailAddress, tld } = this.addForm.value;
     this.dashService
-      .createMapping({ userEmailAddress: userEmailAddress!, registrarId: registrarId! })
+      .createMapping({ userEmailAddress: userEmailAddress!, tld: tld! })
       .subscribe(() => {
         this.addForm.reset();
       });
