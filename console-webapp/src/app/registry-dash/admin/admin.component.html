@@ -1,0 +1,104 @@
+<div class="admin-container">
+  <!-- Error display -->
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Loading spinner -->
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- User-Registrar Mappings Section -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>User-Registrar Mappings</mat-card-title>
+      <mat-card-subtitle>Manage which registrars each Registry Operator user can view</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- Add Mapping Form -->
+      <form [formGroup]="addForm" (ngSubmit)="onAddMapping()" class="add-form">
+        <mat-form-field>
+          <mat-label>User Email</mat-label>
+          <input matInput formControlName="userEmailAddress" type="email" placeholder="user@example.com">
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Registrar</mat-label>
+          <mat-select formControlName="registrarId">
+            <mat-option *ngFor="let r of systemInfo()?.registrars || []" [value]="r.registrarId">
+              {{ r.registrarId }} — {{ r.registrarName }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="addForm.invalid">
+          Add Mapping
+        </button>
+      </form>
+
+      <!-- Mappings Table -->
+      <table mat-table [dataSource]="mappings()" class="mappings-table">
+        <ng-container matColumnDef="userEmailAddress">
+          <th mat-header-cell *matHeaderCellDef>User Email</th>
+          <td mat-cell *matCellDef="let row">{{ row.userEmailAddress }}</td>
+        </ng-container>
+        <ng-container matColumnDef="registrarId">
+          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+        </ng-container>
+        <ng-container matColumnDef="createdAt">
+          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <td mat-cell *matCellDef="let row">{{ row.createdAt | date:'medium' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button color="warn" (click)="onDeleteMapping(row.id)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="mappingColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: mappingColumns;"></tr>
+      </table>
+      <p *ngIf="mappings().length === 0" class="empty-state">No mappings configured yet.</p>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- System Reference Section -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>System Reference</mat-card-title>
+      <mat-card-subtitle>Available TLDs and registrars in the system (read-only)</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- TLDs -->
+      <h3>TLDs</h3>
+      <mat-chip-set>
+        <mat-chip *ngFor="let tld of systemInfo()?.tlds || []">{{ tld }}</mat-chip>
+      </mat-chip-set>
+
+      <!-- Registrars -->
+      <h3>Registrars</h3>
+      <table mat-table [dataSource]="systemInfo()?.registrars || []" class="registrars-table">
+        <ng-container matColumnDef="registrarId">
+          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+        </ng-container>
+        <ng-container matColumnDef="registrarName">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="allowedTlds">
+          <th mat-header-cell *matHeaderCellDef>Allowed TLDs</th>
+          <td mat-cell *matCellDef="let row">
+            <mat-chip-set>
+              <mat-chip *ngFor="let tld of row.allowedTlds">{{ tld }}</mat-chip>
+            </mat-chip-set>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="registrarColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: registrarColumns;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+</div>

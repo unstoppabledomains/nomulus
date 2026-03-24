@@ -1,0 +1,51 @@
+.admin-container {
+  padding: 16px;
+  max-width: 1200px;
+}
+
+.admin-card {
+  margin-bottom: 24px;
+}
+
+.error-banner {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.add-form {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.add-form mat-form-field {
+  flex: 1;
+  min-width: 200px;
+}
+
+.mappings-table,
+.registrars-table {
+  width: 100%;
+}
+
+.empty-state {
+  color: rgba(0, 0, 0, 0.54);
+  text-align: center;
+  padding: 24px;
+}
+
+h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}

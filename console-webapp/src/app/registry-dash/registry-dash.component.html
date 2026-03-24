@@ -1,0 +1,19 @@
+<div class="registry-dash">
+  <div class="registry-dash__nav">
+    <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+      <a mat-tab-link routerLink="overview" routerLinkActive #overviewLink="routerLinkActive"
+        [active]="overviewLink.isActive">Overview</a>
+      <a mat-tab-link routerLink="portfolio" routerLinkActive #portfolioLink="routerLinkActive"
+        [active]="portfolioLink.isActive">Portfolio</a>
+      <a mat-tab-link routerLink="pricing" routerLinkActive #pricingLink="routerLinkActive"
+        [active]="pricingLink.isActive">Pricing</a>
+      <a mat-tab-link routerLink="cost-basis" routerLinkActive #costBasisLink="routerLinkActive"
+        [active]="costBasisLink.isActive">Cost Basis</a>
+      <a mat-tab-link routerLink="admin" routerLinkActive #adminLink="routerLinkActive"
+        [active]="adminLink.isActive">Admin</a>
+    </nav>
+  </div>
+  <mat-tab-nav-panel #tabPanel>
+    <router-outlet></router-outlet>
+  </mat-tab-nav-panel>
+</div>

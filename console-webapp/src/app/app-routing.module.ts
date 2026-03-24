@@ -37,6 +37,7 @@ export const PATHS = {
   NewOteComponent: 'new-ote',
   OteStatusComponent: 'ote-status/:registrarId',
   UsersComponent: 'users',
+  RegistryDash: 'registry-dash',
 };
 export const routes: RouteWithIcon[] = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -145,6 +146,58 @@ export const routes: RouteWithIcon[] = [
     component: SupportComponent,
     title: 'Support',
     iconName: 'help',
+  },
+  {
+    path: PATHS.RegistryDash,
+    title: 'Registry Dashboard',
+    iconName: 'analytics',
+    loadComponent: () =>
+      import('./registry-dash/registry-dash.component').then(
+        (mod) => mod.RegistryDashComponent
+      ),
+    children: [
+      { path: '', redirectTo: 'overview', pathMatch: 'full' },
+      {
+        path: 'overview',
+        title: 'Overview',
+        loadComponent: () =>
+          import('./registry-dash/overview/overview.component').then(
+            (mod) => mod.OverviewComponent
+          ),
+      },
+      {
+        path: 'portfolio',
+        title: 'Portfolio',
+        loadComponent: () =>
+          import('./registry-dash/portfolio/portfolio.component').then(
+            (mod) => mod.PortfolioComponent
+          ),
+      },
+      {
+        path: 'pricing',
+        title: 'Pricing',
+        loadComponent: () =>
+          import('./registry-dash/pricing/pricing.component').then(
+            (mod) => mod.PricingComponent
+          ),
+      },
+      {
+        path: 'cost-basis',
+        title: 'Cost Basis',
+        loadComponent: () =>
+          import('./registry-dash/cost-basis/cost-basis.component').then(
+            (mod) => mod.CostBasisComponent
+          ),
+      },
+      {
+        path: 'admin',
+        title: 'Admin',
+        loadComponent: () =>
+          import('./registry-dash/admin/admin.component').then(
+            (mod) => mod.AdminComponent
+          ),
+      },
+    ],
   },
 ];
 

@@ -1,0 +1,103 @@
+<div class="registry-dash-cost-basis">
+  @if (dashService.loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (dashService.error()) {
+    <div class="error-banner">{{ dashService.error() }}</div>
+  }
+
+  <div class="cost-basis-header">
+    <h2 class="mat-headline-6">Cost Basis</h2>
+    <button mat-raised-button color="primary" (click)="openAddForm()">
+      <mat-icon>add</mat-icon> Add Entry
+    </button>
+  </div>
+
+  @if (showForm()) {
+    <mat-card appearance="outlined" class="cost-form-card">
+      <mat-card-header>
+        <mat-card-title>{{ editingEntry() ? 'Edit' : 'Add' }} Cost Basis</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="costForm" (ngSubmit)="onSubmit()" class="cost-form">
+          <mat-form-field>
+            <mat-label>TLD</mat-label>
+            <input matInput formControlName="tld" [readonly]="!!editingEntry()">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Operation</mat-label>
+            <mat-select formControlName="operation" [disabled]="!!editingEntry()">
+              <mat-option value="CREATE">CREATE</mat-option>
+              <mat-option value="RENEW">RENEW</mat-option>
+              <mat-option value="TRANSFER">TRANSFER</mat-option>
+              <mat-option value="RESTORE">RESTORE</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Cost</mat-label>
+            <input matInput type="number" formControlName="costAmount" step="0.01">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Currency</mat-label>
+            <input matInput formControlName="costCurrency">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Effective Date</mat-label>
+            <input matInput type="datetime-local" formControlName="effectiveDate">
+          </mat-form-field>
+          <mat-form-field class="full-width">
+            <mat-label>Notes</mat-label>
+            <textarea matInput formControlName="notes" rows="2"></textarea>
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-button type="button" (click)="cancelForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit"
+              [disabled]="!costForm.valid">Save</button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (dashService.costBasis().length > 0) {
+    <table mat-table [dataSource]="dashService.costBasis()" class="mat-elevation-z1">
+      <ng-container matColumnDef="tld">
+        <th mat-header-cell *matHeaderCellDef>TLD</th>
+        <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
+      </ng-container>
+      <ng-container matColumnDef="operation">
+        <th mat-header-cell *matHeaderCellDef>Operation</th>
+        <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+      </ng-container>
+      <ng-container matColumnDef="costAmount">
+        <th mat-header-cell *matHeaderCellDef>Cost</th>
+        <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="costCurrency">
+        <th mat-header-cell *matHeaderCellDef>Currency</th>
+        <td mat-cell *matCellDef="let row">{{ row.costCurrency }}</td>
+      </ng-container>
+      <ng-container matColumnDef="effectiveDate">
+        <th mat-header-cell *matHeaderCellDef>Effective</th>
+        <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'short' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="notes">
+        <th mat-header-cell *matHeaderCellDef>Notes</th>
+        <td mat-cell *matCellDef="let row">{{ row.notes }}</td>
+      </ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-icon-button (click)="openEditForm(row)" matTooltip="Edit">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  } @else if (!dashService.loading()) {
+    <p class="secondary-text">No cost basis entries configured.</p>
+  }
+</div>

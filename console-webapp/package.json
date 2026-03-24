@@ -12,6 +12,8 @@
     "prettify": "npx prettier --write ./src/",
     "prettify:check": "npx prettier --check ./src/",
     "start:dev": "concurrently \"./../gradlew :core:runTestServer\" \"ng serve --proxy-config dev-proxy.config.json\"",
+    "auth:alpha": "node ud-local-dev/auth.mjs",
+    "start:alpha": "concurrently \"node ud-local-dev/proxy.mjs\" \"ng serve --proxy-config ud-dev-proxy-alpha.json --configuration=alpha\"",
     "lint": "ng lint"
   },
   "private": true,
