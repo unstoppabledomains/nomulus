@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SnackBarModule } from '../../snackbar.module';
-import { PricingRule, RegistryDashService } from '../registry-dash.service';
+import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-dash.service';
 
 @Component({
   selector: 'app-registry-dash-pricing',
@@ -40,6 +40,18 @@ export class PricingComponent {
 
   showForm = signal(false);
   editingRule = signal<PricingRule | undefined>(undefined);
+  selectedRegistrarId = signal<string>('');
+
+  registrars = computed<SystemRegistrar[]>(
+    () => this.dashService.systemInfo()?.registrars || []
+  );
+
+  availableTlds = computed<string[]>(() => {
+    const regId = this.selectedRegistrarId();
+    if (!regId) return [];
+    const registrar = this.registrars().find((r) => r.registrarId === regId);
+    return registrar?.allowedTlds || [];
+  });
 
   pricingForm = new FormGroup({
     registrarId: new FormControl('', [Validators.required]),
@@ -60,6 +72,14 @@ export class PricingComponent {
     private snackBar: MatSnackBar
   ) {
     this.dashService.getPricing().subscribe();
+    // Load admin data to get registrar list with allowedTlds
+    this.dashService.getAdminData().subscribe();
+
+    // When registrar selection changes, update the signal and reset TLD
+    this.pricingForm.get('registrarId')!.valueChanges.subscribe((value) => {
+      this.selectedRegistrarId.set(value || '');
+      this.pricingForm.get('tld')!.setValue('');
+    });
   }
 
   openAddForm() {
@@ -70,6 +90,7 @@ export class PricingComponent {
 
   openEditForm(rule: PricingRule) {
     this.editingRule.set(rule);
+    this.selectedRegistrarId.set(rule.registrarId);
     this.pricingForm.patchValue({
       registrarId: rule.registrarId,
       tld: rule.tld,

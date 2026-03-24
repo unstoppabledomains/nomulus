@@ -22,12 +22,28 @@
       <mat-card-content>
         <form [formGroup]="pricingForm" (ngSubmit)="onSubmit()" class="pricing-form">
           <mat-form-field>
-            <mat-label>Registrar ID</mat-label>
-            <input matInput formControlName="registrarId" [readonly]="!!editingRule()">
+            <mat-label>Registrar</mat-label>
+            @if (editingRule()) {
+              <input matInput formControlName="registrarId" readonly>
+            } @else {
+              <mat-select formControlName="registrarId">
+                @for (r of registrars(); track r.registrarId) {
+                  <mat-option [value]="r.registrarId">{{ r.registrarName }} ({{ r.registrarId }})</mat-option>
+                }
+              </mat-select>
+            }
           </mat-form-field>
           <mat-form-field>
             <mat-label>TLD</mat-label>
-            <input matInput formControlName="tld" [readonly]="!!editingRule()">
+            @if (editingRule()) {
+              <input matInput formControlName="tld" readonly>
+            } @else {
+              <mat-select formControlName="tld">
+                @for (tld of availableTlds(); track tld) {
+                  <mat-option [value]="tld">{{ tld }}</mat-option>
+                }
+              </mat-select>
+            }
           </mat-form-field>
           <mat-form-field>
             <mat-label>Operation</mat-label>
