@@ -21,10 +21,13 @@ import static google.registry.request.RequestParameters.extractRequiredParameter
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import dagger.Module;
 import dagger.Provides;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarPoc;
+import google.registry.model.registrydash.RegistryDashboardCostBasis;
+import google.registry.model.registrydash.RegistryDashboardRegistrarPricing;
 import google.registry.request.OptionalJsonPayload;
 import google.registry.request.Parameter;
 import google.registry.request.RequestScope;
@@ -34,6 +37,7 @@ import google.registry.security.XsrfTokenManager;
 import google.registry.ui.server.SendEmailUtils;
 import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordData;
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
+import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
 import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
@@ -296,5 +300,33 @@ public final class ConsoleModule {
   public static Optional<String> provideNewPassword(
       Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload.map(e -> gson.fromJson(e, String.class));
+  }
+
+  @Provides
+  @Parameter("registryDashPricing")
+  public static Optional<RegistryDashboardRegistrarPricing> provideRegistryDashPricing(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(e -> gson.fromJson(e, RegistryDashboardRegistrarPricing.class));
+  }
+
+  @Provides
+  @Parameter("registryDashCostBasis")
+  public static Optional<RegistryDashboardCostBasis> provideRegistryDashCostBasis(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(e -> gson.fromJson(e, RegistryDashboardCostBasis.class));
+  }
+
+  @Provides
+  @Parameter("registryDashAdmin")
+  public static Optional<RegistryDashAdminAction.AdminPayload> provideRegistryDashAdmin(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          return new RegistryDashAdminAction.AdminPayload(
+              obj.has("userEmailAddress") ? obj.get("userEmailAddress").getAsString() : null,
+              obj.has("registrarId") ? obj.get("registrarId").getAsString() : null,
+              obj.has("id") ? obj.get("id").getAsLong() : null);
+        });
   }
 }

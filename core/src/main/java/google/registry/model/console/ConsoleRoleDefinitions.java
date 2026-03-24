@@ -116,5 +116,20 @@ public class ConsoleRoleDefinitions {
           .add(ConsolePermission.AUDIT_ACTIVITY_BY_REGISTRAR)
           .build();
 
+  /** Permissions for a registry operator (dashboard user). */
+  static final ImmutableSet<ConsolePermission> REGISTRY_OPERATOR_PERMISSIONS =
+      ImmutableSet.of(
+          ConsolePermission.VIEW_REGISTRARS,
+          ConsolePermission.VIEW_REGISTRAR_DETAILS,
+          ConsolePermission.DOWNLOAD_DOMAINS,
+          ConsolePermission.VIEW_TLD_PORTFOLIO,
+          ConsolePermission.ACCESS_BILLING_DETAILS,
+          ConsolePermission.VIEW_OPERATIONAL_DATA,
+          ConsolePermission.VIEW_DASHBOARD_OVERVIEW,
+          ConsolePermission.VIEW_REGISTRAR_PORTFOLIO,
+          ConsolePermission.VIEW_PRICING,
+          ConsolePermission.MANAGE_PRICING,
+          ConsolePermission.MANAGE_COST_BASIS);
+
   private ConsoleRoleDefinitions() {}
 }
