@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --proxy-config dev-proxy.config.json",
+    "start": "ng serve --proxy-config dev-proxy.config.js",
     "build": "ng build --base-href=/console/ --configuration=$npm_config_configuration",
     "build:local": "ng build --base-href=/default/console/",
     "watch": "ng build --watch --configuration=development",
@@ -11,7 +11,7 @@
     "run:dev": "",
     "prettify": "npx prettier --write ./src/",
     "prettify:check": "npx prettier --check ./src/",
-    "start:dev": "concurrently \"./../gradlew :core:runTestServer\" \"ng serve --proxy-config dev-proxy.config.json\"",
+    "start:dev": "concurrently \"./../gradlew :core:runTestServer\" \"ng serve --proxy-config dev-proxy.config.js\"",
     "auth:alpha": "node ud-local-dev/auth.mjs",
     "start:alpha": "concurrently \"node ud-local-dev/proxy.mjs\" \"ng serve --proxy-config ud-dev-proxy-alpha.json --configuration=alpha\"",
     "lint": "ng lint"
