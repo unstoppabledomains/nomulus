@@ -24,6 +24,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrydash.RegistryDashboardRegistrarPricing;
 import google.registry.request.Action;
@@ -74,9 +75,11 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
       return;
     }
 
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
     ImmutableSet<String> registrarIds =
-        RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
-    if (registrarIds.isEmpty()) {
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+    if (!isAdmin && registrarIds.isEmpty()) {
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
       consoleApiParams.response().setStatus(SC_OK);
       return;
@@ -86,11 +89,19 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
         () -> {
           @SuppressWarnings("unchecked")
           List<RegistryDashboardRegistrarPricing> results =
-              tm().getEntityManager()
-                  .createQuery(PRICING_BY_REGISTRARS,
-                      RegistryDashboardRegistrarPricing.class)
-                  .setParameter("registrarIds", registrarIds)
-                  .getResultList();
+              isAdmin
+                  ? tm().getEntityManager()
+                      .createQuery(
+                          "SELECT p FROM RegistryDashboardRegistrarPricing p"
+                              + " ORDER BY p.registrarId, p.tld, p.operation,"
+                              + " p.effectiveDate DESC",
+                          RegistryDashboardRegistrarPricing.class)
+                      .getResultList()
+                  : tm().getEntityManager()
+                      .createQuery(PRICING_BY_REGISTRARS,
+                          RegistryDashboardRegistrarPricing.class)
+                      .setParameter("registrarIds", registrarIds)
+                      .getResultList();
           List<Map<String, Object>> payload = new java.util.ArrayList<>();
           for (RegistryDashboardRegistrarPricing p : results) {
             payload.add(pricingToMap(p));
@@ -112,11 +123,14 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
         pricingPayload.orElseThrow(
             () -> new IllegalArgumentException("Pricing data is required"));
 
-    ImmutableSet<String> registrarIds =
-        RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
-    if (!registrarIds.contains(pricing.getRegistrarId())) {
-      consoleApiParams.response().setStatus(SC_FORBIDDEN);
-      return;
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    if (!isAdmin) {
+      ImmutableSet<String> registrarIds =
+          RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+      if (!registrarIds.contains(pricing.getRegistrarId())) {
+        consoleApiParams.response().setStatus(SC_FORBIDDEN);
+        return;
+      }
     }
 
     ZonedDateTime now = ZonedDateTime.now(java.time.ZoneOffset.UTC);
@@ -144,8 +158,7 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
       return;
     }
 
-    ImmutableSet<String> registrarIds =
-        RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
     tm().transact(
         () -> {
@@ -156,9 +169,13 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
             setFailedResponse("Pricing rule not found", SC_BAD_REQUEST);
             return;
           }
-          if (!registrarIds.contains(existing.getRegistrarId())) {
-            consoleApiParams.response().setStatus(SC_FORBIDDEN);
-            return;
+          if (!isAdmin) {
+            ImmutableSet<String> registrarIds =
+                RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+            if (!registrarIds.contains(existing.getRegistrarId())) {
+              consoleApiParams.response().setStatus(SC_FORBIDDEN);
+              return;
+            }
           }
           existing.setPriceAmount(pricing.getPriceAmount());
           existing.setPriceCurrency(pricing.getPriceCurrency());

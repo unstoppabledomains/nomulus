@@ -305,15 +305,55 @@ public final class ConsoleModule {
   @Provides
   @Parameter("registryDashPricing")
   public static Optional<RegistryDashboardRegistrarPricing> provideRegistryDashPricing(
-      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
-    return payload.map(e -> gson.fromJson(e, RegistryDashboardRegistrarPricing.class));
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          RegistryDashboardRegistrarPricing p = new RegistryDashboardRegistrarPricing();
+          if (obj.has("registrarId")) p.setRegistrarId(obj.get("registrarId").getAsString());
+          if (obj.has("tld")) p.setTld(obj.get("tld").getAsString());
+          if (obj.has("operation")) p.setOperation(obj.get("operation").getAsString());
+          if (obj.has("priceAmount")) {
+            p.setPriceAmount(obj.get("priceAmount").getAsBigDecimal());
+          }
+          if (obj.has("priceCurrency")) p.setPriceCurrency(obj.get("priceCurrency").getAsString());
+          if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
+              && !obj.get("effectiveDate").getAsString().isEmpty()) {
+            p.setEffectiveDate(
+                java.time.ZonedDateTime.parse(obj.get("effectiveDate").getAsString()));
+          }
+          if (obj.has("expiryDate") && !obj.get("expiryDate").isJsonNull()
+              && !obj.get("expiryDate").getAsString().isEmpty()) {
+            p.setExpiryDate(
+                java.time.ZonedDateTime.parse(obj.get("expiryDate").getAsString()));
+          }
+          if (obj.has("isActive")) p.setActive(obj.get("isActive").getAsBoolean());
+          return p;
+        });
   }
 
   @Provides
   @Parameter("registryDashCostBasis")
   public static Optional<RegistryDashboardCostBasis> provideRegistryDashCostBasis(
-      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
-    return payload.map(e -> gson.fromJson(e, RegistryDashboardCostBasis.class));
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
+          if (obj.has("tld")) cb.setTld(obj.get("tld").getAsString());
+          if (obj.has("operation")) cb.setOperation(obj.get("operation").getAsString());
+          if (obj.has("costAmount")) cb.setCostAmount(obj.get("costAmount").getAsBigDecimal());
+          if (obj.has("costCurrency")) cb.setCostCurrency(obj.get("costCurrency").getAsString());
+          if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
+              && !obj.get("effectiveDate").getAsString().isEmpty()) {
+            cb.setEffectiveDate(
+                java.time.ZonedDateTime.parse(obj.get("effectiveDate").getAsString()));
+          }
+          if (obj.has("notes") && !obj.get("notes").isJsonNull()) {
+            cb.setNotes(obj.get("notes").getAsString());
+          }
+          return cb;
+        });
   }
 
   @Provides

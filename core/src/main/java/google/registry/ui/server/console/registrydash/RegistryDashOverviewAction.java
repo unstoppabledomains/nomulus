@@ -21,6 +21,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
@@ -63,9 +64,11 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
       return;
     }
 
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
     ImmutableSet<String> registrarIds =
-        RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
-    if (registrarIds.isEmpty()) {
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+    if (!isAdmin && registrarIds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("totalDomains", 0L);
       empty.put("activeRegistrars", 0);
@@ -79,17 +82,27 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
         () -> {
           @SuppressWarnings("unchecked")
           List<Object[]> results =
-              tm().getEntityManager()
-                  .createQuery(DOMAIN_COUNT_BY_REGISTRAR)
-                  .setParameter("registrarIds", registrarIds)
-                  .getResultList();
+              isAdmin
+                  ? tm().getEntityManager()
+                      .createQuery(
+                          "SELECT d.currentSponsorRegistrarId, COUNT(d)"
+                              + " FROM Domain d"
+                              + " WHERE d.deletionTime > CURRENT_TIMESTAMP"
+                              + " GROUP BY d.currentSponsorRegistrarId")
+                      .getResultList()
+                  : tm().getEntityManager()
+                      .createQuery(DOMAIN_COUNT_BY_REGISTRAR)
+                      .setParameter("registrarIds", registrarIds)
+                      .getResultList();
 
           long totalDomains = 0;
+          int activeRegistrars = 0;
           List<Map<String, Object>> domainsByRegistrar = new java.util.ArrayList<>();
           for (Object[] row : results) {
             String regId = (String) row[0];
             long count = (Long) row[1];
             totalDomains += count;
+            activeRegistrars++;
             Map<String, Object> entry = new HashMap<>();
             entry.put("registrarId", regId);
             entry.put("count", count);
@@ -98,7 +111,7 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
 
           Map<String, Object> response = new HashMap<>();
           response.put("totalDomains", totalDomains);
-          response.put("activeRegistrars", registrarIds.size());
+          response.put("activeRegistrars", isAdmin ? activeRegistrars : registrarIds.size());
           response.put("domainsByRegistrar", domainsByRegistrar);
 
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));

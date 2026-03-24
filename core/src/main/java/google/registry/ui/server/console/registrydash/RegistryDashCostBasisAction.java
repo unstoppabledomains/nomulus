@@ -22,7 +22,9 @@ import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
+import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrydash.RegistryDashboardCostBasis;
 import google.registry.request.Action;
@@ -66,7 +68,9 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
 
   @Override
   protected void getHandler(User user) {
-    if (!user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    if (!isAdmin
+        && !user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
       consoleApiParams.response().setStatus(SC_FORBIDDEN);
       return;
     }
@@ -91,8 +95,10 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
 
   @Override
   protected void postHandler(User user) {
-    if (!user.getUserRoles().hasGlobalPermission(
-        ConsolePermission.MANAGE_COST_BASIS)) {
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    if (!isAdmin
+        && !user.getUserRoles().hasGlobalPermission(
+            ConsolePermission.MANAGE_COST_BASIS)) {
       consoleApiParams.response().setStatus(SC_FORBIDDEN);
       return;
     }
@@ -115,7 +121,9 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
 
   @Override
   protected void putHandler(User user) {
-    if (!user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    if (!isAdmin
+        && !user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
       consoleApiParams.response().setStatus(SC_FORBIDDEN);
       return;
     }

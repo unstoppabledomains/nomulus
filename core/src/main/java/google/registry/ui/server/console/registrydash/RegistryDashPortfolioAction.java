@@ -21,6 +21,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
+import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
@@ -70,9 +71,11 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
       return;
     }
 
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
     ImmutableSet<String> registrarIds =
-        RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
-    if (registrarIds.isEmpty()) {
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+    if (!isAdmin && registrarIds.isEmpty()) {
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
       consoleApiParams.response().setStatus(SC_OK);
       return;
@@ -82,17 +85,29 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
         () -> {
           @SuppressWarnings("unchecked")
           List<Registrar> registrars =
-              tm().getEntityManager()
-                  .createQuery(REGISTRARS_QUERY, Registrar.class)
-                  .setParameter("registrarIds", registrarIds)
-                  .getResultList();
+              isAdmin
+                  ? tm().getEntityManager()
+                      .createQuery("SELECT r FROM Registrar r", Registrar.class)
+                      .getResultList()
+                  : tm().getEntityManager()
+                      .createQuery(REGISTRARS_QUERY, Registrar.class)
+                      .setParameter("registrarIds", registrarIds)
+                      .getResultList();
 
           @SuppressWarnings("unchecked")
           List<Object[]> domainCounts =
-              tm().getEntityManager()
-                  .createQuery(DOMAIN_COUNTS_QUERY)
-                  .setParameter("registrarIds", registrarIds)
-                  .getResultList();
+              isAdmin
+                  ? tm().getEntityManager()
+                      .createQuery(
+                          "SELECT d.currentSponsorRegistrarId, COUNT(d)"
+                              + " FROM Domain d"
+                              + " WHERE d.deletionTime > CURRENT_TIMESTAMP"
+                              + " GROUP BY d.currentSponsorRegistrarId")
+                      .getResultList()
+                  : tm().getEntityManager()
+                      .createQuery(DOMAIN_COUNTS_QUERY)
+                      .setParameter("registrarIds", registrarIds)
+                      .getResultList();
 
           Map<String, Long> countMap = new HashMap<>();
           for (Object[] row : domainCounts) {
