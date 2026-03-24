@@ -2,8 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict BMxq3i64RBGBi9N2atW9zeJZS7rAGq6sxLpzL4dYb53nJkeV2GWuJuy6dBx5KCy
-
 -- Dumped from database version 17.9
 -- Dumped by pg_dump version 17.9
 
@@ -3620,6 +3618,4 @@ ALTER TABLE ONLY public."DelegationSignerData"
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict BMxq3i64RBGBi9N2atW9zeJZS7rAGq6sxLpzL4dYb53nJkeV2GWuJuy6dBx5KCy
 
