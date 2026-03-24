@@ -310,13 +310,21 @@ public final class ConsoleModule {
         e -> {
           JsonObject obj = e.getAsJsonObject();
           RegistryDashboardRegistrarPricing p = new RegistryDashboardRegistrarPricing();
-          if (obj.has("registrarId")) p.setRegistrarId(obj.get("registrarId").getAsString());
-          if (obj.has("tld")) p.setTld(obj.get("tld").getAsString());
-          if (obj.has("operation")) p.setOperation(obj.get("operation").getAsString());
+          if (obj.has("registrarId")) {
+            p.setRegistrarId(obj.get("registrarId").getAsString());
+          }
+          if (obj.has("tld")) {
+            p.setTld(obj.get("tld").getAsString());
+          }
+          if (obj.has("operation")) {
+            p.setOperation(obj.get("operation").getAsString());
+          }
           if (obj.has("priceAmount")) {
             p.setPriceAmount(obj.get("priceAmount").getAsBigDecimal());
           }
-          if (obj.has("priceCurrency")) p.setPriceCurrency(obj.get("priceCurrency").getAsString());
+          if (obj.has("priceCurrency")) {
+            p.setPriceCurrency(obj.get("priceCurrency").getAsString());
+          }
           if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
               && !obj.get("effectiveDate").getAsString().isEmpty()) {
             p.setEffectiveDate(
@@ -327,7 +335,9 @@ public final class ConsoleModule {
             p.setExpiryDate(
                 java.time.ZonedDateTime.parse(obj.get("expiryDate").getAsString()));
           }
-          if (obj.has("isActive")) p.setActive(obj.get("isActive").getAsBoolean());
+          if (obj.has("isActive")) {
+            p.setActive(obj.get("isActive").getAsBoolean());
+          }
           return p;
         });
   }
@@ -340,10 +350,18 @@ public final class ConsoleModule {
         e -> {
           JsonObject obj = e.getAsJsonObject();
           RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
-          if (obj.has("tld")) cb.setTld(obj.get("tld").getAsString());
-          if (obj.has("operation")) cb.setOperation(obj.get("operation").getAsString());
-          if (obj.has("costAmount")) cb.setCostAmount(obj.get("costAmount").getAsBigDecimal());
-          if (obj.has("costCurrency")) cb.setCostCurrency(obj.get("costCurrency").getAsString());
+          if (obj.has("tld")) {
+            cb.setTld(obj.get("tld").getAsString());
+          }
+          if (obj.has("operation")) {
+            cb.setOperation(obj.get("operation").getAsString());
+          }
+          if (obj.has("costAmount")) {
+            cb.setCostAmount(obj.get("costAmount").getAsBigDecimal());
+          }
+          if (obj.has("costCurrency")) {
+            cb.setCostCurrency(obj.get("costCurrency").getAsString());
+          }
           if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
               && !obj.get("effectiveDate").getAsString().isEmpty()) {
             cb.setEffectiveDate(

@@ -22,7 +22,6 @@ import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
-import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
