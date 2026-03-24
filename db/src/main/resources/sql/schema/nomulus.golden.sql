@@ -2,6 +2,8 @@
 -- PostgreSQL database dump
 --
 
+\restrict BMxq3i64RBGBi9N2atW9zeJZS7rAGq6sxLpzL4dYb53nJkeV2GWuJuy6dBx5KCy
+
 -- Dumped from database version 17.9
 -- Dumped by pg_dump version 17.9
 
@@ -1209,51 +1211,6 @@ ALTER SEQUENCE public."RegistryDashboardRegistrarPricing_id_seq" OWNED BY public
 
 
 --
--- Name: RoRegistry; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public."RoRegistry" (
-    id bigserial NOT NULL,
-    name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (id),
-    UNIQUE (name)
-);
-
-
---
--- Name: RoRegistryTld; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public."RoRegistryTld" (
-    id bigserial NOT NULL,
-    registry_id bigint NOT NULL REFERENCES public."RoRegistry"(id) ON DELETE CASCADE,
-    tld text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (id),
-    UNIQUE (registry_id, tld)
-);
-
-CREATE INDEX idx_ro_registry_tld_registry ON public."RoRegistryTld" (registry_id);
-
-
---
--- Name: RoRegistryUser; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public."RoRegistryUser" (
-    id bigserial NOT NULL,
-    registry_id bigint NOT NULL REFERENCES public."RoRegistry"(id) ON DELETE CASCADE,
-    user_email text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (id),
-    UNIQUE (registry_id, user_email)
-);
-
-CREATE INDEX idx_ro_registry_user_email ON public."RoRegistryUser" (user_email);
-
-
---
 -- Name: RegistryLock; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1334,6 +1291,98 @@ CREATE SEQUENCE public."ReservedList_revision_id_seq"
 --
 
 ALTER SEQUENCE public."ReservedList_revision_id_seq" OWNED BY public."ReservedList".revision_id;
+
+
+--
+-- Name: RoRegistry; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistry" (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RoRegistryTld; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistryTld" (
+    id bigint NOT NULL,
+    registry_id bigint NOT NULL,
+    tld text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RoRegistryTld_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistryTld_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistryTld_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistryTld_id_seq" OWNED BY public."RoRegistryTld".id;
+
+
+--
+-- Name: RoRegistryUser; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistryUser" (
+    id bigint NOT NULL,
+    registry_id bigint NOT NULL,
+    user_email text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RoRegistryUser_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistryUser_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistryUser_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistryUser_id_seq" OWNED BY public."RoRegistryUser".id;
+
+
+--
+-- Name: RoRegistry_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistry_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistry_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistry_id_seq" OWNED BY public."RoRegistry".id;
 
 
 --
@@ -1606,11 +1655,6 @@ ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing" ALTER COLUMN id SET 
 
 
 --
--- Note: RoRegistry, RoRegistryTld, RoRegistryUser use bigserial (no separate DEFAULT needed)
---
-
-
---
 -- Name: RegistryLock revision_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1622,6 +1666,27 @@ ALTER TABLE ONLY public."RegistryLock" ALTER COLUMN revision_id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public."ReservedList" ALTER COLUMN revision_id SET DEFAULT nextval('public."ReservedList_revision_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistry id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistry_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistryTld id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistryTld_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistryUser id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistryUser_id_seq"'::regclass);
 
 
 --
@@ -1967,11 +2032,6 @@ ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing"
 
 
 --
--- Note: RoRegistry, RoRegistryTld, RoRegistryUser constraints are defined inline in CREATE TABLE
---
-
-
---
 -- Name: RegistryLock RegistryLock_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1993,6 +2053,54 @@ ALTER TABLE ONLY public."ReservedEntry"
 
 ALTER TABLE ONLY public."ReservedList"
     ADD CONSTRAINT "ReservedList_pkey" PRIMARY KEY (revision_id);
+
+
+--
+-- Name: RoRegistryTld RoRegistryTld_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RoRegistryTld RoRegistryTld_registry_id_tld_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_registry_id_tld_key" UNIQUE (registry_id, tld);
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_registry_id_user_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_registry_id_user_email_key" UNIQUE (registry_id, user_email);
+
+
+--
+-- Name: RoRegistry RoRegistry_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry"
+    ADD CONSTRAINT "RoRegistry_name_key" UNIQUE (name);
+
+
+--
+-- Name: RoRegistry RoRegistry_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry"
+    ADD CONSTRAINT "RoRegistry_pkey" PRIMARY KEY (id);
 
 
 --
@@ -2505,8 +2613,17 @@ CREATE INDEX idx_registry_lock_verification_code ON public."RegistryLock" USING 
 
 
 --
--- Note: RoRegistry indexes are defined inline in CREATE TABLE section
+-- Name: idx_ro_registry_tld_registry; Type: INDEX; Schema: public; Owner: -
 --
+
+CREATE INDEX idx_ro_registry_tld_registry ON public."RoRegistryTld" USING btree (registry_id);
+
+
+--
+-- Name: idx_ro_registry_user_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_registry_user_email ON public."RoRegistryUser" USING btree (user_email);
 
 
 --
@@ -3021,6 +3138,22 @@ CREATE INDEX spec11threatmatch_tld_idx ON public."Spec11ThreatMatch" USING btree
 
 
 --
+-- Name: RoRegistryTld RoRegistryTld_registry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_registry_id_fkey" FOREIGN KEY (registry_id) REFERENCES public."RoRegistry"(id) ON DELETE CASCADE;
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_registry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_registry_id_fkey" FOREIGN KEY (registry_id) REFERENCES public."RoRegistry"(id) ON DELETE CASCADE;
+
+
+--
 -- Name: Contact fk1sfyj7o7954prbn1exk7lpnoe; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3487,3 +3620,6 @@ ALTER TABLE ONLY public."DelegationSignerData"
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict BMxq3i64RBGBi9N2atW9zeJZS7rAGq6sxLpzL4dYb53nJkeV2GWuJuy6dBx5KCy
+
