@@ -100,6 +100,105 @@
     </mat-card-content>
   </mat-card>
 
+  <!-- Cost Basis Management -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>Cost Basis Rates</mat-card-title>
+      <mat-card-subtitle>What the RSP pays the registry per TLD and operation. NULL registrar = default rate for all registrars.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <button mat-raised-button color="primary" (click)="onAddCostBasis()" *ngIf="!showCostBasisForm()">
+        <mat-icon>add</mat-icon> Add Rate
+      </button>
+
+      <!-- Add/Edit Form -->
+      <div *ngIf="showCostBasisForm()" class="cost-basis-form">
+        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Cost Basis Rate</h3>
+        <form [formGroup]="costBasisForm" (ngSubmit)="onSaveCostBasis()" class="add-form cost-basis-fields">
+          <mat-form-field>
+            <mat-label>TLD</mat-label>
+            <mat-select formControlName="tld">
+              <mat-option *ngFor="let tld of systemInfo()?.tlds || []" [value]="tld">{{ tld }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Operation</mat-label>
+            <mat-select formControlName="operation">
+              <mat-option *ngFor="let op of operations" [value]="op">{{ op }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Registrar (blank = all)</mat-label>
+            <mat-select formControlName="registrarId">
+              <mat-option value="">All (default)</mat-option>
+              <mat-option *ngFor="let reg of systemInfo()?.registrars || []" [value]="reg.registrarId">{{ reg.registrarId }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Cost Amount</mat-label>
+            <input matInput formControlName="costAmount" type="number" step="0.01">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Currency</mat-label>
+            <input matInput formControlName="costCurrency">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Notes</mat-label>
+            <input matInput formControlName="notes">
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="costBasisForm.invalid">
+              {{ editingCostBasis() ? 'Update' : 'Create' }}
+            </button>
+            <button mat-button type="button" (click)="onCancelCostBasis()">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Cost Basis Table -->
+      <table mat-table [dataSource]="costBasisEntries()" class="cost-basis-table" *ngIf="costBasisEntries().length > 0">
+        <ng-container matColumnDef="tld">
+          <th mat-header-cell *matHeaderCellDef>TLD</th>
+          <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
+        </ng-container>
+        <ng-container matColumnDef="operation">
+          <th mat-header-cell *matHeaderCellDef>Operation</th>
+          <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+        </ng-container>
+        <ng-container matColumnDef="registrarId">
+          <th mat-header-cell *matHeaderCellDef>Registrar</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarId || 'All (default)' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="costAmount">
+          <th mat-header-cell *matHeaderCellDef>Cost</th>
+          <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="costCurrency">
+          <th mat-header-cell *matHeaderCellDef>Currency</th>
+          <td mat-cell *matCellDef="let row">{{ row.costCurrency }}</td>
+        </ng-container>
+        <ng-container matColumnDef="notes">
+          <th mat-header-cell *matHeaderCellDef>Notes</th>
+          <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button (click)="onEditCostBasis(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="costBasisColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: costBasisColumns;"></tr>
+      </table>
+
+      <p *ngIf="costBasisEntries().length === 0 && !dashService.loading()" class="empty-state">
+        No cost basis rates configured yet.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
   <!-- System Reference Section -->
   <mat-card class="admin-card">
     <mat-card-header>

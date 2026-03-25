@@ -1,0 +1,185 @@
+<div class="financials-container">
+  <h2>Financial Overview</h2>
+  <p class="subtitle">Registry cost basis rates and financial data (read-only)</p>
+
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Summary Metric Cards -->
+  <div class="metric-cards" *ngIf="costBasisEntries().length > 0">
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ totalTlds() }}</div>
+        <div class="metric-label">TLDs Covered</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ totalOperations() }}</div>
+        <div class="metric-label">Operation Types</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ averageCost() | number:'1.2-2' }}</div>
+        <div class="metric-label">Avg Cost / Operation</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Cost by TLD Bar Chart -->
+  <div class="bar-chart" *ngIf="chartData().length > 0">
+    <h3 class="chart-title">Cost by TLD</h3>
+    <div class="chart-legend">
+      <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
+        <span class="legend-swatch" [style.background]="getOperationColor(op)"></span>
+        {{ op }}
+      </span>
+    </div>
+    <div class="chart-rows">
+      <div class="bar-row" *ngFor="let row of chartData()">
+        <span class="bar-label">.{{ row.tld }}</span>
+        <div class="bar-track">
+          <div class="bar-segments" [style.width.%]="row.totalWidthPercent">
+            <div
+              class="bar-segment"
+              *ngFor="let seg of row.segments"
+              [style.width.%]="(seg.amount / row.total) * 100"
+              [style.background]="seg.color"
+              [matTooltip]="seg.operation + ': $' + (seg.amount | number:'1.2-2')"
+            ></div>
+          </div>
+        </div>
+        <span class="bar-total">${{ row.total | number:'1.2-2' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <mat-tab-group (selectedIndexChange)="onTabChange($event)">
+    <!-- Cost Basis Rates Tab -->
+    <mat-tab label="Cost Basis Rates">
+      <div class="tab-content">
+        <p class="tab-description">What the RSP pays the registry per TLD and operation. Manage rates on the Admin tab.</p>
+
+        <div class="cost-basis-filters">
+          <mat-form-field>
+            <mat-label>Filter by TLD</mat-label>
+            <mat-select [value]="filterTld()" (selectionChange)="filterTld.set($event.value)">
+              <mat-option value="all">All TLDs</mat-option>
+              <mat-option *ngFor="let tld of uniqueTlds()" [value]="tld">{{ tld }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Filter by Operation</mat-label>
+            <mat-select [value]="filterOperation()" (selectionChange)="filterOperation.set($event.value)">
+              <mat-option value="all">All Operations</mat-option>
+              <mat-option *ngFor="let op of uniqueOperations()" [value]="op">{{ op }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field *ngIf="uniqueRegistrars().length > 0">
+            <mat-label>Filter by Registrar</mat-label>
+            <mat-select [value]="filterRegistrar()" (selectionChange)="filterRegistrar.set($event.value)">
+              <mat-option value="all">All Registrars</mat-option>
+              <mat-option *ngFor="let reg of uniqueRegistrars()" [value]="reg">{{ reg }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-button *ngIf="hasActiveFilters()" (click)="clearFilters()">
+            <mat-icon>clear</mat-icon> Clear Filters
+          </button>
+        </div>
+
+        <table mat-table [dataSource]="dataSource" matSort #costBasisSort="matSort" class="financials-table" *ngIf="filteredEntries().length > 0">
+          <ng-container matColumnDef="tld">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>TLD</th>
+            <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
+          </ng-container>
+          <ng-container matColumnDef="operation">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
+            <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+          </ng-container>
+          <ng-container matColumnDef="registrarId">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
+            <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="costAmount">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
+            <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="costCurrency">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Currency</th>
+            <td mat-cell *matCellDef="let row">{{ row.costCurrency }}</td>
+          </ng-container>
+          <ng-container matColumnDef="effectiveDate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Effective</th>
+            <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'short' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="notes">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
+            <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="costBasisColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: costBasisColumns;"></tr>
+        </table>
+
+        <div *ngIf="filteredEntries().length === 0 && !dashService.loading()" class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p *ngIf="hasActiveFilters()">No cost basis rates match the current filters.</p>
+          <p *ngIf="!hasActiveFilters()">No cost basis rates configured. Use the Admin tab to add rates.</p>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Summary by TLD Tab -->
+    <mat-tab label="Summary by TLD">
+      <div class="tab-content">
+        <p class="tab-description">Cost basis rates grouped by TLD.</p>
+
+        <div *ngFor="let group of costBasisByTld()" class="tld-group">
+          <h3>{{ group.tld }}</h3>
+          <table mat-table [dataSource]="group.entries" matSort class="financials-table compact">
+            <ng-container matColumnDef="operation">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
+              <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+            </ng-container>
+            <ng-container matColumnDef="registrarId">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
+              <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="costAmount">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
+              <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }} {{ row.costCurrency }}</td>
+            </ng-container>
+            <ng-container matColumnDef="notes">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
+              <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="['operation', 'registrarId', 'costAmount', 'notes']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['operation', 'registrarId', 'costAmount', 'notes'];"></tr>
+          </table>
+        </div>
+
+        <div *ngIf="costBasisByTld().length === 0 && !dashService.loading()" class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p>No cost basis data available.</p>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Pricing Spread Tab (placeholder for feature flag) -->
+    <mat-tab label="Pricing Spread">
+      <div class="tab-content">
+        <div class="coming-soon">
+          <mat-icon>lock</mat-icon>
+          <h3>Pricing Spread Analysis</h3>
+          <p>This view compares registrar pricing rules against cost basis rates to show margins.</p>
+          <p class="muted">Available when enabled by your administrator.</p>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

@@ -94,3 +94,32 @@ h3 {
   margin-top: 24px;
   margin-bottom: 12px;
 }
+
+.cost-basis-table {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.cost-basis-form {
+  margin-bottom: 16px;
+}
+
+.cost-basis-fields {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cost-basis-fields mat-form-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding-top: 8px;
+}

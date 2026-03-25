@@ -147,6 +147,7 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
           existing.setCostAmount(costBasis.getCostAmount());
           existing.setCostCurrency(costBasis.getCostCurrency());
           existing.setNotes(costBasis.getNotes());
+          existing.setRegistrarId(costBasis.getRegistrarId());
           existing.setUpdatedAt(ZonedDateTime.now(java.time.ZoneOffset.UTC));
           tm().getEntityManager().merge(existing);
           consoleApiParams.response().setPayload(
@@ -161,6 +162,7 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
     map.put("id", c.getId());
     map.put("tld", c.getTld());
     map.put("operation", c.getOperation());
+    map.put("registrarId", c.getRegistrarId());
     map.put("costAmount", c.getCostAmount());
     map.put("costCurrency", c.getCostCurrency());
     map.put("effectiveDate", c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : null);

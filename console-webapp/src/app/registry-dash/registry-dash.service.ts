@@ -55,6 +55,7 @@ export interface CostBasisEntry {
   id?: number;
   tld: string;
   operation: string;
+  registrarId?: string;
   costAmount: number;
   costCurrency: string;
   effectiveDate: string;

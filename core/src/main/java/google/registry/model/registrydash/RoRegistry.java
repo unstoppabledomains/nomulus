@@ -22,6 +22,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** A named registry group that owns TLDs and has users. */
 @Entity
@@ -37,6 +39,12 @@ public class RoRegistry {
 
   @Column(name = "created_at", nullable = false)
   ZonedDateTime createdAt;
+
+  // ===== start registry-dash-financials =====
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(columnDefinition = "jsonb", nullable = false)
+  String settings = "{}";
+  // ===== end registry-dash-financials =====
 
   /** Required by Hibernate. */
   public RoRegistry() {}
@@ -56,5 +64,13 @@ public class RoRegistry {
 
   public ZonedDateTime getCreatedAt() {
     return createdAt;
+  }
+
+  public String getSettings() {
+    return settings;
+  }
+
+  public void setSettings(String settings) {
+    this.settings = settings;
   }
 }

@@ -16,7 +16,7 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { MaterialModule } from '../../material.module';
-import { RegistryDashService, RoRegistry } from '../registry-dash.service';
+import { RegistryDashService, RoRegistry, CostBasisEntry } from '../registry-dash.service';
 
 @Component({
   selector: 'app-admin',
@@ -45,10 +45,29 @@ export class AdminComponent implements OnInit {
     userEmail: new FormControl('', [Validators.required, Validators.email]),
   });
 
+  // Cost Basis management
+  costBasisEntries = computed(() => this.dashService.costBasis());
+  costBasisColumns = ['tld', 'operation', 'registrarId', 'costAmount', 'costCurrency', 'notes', 'actions'];
+
+  showCostBasisForm = signal(false);
+  editingCostBasis = signal<CostBasisEntry | undefined>(undefined);
+
+  costBasisForm = new FormGroup({
+    tld: new FormControl('', [Validators.required]),
+    operation: new FormControl('', [Validators.required]),
+    registrarId: new FormControl(''),
+    costAmount: new FormControl<number | null>(null, [Validators.required, Validators.min(0)]),
+    costCurrency: new FormControl('USD', [Validators.required]),
+    notes: new FormControl(''),
+  });
+
+  operations = ['CREATE', 'RENEW', 'RESTORE', 'TRANSFER'];
+
   constructor(public dashService: RegistryDashService) {}
 
   ngOnInit() {
     this.dashService.getAdminData().subscribe();
+    this.dashService.getCostBasis().subscribe();
   }
 
   onCreateRegistry() {
@@ -135,4 +154,53 @@ export class AdminComponent implements OnInit {
     const assigned = (this.selectedRegistry()?.tlds || []).map((t) => t.tld);
     return all.filter((t) => !assigned.includes(t));
   });
+
+  onAddCostBasis() {
+    this.editingCostBasis.set(undefined);
+    this.costBasisForm.reset({ costCurrency: 'USD' });
+    this.showCostBasisForm.set(true);
+  }
+
+  onEditCostBasis(entry: CostBasisEntry) {
+    this.editingCostBasis.set(entry);
+    this.costBasisForm.patchValue({
+      tld: entry.tld,
+      operation: entry.operation,
+      registrarId: entry.registrarId || '',
+      costAmount: entry.costAmount,
+      costCurrency: entry.costCurrency,
+      notes: entry.notes || '',
+    });
+    this.showCostBasisForm.set(true);
+  }
+
+  onSaveCostBasis() {
+    if (this.costBasisForm.invalid) return;
+    const val = this.costBasisForm.value;
+    const entry: CostBasisEntry = {
+      tld: val.tld!,
+      operation: val.operation!,
+      registrarId: val.registrarId || undefined,
+      costAmount: val.costAmount!,
+      costCurrency: val.costCurrency!,
+      notes: val.notes || undefined,
+      effectiveDate: new Date().toISOString(),
+    };
+    const editing = this.editingCostBasis();
+    if (editing?.id) {
+      entry.id = editing.id;
+      this.dashService.updateCostBasis(entry).subscribe(() => {
+        this.showCostBasisForm.set(false);
+      });
+    } else {
+      this.dashService.createCostBasis(entry).subscribe(() => {
+        this.showCostBasisForm.set(false);
+      });
+    }
+  }
+
+  onCancelCostBasis() {
+    this.showCostBasisForm.set(false);
+    this.editingCostBasis.set(undefined);
+  }
 }

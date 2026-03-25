@@ -440,6 +440,74 @@ public class RegistryDashboardEntitiesTest {
   }
 
   @Test
+  void testCostBasis_withRegistrarId() {
+    RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
+    cb.setTld("tld");
+    cb.setOperation("CREATE");
+    cb.setCostAmount(new BigDecimal("5.00"));
+    cb.setCostCurrency("USD");
+    cb.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
+    cb.setRegistrarId("arsenic");
+    tm().transact(() -> tm().getEntityManager().persist(cb));
+
+    tm().transact(
+        () -> {
+          RegistryDashboardCostBasis loaded =
+              tm().getEntityManager()
+                  .find(RegistryDashboardCostBasis.class, cb.getId());
+          assertThat(loaded.getRegistrarId()).isEqualTo("arsenic");
+        });
+  }
+
+  @Test
+  void testCostBasis_nullRegistrarId_isDefault() {
+    RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
+    cb.setTld("tld");
+    cb.setOperation("RENEW");
+    cb.setCostAmount(new BigDecimal("7.00"));
+    cb.setCostCurrency("USD");
+    cb.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
+    // registrarId left null - this is the "default" rate
+    tm().transact(() -> tm().getEntityManager().persist(cb));
+
+    tm().transact(
+        () -> {
+          RegistryDashboardCostBasis loaded =
+              tm().getEntityManager()
+                  .find(RegistryDashboardCostBasis.class, cb.getId());
+          assertThat(loaded.getRegistrarId()).isNull();
+        });
+  }
+
+  @Test
+  void testRoRegistry_settings() {
+    RoRegistry reg = new RoRegistry("SettingsTest");
+    tm().transact(() -> tm().getEntityManager().persist(reg));
+
+    tm().transact(
+        () -> {
+          RoRegistry loaded =
+              tm().getEntityManager().find(RoRegistry.class, reg.getId());
+          assertThat(loaded.getSettings()).isEqualTo("{}");
+        });
+
+    tm().transact(
+        () -> {
+          RoRegistry r = tm().getEntityManager().find(RoRegistry.class, reg.getId());
+          r.setSettings("{\"showPricingSpread\":true}");
+          tm().getEntityManager().merge(r);
+        });
+
+    tm().transact(
+        () -> {
+          RoRegistry updated =
+              tm().getEntityManager().find(RoRegistry.class, reg.getId());
+          // PostgreSQL normalizes JSON whitespace (adds space after colon)
+          assertThat(updated.getSettings()).isEqualTo("{\"showPricingSpread\": true}");
+        });
+  }
+
+  @Test
   void testCostBasis_autoGeneratesIdAndTimestamps() {
     RegistryDashboardCostBasis cost = new RegistryDashboardCostBasis();
     cost.setTld("tld");

@@ -182,11 +182,11 @@ export const routes: RouteWithIcon[] = [
           ),
       },
       {
-        path: 'cost-basis',
-        title: 'Cost Basis',
+        path: 'financials',
+        title: 'Financials',
         loadComponent: () =>
-          import('./registry-dash/cost-basis/cost-basis.component').then(
-            (mod) => mod.CostBasisComponent
+          import('./registry-dash/financials/financials.component').then(
+            (mod) => mod.FinancialsComponent
           ),
       },
       {

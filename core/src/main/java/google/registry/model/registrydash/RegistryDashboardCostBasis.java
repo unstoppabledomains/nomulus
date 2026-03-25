@@ -39,6 +39,10 @@ public class RegistryDashboardCostBasis {
   @Column(nullable = false)
   String operation;
 
+  @Nullable
+  @Column(name = "registrar_id")
+  String registrarId;
+
   @Column(name = "cost_amount", nullable = false, precision = 19, scale = 2)
   BigDecimal costAmount;
 
@@ -83,6 +87,15 @@ public class RegistryDashboardCostBasis {
 
   public void setOperation(String operation) {
     this.operation = operation;
+  }
+
+  @Nullable
+  public String getRegistrarId() {
+    return registrarId;
+  }
+
+  public void setRegistrarId(@Nullable String registrarId) {
+    this.registrarId = registrarId;
   }
 
   public BigDecimal getCostAmount() {

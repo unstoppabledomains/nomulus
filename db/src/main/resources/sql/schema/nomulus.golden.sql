@@ -1147,7 +1147,8 @@ CREATE TABLE public."RegistryDashboardCostBasis" (
     effective_date timestamp with time zone DEFAULT now() NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    registrar_id text
 );
 
 
@@ -1298,7 +1299,8 @@ ALTER SEQUENCE public."ReservedList_revision_id_seq" OWNED BY public."ReservedLi
 CREATE TABLE public."RoRegistry" (
     id bigint NOT NULL,
     name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    settings jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -2006,11 +2008,10 @@ ALTER TABLE ONLY public."RegistryDashboardCostBasis"
 
 
 --
--- Name: RegistryDashboardCostBasis RegistryDashboardCostBasis_tld_operation_effective_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public."RegistryDashboardCostBasis"
-    ADD CONSTRAINT "RegistryDashboardCostBasis_tld_operation_effective_date_key" UNIQUE (tld, operation, effective_date);
+CREATE UNIQUE INDEX idx_cost_basis_tld_op_reg_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, COALESCE(registrar_id, ''::text), effective_date);
 
 
 --

@@ -370,6 +370,18 @@ public final class ConsoleModule {
           if (obj.has("notes") && !obj.get("notes").isJsonNull()) {
             cb.setNotes(obj.get("notes").getAsString());
           }
+          if (obj.has("registrarId") && !obj.get("registrarId").isJsonNull()) {
+            cb.setRegistrarId(obj.get("registrarId").getAsString());
+          }
+          if (obj.has("id") && !obj.get("id").isJsonNull()) {
+            try {
+              var idField = RegistryDashboardCostBasis.class.getDeclaredField("id");
+              idField.setAccessible(true);
+              idField.set(cb, obj.get("id").getAsLong());
+            } catch (Exception ex) {
+              // Ignore - id will be auto-generated for new entries
+            }
+          }
           return cb;
         });
   }
