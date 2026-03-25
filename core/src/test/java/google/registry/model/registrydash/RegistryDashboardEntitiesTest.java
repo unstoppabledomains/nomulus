@@ -23,6 +23,7 @@ import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.persistence.transaction.JpaTestExtensions;
+import google.registry.persistence.transaction.JpaTestExtensions.JpaIntegrationWithCoverageExtension;
 import google.registry.testing.FakeClock;
 import jakarta.persistence.PersistenceException;
 import java.math.BigDecimal;
@@ -35,13 +36,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Tests for registry dashboard JPA entities. */
-class RegistryDashboardEntitiesTest {
+public class RegistryDashboardEntitiesTest {
 
   private final FakeClock clock = new FakeClock(DateTime.parse("2024-04-15T00:00:00.000Z"));
 
   @RegisterExtension
-  final JpaTestExtensions.JpaIntegrationTestExtension jpa =
-      new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
+  final JpaIntegrationWithCoverageExtension jpa =
+      new JpaTestExtensions.Builder().withClock(clock).buildIntegrationWithCoverageExtension();
 
   @BeforeEach
   void setUp() {
