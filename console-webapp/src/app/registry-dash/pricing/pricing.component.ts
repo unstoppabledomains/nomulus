@@ -62,8 +62,8 @@ export class PricingComponent {
       Validators.min(0),
     ]),
     priceCurrency: new FormControl('USD', [Validators.required]),
-    effectiveDate: new FormControl<Date | null>(null),
-    expiryDate: new FormControl<Date | null>(null),
+    effectiveDate: new FormControl<string>(''),
+    expiryDate: new FormControl<string>(''),
     isActive: new FormControl(true),
   });
 
@@ -97,8 +97,8 @@ export class PricingComponent {
       operation: rule.operation,
       priceAmount: rule.priceAmount,
       priceCurrency: rule.priceCurrency,
-      effectiveDate: rule.effectiveDate ? new Date(rule.effectiveDate) : null,
-      expiryDate: rule.expiryDate ? new Date(rule.expiryDate) : null,
+      effectiveDate: rule.effectiveDate ? this.toDatetimeLocal(rule.effectiveDate) : '',
+      expiryDate: rule.expiryDate ? this.toDatetimeLocal(rule.expiryDate) : '',
       isActive: rule.isActive,
     });
     this.showForm.set(true);
@@ -113,16 +113,14 @@ export class PricingComponent {
     if (!this.pricingForm.valid) return;
 
     const formValue = this.pricingForm.value;
-    const effectiveDate = formValue.effectiveDate;
-    const expiryDate = formValue.expiryDate;
     const rule: PricingRule = {
       registrarId: formValue.registrarId!,
       tld: formValue.tld!,
       operation: formValue.operation!,
       priceAmount: formValue.priceAmount!,
       priceCurrency: formValue.priceCurrency!,
-      effectiveDate: effectiveDate instanceof Date ? effectiveDate.toISOString() : (effectiveDate || ''),
-      expiryDate: expiryDate instanceof Date ? expiryDate.toISOString() : (expiryDate || undefined),
+      effectiveDate: formValue.effectiveDate ? new Date(formValue.effectiveDate).toISOString() : '',
+      expiryDate: formValue.expiryDate ? new Date(formValue.expiryDate).toISOString() : undefined,
       isActive: formValue.isActive ?? true,
     };
 
@@ -145,5 +143,11 @@ export class PricingComponent {
         error: (err) => this.snackBar.open(err.error || 'Create failed'),
       });
     }
+  }
+
+  private toDatetimeLocal(isoString: string): string {
+    const d = new Date(isoString);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 }
