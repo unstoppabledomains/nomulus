@@ -27,6 +27,7 @@ import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrydash.RegistryDashboardRegistrarPricing;
+import google.registry.model.tld.Tld;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
@@ -34,11 +35,15 @@ import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.joda.time.DateTime;
 
 /** Handles per-registrar pricing CRUD for the registry dashboard. */
 @Action(
@@ -102,9 +107,25 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
                           RegistryDashboardRegistrarPricing.class)
                       .setParameter("registrarIds", registrarIds)
                       .getResultList();
+          // ===== start registry-dash-default-prices =====
+          // Build a TLD cache for default price lookups
+          Map<String, Tld> tldCache = results.stream()
+              .map(RegistryDashboardRegistrarPricing::getTld)
+              .distinct()
+              .collect(Collectors.toMap(
+                  tldStr -> tldStr,
+                  tldStr -> {
+                    try {
+                      return Tld.get(tldStr);
+                    } catch (Exception e) {
+                      return null;
+                    }
+                  },
+                  (a, b) -> a));
+          // ===== end registry-dash-default-prices =====
           List<Map<String, Object>> payload = new java.util.ArrayList<>();
           for (RegistryDashboardRegistrarPricing p : results) {
-            payload.add(pricingToMap(p));
+            payload.add(pricingToMap(p, tldCache.get(p.getTld())));
           }
           consoleApiParams.response().setPayload(
               consoleApiParams.gson().toJson(payload));
@@ -189,8 +210,15 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
         });
   }
 
+  /** Converts a pricing rule to a response map without default price enrichment. */
   private static Map<String, Object> pricingToMap(
       RegistryDashboardRegistrarPricing p) {
+    return pricingToMap(p, null);
+  }
+
+  /** Converts a pricing rule to a response map, enriched with default TLD price if available. */
+  private static Map<String, Object> pricingToMap(
+      RegistryDashboardRegistrarPricing p, Tld tld) {
     Map<String, Object> map = new HashMap<>();
     map.put("id", p.getId());
     map.put("registrarId", p.getRegistrarId());
@@ -201,6 +229,26 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
     map.put("effectiveDate", p.getEffectiveDate() != null ? p.getEffectiveDate().toString() : null);
     map.put("expiryDate", p.getExpiryDate() != null ? p.getExpiryDate().toString() : null);
     map.put("isActive", p.isActive());
+    // ===== start registry-dash-default-prices =====
+    if (tld != null) {
+      BigDecimal defaultPrice = getDefaultPrice(tld, p.getOperation());
+      map.put("defaultPrice", defaultPrice);
+      map.put("defaultPriceCurrency", tld.getCurrency().getCode());
+    }
+    // ===== end registry-dash-default-prices =====
     return map;
   }
+
+  // ===== start registry-dash-default-prices =====
+  /** Looks up the default TLD price for a given operation type. */
+  private static BigDecimal getDefaultPrice(Tld tld, String operation) {
+    DateTime now = DateTime.now(org.joda.time.DateTimeZone.UTC);
+    return switch (operation.toUpperCase(Locale.US)) {
+      case "CREATE" -> tld.getCreateBillingCost(now).getAmount();
+      case "RENEW", "TRANSFER" -> tld.getStandardRenewCost(now).getAmount();
+      case "RESTORE" -> tld.getRestoreBillingCost().getAmount();
+      default -> null;
+    };
+  }
+  // ===== end registry-dash-default-prices =====
 }

@@ -12,31 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, computed, signal } from '@angular/core';
+import { AfterViewInit, Component, ViewChild, computed, effect, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatTableDataSource } from '@angular/material/table';
 import { SnackBarModule } from '../../snackbar.module';
 import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-dash.service';
 
 @Component({
   selector: 'app-registry-dash-pricing',
-  imports: [MaterialModule, CommonModule, ReactiveFormsModule, SnackBarModule],
+  imports: [MaterialModule, CommonModule, ReactiveFormsModule, SnackBarModule, MatSortModule],
   templateUrl: './pricing.component.html',
   styleUrls: ['./pricing.component.scss'],
 })
-export class PricingComponent {
+export class PricingComponent implements AfterViewInit {
   displayedColumns = [
     'registrarId',
     'tld',
     'operation',
     'priceAmount',
+    'defaultPrice',
+    'difference',
     'priceCurrency',
     'effectiveDate',
     'isActive',
     'actions',
   ];
+
+  @ViewChild(MatSort) sort!: MatSort;
+  dataSource = new MatTableDataSource<PricingRule>([]);
+
+  filterRegistrar = signal<string>('all');
+  filterTld = signal<string>('all');
+
+  uniqueRegistrars = computed(() => {
+    const rules = this.dashService.pricingRules();
+    return [...new Set(rules.map(r => r.registrarId))].sort();
+  });
+
+  uniqueTlds = computed(() => {
+    const rules = this.dashService.pricingRules();
+    return [...new Set(rules.map(r => r.tld))].sort();
+  });
+
+  filteredRules = computed(() => {
+    let rules = this.dashService.pricingRules();
+    const reg = this.filterRegistrar();
+    const tld = this.filterTld();
+    if (reg !== 'all') rules = rules.filter(r => r.registrarId === reg);
+    if (tld !== 'all') rules = rules.filter(r => r.tld === tld);
+    return rules;
+  });
 
   showForm = signal(false);
   editingRule = signal<PricingRule | undefined>(undefined);
@@ -80,6 +109,42 @@ export class PricingComponent {
       this.selectedRegistrarId.set(value || '');
       this.pricingForm.get('tld')!.setValue('');
     });
+
+    // Sync filtered rules into dataSource
+    effect(() => {
+      this.dataSource.data = this.filteredRules();
+    });
+  }
+
+  ngAfterViewInit() {
+    this.dataSource.sort = this.sort;
+    this.dataSource.sortingDataAccessor = (item: PricingRule, property: string) => {
+      if (property === 'difference') {
+        return this.getDifference(item) ?? 0;
+      }
+      if (property === 'defaultPrice') {
+        return item.defaultPrice ?? 0;
+      }
+      return (item as any)[property];
+    };
+  }
+
+  getDifference(rule: PricingRule): number | null {
+    if (rule.defaultPrice == null) return null;
+    return rule.priceAmount - rule.defaultPrice;
+  }
+
+  getDifferenceClass(rule: PricingRule): string {
+    const diff = this.getDifference(rule);
+    if (diff === null) return '';
+    if (diff < 0) return 'diff-discount';
+    if (diff > 0) return 'diff-premium';
+    return 'diff-zero';
+  }
+
+  clearFilters() {
+    this.filterRegistrar.set('all');
+    this.filterTld.set('all');
   }
 
   openAddForm() {

@@ -47,6 +47,8 @@ export interface PricingRule {
   effectiveDate: string;
   expiryDate?: string;
   isActive: boolean;
+  defaultPrice?: number;
+  defaultPriceCurrency?: string;
 }
 
 export interface CostBasisEntry {
