@@ -20,25 +20,61 @@
 
   .pricing-form-card {
     margin-bottom: 1.5rem;
+    border-radius: 12px;
+  }
+
+  .form-title {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 1.25rem;
+    color: rgba(0, 0, 0, 0.87);
   }
 
   .pricing-form {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 1rem;
-    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 
-    mat-checkbox {
-      grid-column: span 2;
-      margin-bottom: 0.5rem;
+    mat-divider {
+      margin: 0.5rem 0;
+    }
+  }
+
+  .form-section {
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(0, 0, 0, 0.54);
+      margin-bottom: 0.75rem;
     }
 
-    .form-actions {
-      grid-column: span 2;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
+    .section-fields {
+      &.cols-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0 1rem;
+        align-items: start;
+      }
+
+      .span-2 {
+        grid-column: span 2;
+      }
     }
+  }
+
+  .active-toggle {
+    display: flex;
+    align-items: center;
+    padding-top: 0.75rem;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
   }
 
   table {

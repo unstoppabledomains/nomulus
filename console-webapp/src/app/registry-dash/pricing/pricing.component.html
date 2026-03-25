@@ -16,69 +16,109 @@
 
   @if (showForm()) {
     <mat-card appearance="outlined" class="pricing-form-card">
-      <mat-card-header>
-        <mat-card-title>{{ editingRule() ? 'Edit' : 'Add' }} Pricing Rule</mat-card-title>
-      </mat-card-header>
       <mat-card-content>
+        <div class="form-title">{{ editingRule() ? 'Edit' : 'Add' }} Pricing Rule</div>
         <form [formGroup]="pricingForm" (ngSubmit)="onSubmit()" class="pricing-form">
-          <mat-form-field>
-            <mat-label>Registrar</mat-label>
-            @if (editingRule()) {
-              <input matInput formControlName="registrarId" readonly>
-            } @else {
-              <mat-select formControlName="registrarId">
-                @for (r of registrars(); track r.registrarId) {
-                  <mat-option [value]="r.registrarId">{{ r.registrarName }} ({{ r.registrarId }})</mat-option>
+
+          <div class="form-section">
+            <div class="section-label">Registrar &amp; TLD</div>
+            <div class="section-fields cols-4">
+              <mat-form-field class="span-2">
+                <mat-label>Registrar</mat-label>
+                @if (editingRule()) {
+                  <input matInput formControlName="registrarId" readonly>
+                } @else {
+                  <mat-select formControlName="registrarId">
+                    @for (r of registrars(); track r.registrarId) {
+                      <mat-option [value]="r.registrarId">{{ r.registrarName }} ({{ r.registrarId }})</mat-option>
+                    }
+                  </mat-select>
                 }
-              </mat-select>
-            }
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>TLD</mat-label>
-            @if (editingRule()) {
-              <input matInput formControlName="tld" readonly>
-            } @else {
-              <mat-select formControlName="tld">
-                @for (tld of availableTlds(); track tld) {
-                  <mat-option [value]="tld">{{ tld }}</mat-option>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>TLD</mat-label>
+                @if (editingRule()) {
+                  <input matInput formControlName="tld" readonly>
+                } @else {
+                  <mat-select formControlName="tld">
+                    @for (tld of availableTlds(); track tld) {
+                      <mat-option [value]="tld">{{ tld }}</mat-option>
+                    }
+                  </mat-select>
                 }
-              </mat-select>
-            }
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Operation</mat-label>
-            <mat-select formControlName="operation" [disabled]="!!editingRule()">
-              <mat-option value="CREATE">CREATE</mat-option>
-              <mat-option value="RENEW">RENEW</mat-option>
-              <mat-option value="TRANSFER">TRANSFER</mat-option>
-              <mat-option value="RESTORE">RESTORE</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Price</mat-label>
-            <input matInput type="number" formControlName="priceAmount" step="0.01">
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Currency</mat-label>
-            <mat-select formControlName="priceCurrency">
-              <mat-option value="USD">USD</mat-option>
-              <mat-option value="EUR">EUR</mat-option>
-              <mat-option value="GBP">GBP</mat-option>
-              <mat-option value="JPY">JPY</mat-option>
-              <mat-option value="CAD">CAD</mat-option>
-              <mat-option value="AUD">AUD</mat-option>
-              <mat-option value="CHF">CHF</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Effective Date &amp; Time</mat-label>
-            <input matInput type="datetime-local" formControlName="effectiveDate">
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Expiry Date &amp; Time</mat-label>
-            <input matInput type="datetime-local" formControlName="expiryDate">
-          </mat-form-field>
-          <mat-checkbox formControlName="isActive">Active</mat-checkbox>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Operation</mat-label>
+                <mat-select formControlName="operation" [disabled]="!!editingRule()">
+                  <mat-option value="CREATE">CREATE</mat-option>
+                  <mat-option value="RENEW">RENEW</mat-option>
+                  <mat-option value="TRANSFER">TRANSFER</mat-option>
+                  <mat-option value="RESTORE">RESTORE</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="form-section">
+            <div class="section-label">Pricing</div>
+            <div class="section-fields cols-4">
+              <mat-form-field>
+                <mat-label>Price</mat-label>
+                <input matInput type="number" formControlName="priceAmount" step="0.01">
+                <span matTextPrefix>$&nbsp;</span>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Currency</mat-label>
+                <mat-select formControlName="priceCurrency">
+                  <mat-option value="USD">USD</mat-option>
+                  <mat-option value="EUR">EUR</mat-option>
+                  <mat-option value="GBP">GBP</mat-option>
+                  <mat-option value="JPY">JPY</mat-option>
+                  <mat-option value="CAD">CAD</mat-option>
+                  <mat-option value="AUD">AUD</mat-option>
+                  <mat-option value="CHF">CHF</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <div class="active-toggle span-2">
+                <mat-checkbox formControlName="isActive">Active</mat-checkbox>
+              </div>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="form-section">
+            <div class="section-label">Validity Period</div>
+            <div class="section-fields cols-4">
+              <mat-form-field>
+                <mat-label>Effective Date</mat-label>
+                <input matInput [matDatepicker]="effectiveDatePicker" formControlName="effectiveDate">
+                <mat-datepicker-toggle matIconSuffix [for]="effectiveDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #effectiveDatePicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Effective Time</mat-label>
+                <input matInput [matTimepicker]="effectiveTimePicker" formControlName="effectiveDate">
+                <mat-timepicker-toggle matIconSuffix [for]="effectiveTimePicker"></mat-timepicker-toggle>
+                <mat-timepicker #effectiveTimePicker></mat-timepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Expiry Date</mat-label>
+                <input matInput [matDatepicker]="expiryDatePicker" formControlName="expiryDate">
+                <mat-datepicker-toggle matIconSuffix [for]="expiryDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #expiryDatePicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Expiry Time</mat-label>
+                <input matInput [matTimepicker]="expiryTimePicker" formControlName="expiryDate">
+                <mat-timepicker-toggle matIconSuffix [for]="expiryTimePicker"></mat-timepicker-toggle>
+                <mat-timepicker #expiryTimePicker></mat-timepicker>
+              </mat-form-field>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button mat-button type="button" (click)="cancelForm()">Cancel</button>
             <button mat-raised-button color="primary" type="submit"

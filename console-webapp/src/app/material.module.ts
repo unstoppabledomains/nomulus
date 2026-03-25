@@ -46,6 +46,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatTimepickerModule } from '@angular/material/timepicker';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTreeModule } from '@angular/material/tree';
@@ -79,6 +80,7 @@ import { MatTreeModule } from '@angular/material/tree';
     MatSidenavModule,
     MatTableModule,
     MatTabsModule,
+    MatTimepickerModule,
     MatToolbarModule,
     MatTooltipModule,
     MatTreeModule,

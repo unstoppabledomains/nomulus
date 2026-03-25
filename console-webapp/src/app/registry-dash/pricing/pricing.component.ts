@@ -62,8 +62,8 @@ export class PricingComponent {
       Validators.min(0),
     ]),
     priceCurrency: new FormControl('USD', [Validators.required]),
-    effectiveDate: new FormControl<string>(''),
-    expiryDate: new FormControl<string>(''),
+    effectiveDate: new FormControl<Date | null>(null),
+    expiryDate: new FormControl<Date | null>(null),
     isActive: new FormControl(true),
   });
 
@@ -97,8 +97,8 @@ export class PricingComponent {
       operation: rule.operation,
       priceAmount: rule.priceAmount,
       priceCurrency: rule.priceCurrency,
-      effectiveDate: rule.effectiveDate ? this.toDatetimeLocal(rule.effectiveDate) : '',
-      expiryDate: rule.expiryDate ? this.toDatetimeLocal(rule.expiryDate) : '',
+      effectiveDate: rule.effectiveDate ? new Date(rule.effectiveDate) : null,
+      expiryDate: rule.expiryDate ? new Date(rule.expiryDate) : null,
       isActive: rule.isActive,
     });
     this.showForm.set(true);
@@ -119,8 +119,8 @@ export class PricingComponent {
       operation: formValue.operation!,
       priceAmount: formValue.priceAmount!,
       priceCurrency: formValue.priceCurrency!,
-      effectiveDate: formValue.effectiveDate ? new Date(formValue.effectiveDate).toISOString() : '',
-      expiryDate: formValue.expiryDate ? new Date(formValue.expiryDate).toISOString() : undefined,
+      effectiveDate: formValue.effectiveDate instanceof Date ? formValue.effectiveDate.toISOString() : '',
+      expiryDate: formValue.expiryDate instanceof Date ? formValue.expiryDate.toISOString() : undefined,
       isActive: formValue.isActive ?? true,
     };
 
@@ -145,9 +145,4 @@ export class PricingComponent {
     }
   }
 
-  private toDatetimeLocal(isoString: string): string {
-    const d = new Date(isoString);
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
 }
