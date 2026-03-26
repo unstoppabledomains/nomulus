@@ -21,14 +21,14 @@ import { RegistryDashService, CostBasisEntry } from '../registry-dash.service';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
-  RENEW: '#059669',
-  TRANSFER: '#d97706',
-  RESTORE: '#dc2626',
+  RENEW: '#0546B7',
+  TRANSFER: '#65A1DA',
+  RESTORE: '#192B55',
 };
 
 const TLD_COLORS = [
-  '#0D67FE', '#059669', '#d97706', '#dc2626',
-  '#0546B7', '#7A7A85', '#9191A1', '#0A5FEA',
+  '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
+  '#00C9FF', '#0A5FEA', '#4A9B30', '#9191A1',
 ];
 
 @Component({
