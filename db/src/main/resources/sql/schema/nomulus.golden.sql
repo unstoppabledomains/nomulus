@@ -2,6 +2,8 @@
 -- PostgreSQL database dump
 --
 
+\restrict 5WxvLUPsjElARrVcbEpdMapv3QNLjXKjEe3zzpRllWN2JDhsKwmuan4PJUrbJBl
+
 -- Dumped from database version 17.9
 -- Dumped by pg_dump version 17.9
 
@@ -2008,13 +2010,6 @@ ALTER TABLE ONLY public."RegistryDashboardCostBasis"
 
 
 --
--- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_cost_basis_tld_op_reg_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, COALESCE(registrar_id, ''::text), effective_date);
-
-
---
 -- Name: RegistryDashboardRegistrarPricing RegistryDashboardRegistrarPri_registrar_id_tld_operation_ef_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2588,6 +2583,13 @@ CREATE INDEX idx_console_update_history_modification_time ON public."ConsoleUpda
 --
 
 CREATE INDEX idx_console_update_history_type ON public."ConsoleUpdateHistory" USING btree (type);
+
+
+--
+-- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_cost_basis_tld_op_reg_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, COALESCE(registrar_id, ''::text), effective_date);
 
 
 --
@@ -3619,4 +3621,6 @@ ALTER TABLE ONLY public."DelegationSignerData"
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 5WxvLUPsjElARrVcbEpdMapv3QNLjXKjEe3zzpRllWN2JDhsKwmuan4PJUrbJBl
 
