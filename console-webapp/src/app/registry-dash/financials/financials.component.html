@@ -139,6 +139,26 @@
       <div class="tab-content">
         <p class="tab-description">Cost basis rates grouped by TLD.</p>
 
+        <!-- TLD Cost Distribution Donut -->
+        <div class="tld-donut-section" *ngIf="tldCostDonut().segments.length > 0">
+          <h3 class="chart-title">Cost Distribution by TLD</h3>
+          <div class="donut-wrapper">
+            <div class="donut-ring" [style.background]="tldCostDonut().gradient">
+              <div class="donut-hole">
+                <span class="donut-total">${{ tldCostDonut().total | number:'1.0-0' }}</span>
+                <span class="donut-label">total</span>
+              </div>
+            </div>
+            <div class="donut-legend">
+              <div class="legend-row" *ngFor="let seg of tldCostDonut().segments">
+                <span class="legend-swatch" [style.background]="seg.color"></span>
+                <span class="legend-name">.{{ seg.tld }}</span>
+                <span class="legend-value">${{ seg.cost | number:'1.2-2' }} ({{ seg.pct * 100 | number:'1.0-0' }}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div *ngFor="let group of costBasisByTld()" class="tld-group">
           <h3>{{ group.tld }}</h3>
           <table mat-table [dataSource]="group.entries" matSort class="financials-table compact">
@@ -170,14 +190,43 @@
       </div>
     </mat-tab>
 
-    <!-- Pricing Spread Tab (placeholder for feature flag) -->
+    <!-- Pricing Spread Tab -->
     <mat-tab label="Pricing Spread">
       <div class="tab-content">
-        <div class="coming-soon">
-          <mat-icon>lock</mat-icon>
-          <h3>Pricing Spread Analysis</h3>
-          <p>This view compares registrar pricing rules against cost basis rates to show margins.</p>
-          <p class="muted">Available when enabled by your administrator.</p>
+        <p class="tab-description">Registrar pricing vs cost basis. Green = registrar pays more than cost (margin). Red = registrar pays less (discount).</p>
+
+        <div class="spread-chart" *ngIf="pricingSpreadData().length > 0">
+          <div class="spread-header">
+            <span class="spread-col-label">← Discount</span>
+            <span class="spread-col-center">0</span>
+            <span class="spread-col-label">Margin →</span>
+          </div>
+          <div class="spread-row" *ngFor="let row of pricingSpreadData()">
+            <span class="spread-label">{{ row.registrarId }} · {{ row.tld }} · {{ row.operation }}</span>
+            <div class="spread-bar-container">
+              <div class="spread-bar-left">
+                <div class="spread-bar-fill spread-discount"
+                  *ngIf="!row.isPositive"
+                  [style.width.%]="row.barWidthPct"
+                ></div>
+              </div>
+              <div class="spread-center-line"></div>
+              <div class="spread-bar-right">
+                <div class="spread-bar-fill spread-margin"
+                  *ngIf="row.isPositive"
+                  [style.width.%]="row.barWidthPct"
+                ></div>
+              </div>
+            </div>
+            <span class="spread-value" [class.spread-positive]="row.isPositive" [class.spread-negative]="!row.isPositive">
+              {{ row.spread >= 0 ? '+' : '' }}{{ row.spread | number:'1.2-2' }} {{ row.currency }}
+            </span>
+          </div>
+        </div>
+
+        <div *ngIf="pricingSpreadData().length === 0 && !dashService.loading()" class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p>No pricing spread data available. Configure pricing rules and cost basis rates first.</p>
         </div>
       </div>
     </mat-tab>

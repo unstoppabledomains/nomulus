@@ -26,6 +26,11 @@ const OPERATION_COLORS: Record<string, string> = {
   RESTORE: '#dc2626',
 };
 
+const TLD_COLORS = [
+  '#0D67FE', '#059669', '#d97706', '#dc2626',
+  '#0546B7', '#7A7A85', '#9191A1', '#0A5FEA',
+];
+
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
@@ -123,6 +128,67 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     });
   });
 
+  // TLD cost distribution donut for Summary tab
+  tldCostDonut = computed(() => {
+    const byTld = this.costBasisByTld();
+    const total = byTld.reduce((s, g) => s + g.totalCost, 0);
+    if (total === 0) return { segments: [], gradient: 'conic-gradient(var(--ud-border-subtle) 0deg 360deg)', total: 0 };
+    let startDeg = 0;
+    const segments = byTld.map((g, i) => {
+      const pct = g.totalCost / total;
+      const deg = pct * 360;
+      const seg = { tld: g.tld, cost: g.totalCost, pct, startDeg, deg, color: TLD_COLORS[i % TLD_COLORS.length] };
+      startDeg += deg;
+      return seg;
+    });
+    const stops = segments.map(s => `${s.color} ${s.startDeg}deg ${s.startDeg + s.deg}deg`);
+    return { segments, gradient: `conic-gradient(${stops.join(', ')})`, total };
+  });
+
+  // Pricing spread data — compare registrar prices to cost basis
+  pricingSpreadData = computed(() => {
+    const rules = this.dashService.pricingRules();
+    const costBasis = this.costBasisEntries();
+    if (rules.length === 0 || costBasis.length === 0) return [];
+
+    // Build cost lookup: tld+operation -> cost
+    const costLookup = new Map<string, number>();
+    for (const cb of costBasis) {
+      const key = `${cb.tld}:${cb.operation}:${cb.registrarId || ''}`;
+      costLookup.set(key, cb.costAmount);
+      // Also set default (no registrar) fallback
+      if (!cb.registrarId) {
+        costLookup.set(`${cb.tld}:${cb.operation}:default`, cb.costAmount);
+      }
+    }
+
+    const maxSpread = { value: 0 };
+    const spreads = rules.map(r => {
+      const cost = costLookup.get(`${r.tld}:${r.operation}:${r.registrarId}`)
+        ?? costLookup.get(`${r.tld}:${r.operation}:default`)
+        ?? r.defaultPrice
+        ?? 0;
+      const spread = r.priceAmount - cost;
+      if (Math.abs(spread) > maxSpread.value) maxSpread.value = Math.abs(spread);
+      return {
+        registrarId: r.registrarId,
+        tld: r.tld,
+        operation: r.operation,
+        price: r.priceAmount,
+        cost,
+        spread,
+        currency: r.priceCurrency,
+      };
+    });
+
+    const maxAbs = maxSpread.value || 1;
+    return spreads.map(s => ({
+      ...s,
+      barWidthPct: (Math.abs(s.spread) / maxAbs) * 50,
+      isPositive: s.spread >= 0,
+    }));
+  });
+
   costBasisColumns = ['tld', 'operation', 'registrarId', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
 
   constructor(public dashService: RegistryDashService) {
@@ -134,6 +200,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     this.dashService.getCostBasis().subscribe();
+    this.dashService.getPricing().subscribe();
   }
 
   ngAfterViewInit() {
