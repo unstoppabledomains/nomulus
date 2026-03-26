@@ -127,6 +127,7 @@ class RegistryDashOverviewActionTest {
     assertThat(response.getStatus()).isEqualTo(SC_OK);
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = GSON.fromJson((String) response.getPayload(), Map.class);
-    assertThat(((Number) payload.get("activeRegistrars")).intValue()).isEqualTo(1);
+    // 3 registrars: registrar1 (from setUp) + TheRegistrar + NewRegistrar (from test framework)
+    assertThat(((Number) payload.get("activeRegistrars")).intValue()).isEqualTo(3);
   }
 }
