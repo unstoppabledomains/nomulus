@@ -83,5 +83,11 @@ public enum ConsolePermission {
   /** Create/edit per-registrar pricing rules in the registry dashboard. */
   MANAGE_PRICING,
   /** Create/edit cost basis entries in the registry dashboard. */
-  MANAGE_COST_BASIS
+  MANAGE_COST_BASIS,
+  /** View revenue and billing analytics in the registry dashboard. */
+  VIEW_REVENUE_BILLING,
+  /** View domain activity analytics in the registry dashboard. */
+  VIEW_DOMAIN_ACTIVITY,
+  /** View domain forecasting data in the registry dashboard. */
+  VIEW_FORECASTING
 }

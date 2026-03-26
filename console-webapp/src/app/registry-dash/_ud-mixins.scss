@@ -1,0 +1,67 @@
+// Copyright 2024 The Nomulus Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Shared UD dashboard mixins — keeps component styles DRY.
+
+@mixin error-banner {
+  color: var(--ud-error);
+  background: var(--ud-error-bg);
+  padding: 0.75rem 1rem;
+  border-radius: var(--ud-radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+@mixin card-interactive {
+  box-shadow: var(--ud-shadow-sm);
+  border: 1px solid var(--ud-border-subtle);
+  border-radius: var(--ud-radius-lg);
+  transition: box-shadow var(--ud-transition), border-color var(--ud-transition);
+
+  &:hover {
+    box-shadow: var(--ud-shadow-md);
+    border-color: var(--border);
+  }
+}
+
+@mixin empty-state {
+  text-align: center;
+  padding: 48px 0;
+  color: var(--ud-text-secondary);
+
+  mat-icon {
+    font-size: 48px;
+    height: 48px;
+    width: 48px;
+    margin-bottom: 16px;
+    color: var(--ud-text-muted);
+  }
+
+  p {
+    margin: 8px 0;
+    font-size: 14px;
+  }
+}
+
+@mixin status-badge($bg, $color) {
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 0.8em;
+  font-weight: 500;
+  background: $bg;
+  color: $color;
+  letter-spacing: 0.01em;
+  transition: background-color var(--ud-transition);
+}

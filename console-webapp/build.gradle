@@ -32,6 +32,7 @@ clean {
 }
 
 task npmInstallDeps(type: Exec) {
+  dependsOn(rootProject.tasks.nodeSetup)
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'i', '--no-audit', '--no-fund', '--loglevel=error'

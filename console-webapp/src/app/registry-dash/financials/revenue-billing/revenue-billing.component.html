@@ -1,0 +1,73 @@
+<!-- Copyright 2024 The Nomulus Authors. All Rights Reserved.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License. -->
+
+<div class="revenue-billing-container">
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Time Range Toggle -->
+  <div class="time-range">
+    <mat-button-toggle-group [value]="selectedMonths()" (change)="onMonthsChange($event.value)">
+      <mat-button-toggle [value]="3">3m</mat-button-toggle>
+      <mat-button-toggle [value]="6">6m</mat-button-toggle>
+      <mat-button-toggle [value]="12">12m</mat-button-toggle>
+      <mat-button-toggle [value]="24">24m</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metric-cards" *ngIf="data()">
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ totalRevenue() | number:'1.2-2' }} {{ currency() }}</div>
+        <div class="metric-label">Total Revenue</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ avgMonthlyRevenue() | number:'1.2-2' }} {{ currency() }}</div>
+        <div class="metric-label">Avg Monthly</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">.{{ topTld() }}</div>
+        <div class="metric-label">Top TLD</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" *ngIf="data()">
+    <div class="chart-container" *ngIf="revenueLineOptions()">
+      <h3>Revenue by TLD</h3>
+      <div echarts [options]="revenueLineOptions()!" [theme]="'ud-brand'" class="chart"></div>
+    </div>
+    <div class="chart-container" *ngIf="operationBarOptions()">
+      <h3>Revenue by Operation</h3>
+      <div echarts [options]="operationBarOptions()!" [theme]="'ud-brand'" class="chart"></div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!data() && !dashService.loading() && !dashService.error()" class="empty-state">
+    <mat-icon>info</mat-icon>
+    <p>No revenue data available for the selected period.</p>
+  </div>
+</div>

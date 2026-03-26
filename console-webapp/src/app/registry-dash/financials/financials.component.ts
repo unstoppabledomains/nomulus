@@ -18,18 +18,22 @@ import { MaterialModule } from '../../material.module';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { RegistryDashService, CostBasisEntry } from '../registry-dash.service';
+import { OverviewComponent } from '../overview/overview.component';
+import { RevenueBillingComponent } from './revenue-billing/revenue-billing.component';
+import { DomainActivityComponent } from './domain-activity/domain-activity.component';
+import { ForecastingComponent } from './forecasting/forecasting.component';
 
 const OPERATION_COLORS: Record<string, string> = {
-  CREATE: '#1a73e8',
-  RENEW: '#34a853',
-  TRANSFER: '#fbbc04',
-  RESTORE: '#ea4335',
+  CREATE: '#0D67FE',
+  RENEW: '#0546B7',
+  TRANSFER: '#65A1DA',
+  RESTORE: '#192B55',
 };
 
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, MatSortModule],
+  imports: [CommonModule, MaterialModule, MatSortModule, OverviewComponent, RevenueBillingComponent, DomainActivityComponent, ForecastingComponent],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
 })
@@ -77,7 +81,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     this.filterTld() !== 'all' || this.filterOperation() !== 'all' || this.filterRegistrar() !== 'all'
   );
 
-  // Group cost basis by TLD for the summary view
+  // Group fee schedule by TLD for the summary view
   costBasisByTld = computed(() => {
     const entries = this.costBasisEntries();
     const grouped = new Map<string, CostBasisEntry[]>();
@@ -92,6 +96,27 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
       totalCost: items.reduce((sum, e) => sum + e.costAmount, 0),
     }));
   });
+
+  // Build a lookup from pricing rules: tld+operation -> avg registrar fee
+  pricingLookup = computed(() => {
+    const rules = this.dashService.pricingRules();
+    const lookup = new Map<string, { totalPrice: number; count: number }>();
+    for (const r of rules) {
+      const key = `${r.tld}:${r.operation}`;
+      const entry = lookup.get(key) ?? { totalPrice: 0, count: 0 };
+      entry.totalPrice += r.priceAmount;
+      entry.count++;
+      lookup.set(key, entry);
+    }
+    return lookup;
+  });
+
+  // Get the average registrar fee for a given tld+operation
+  getRegistrarFee(tld: string, operation: string): number | null {
+    const entry = this.pricingLookup()?.get(`${tld}:${operation}`);
+    if (!entry || entry.count === 0) return null;
+    return entry.totalPrice / entry.count;
+  }
 
   // Summary metrics
   totalTlds = computed(() => this.uniqueTlds().length);
@@ -112,7 +137,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
         operation: e.operation,
         amount: e.costAmount,
         widthPercent: (e.costAmount / maxTotal) * 100,
-        color: OPERATION_COLORS[e.operation] || '#9e9e9e',
+        color: OPERATION_COLORS[e.operation] || '#9191A1',
       }));
       return {
         tld: group.tld,
@@ -123,7 +148,51 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     });
   });
 
-  costBasisColumns = ['tld', 'operation', 'registrarId', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
+  // Registrar markup — compare registrar prices to registry fees
+  pricingSpreadData = computed(() => {
+    const rules = this.dashService.pricingRules();
+    const costBasis = this.costBasisEntries();
+    if (rules.length === 0 || costBasis.length === 0) return [];
+
+    // Build cost lookup: tld+operation -> cost
+    const costLookup = new Map<string, number>();
+    for (const cb of costBasis) {
+      const key = `${cb.tld}:${cb.operation}:${cb.registrarId || ''}`;
+      costLookup.set(key, cb.costAmount);
+      // Also set default (no registrar) fallback
+      if (!cb.registrarId) {
+        costLookup.set(`${cb.tld}:${cb.operation}:default`, cb.costAmount);
+      }
+    }
+
+    const maxSpread = { value: 0 };
+    const spreads = rules.map(r => {
+      const cost = costLookup.get(`${r.tld}:${r.operation}:${r.registrarId}`)
+        ?? costLookup.get(`${r.tld}:${r.operation}:default`)
+        ?? r.defaultPrice
+        ?? 0;
+      const spread = r.priceAmount - cost;
+      if (Math.abs(spread) > maxSpread.value) maxSpread.value = Math.abs(spread);
+      return {
+        registrarId: r.registrarId,
+        tld: r.tld,
+        operation: r.operation,
+        price: r.priceAmount,
+        cost,
+        spread,
+        currency: r.priceCurrency,
+      };
+    });
+
+    const maxAbs = maxSpread.value || 1;
+    return spreads.map(s => ({
+      ...s,
+      barWidthPct: (Math.abs(s.spread) / maxAbs) * 50,
+      isPositive: s.spread >= 0,
+    }));
+  });
+
+  costBasisColumns = ['tld', 'operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
 
   constructor(public dashService: RegistryDashService) {
     // Sync filtered entries into dataSource
@@ -134,6 +203,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     this.dashService.getCostBasis().subscribe();
+    this.dashService.getPricing().subscribe();
   }
 
   ngAfterViewInit() {
@@ -155,6 +225,6 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
   }
 
   getOperationColor(operation: string): string {
-    return OPERATION_COLORS[operation] || '#9e9e9e';
+    return OPERATION_COLORS[operation] || '#9191A1';
   }
 }

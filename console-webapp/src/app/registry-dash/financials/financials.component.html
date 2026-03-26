@@ -1,6 +1,6 @@
 <div class="financials-container">
-  <h2>Financial Overview</h2>
-  <p class="subtitle">Registry cost basis rates and financial data (read-only)</p>
+  <h2>Registry Financials</h2>
+  <p class="subtitle">Fee schedules, revenue, and financial data (read-only)</p>
 
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>
@@ -27,44 +27,23 @@
     <mat-card class="metric-card">
       <mat-card-content>
         <div class="metric-value">{{ averageCost() | number:'1.2-2' }}</div>
-        <div class="metric-label">Avg Cost / Operation</div>
+        <div class="metric-label">Avg Fee / Operation</div>
       </mat-card-content>
     </mat-card>
   </div>
 
-  <!-- Cost by TLD Bar Chart -->
-  <div class="bar-chart" *ngIf="chartData().length > 0">
-    <h3 class="chart-title">Cost by TLD</h3>
-    <div class="chart-legend">
-      <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
-        <span class="legend-swatch" [style.background]="getOperationColor(op)"></span>
-        {{ op }}
-      </span>
-    </div>
-    <div class="chart-rows">
-      <div class="bar-row" *ngFor="let row of chartData()">
-        <span class="bar-label">.{{ row.tld }}</span>
-        <div class="bar-track">
-          <div class="bar-segments" [style.width.%]="row.totalWidthPercent">
-            <div
-              class="bar-segment"
-              *ngFor="let seg of row.segments"
-              [style.width.%]="(seg.amount / row.total) * 100"
-              [style.background]="seg.color"
-              [matTooltip]="seg.operation + ': $' + (seg.amount | number:'1.2-2')"
-            ></div>
-          </div>
-        </div>
-        <span class="bar-total">${{ row.total | number:'1.2-2' }}</span>
-      </div>
-    </div>
-  </div>
-
   <mat-tab-group (selectedIndexChange)="onTabChange($event)">
-    <!-- Cost Basis Rates Tab -->
-    <mat-tab label="Cost Basis Rates">
+    <!-- Overview Tab -->
+    <mat-tab label="Overview">
+      <ng-template matTabContent>
+        <app-registry-dash-overview></app-registry-dash-overview>
+      </ng-template>
+    </mat-tab>
+
+    <!-- Fee Schedule Tab -->
+    <mat-tab label="Fee Schedule">
       <div class="tab-content">
-        <p class="tab-description">What the RSP pays the registry per TLD and operation. Manage rates on the Admin tab.</p>
+        <p class="tab-description">Registrar fees, RSP cut, and net revenue to the registry per TLD and operation. Manage rates on the Admin tab.</p>
 
         <div class="cost-basis-filters">
           <mat-form-field>
@@ -106,8 +85,22 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
             <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
           </ng-container>
+          <ng-container matColumnDef="registrarFee">
+            <th mat-header-cell *matHeaderCellDef>Registrar Fee</th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee | number:'1.2-2' }}</ng-container>
+              <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="rspCut">
+            <th mat-header-cell *matHeaderCellDef>RSP Cut</th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee - row.costAmount | number:'1.2-2' }}</ng-container>
+              <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
+            </td>
+          </ng-container>
           <ng-container matColumnDef="costAmount">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Net to Registry</th>
             <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
           </ng-container>
           <ng-container matColumnDef="costCurrency">
@@ -128,16 +121,44 @@
 
         <div *ngIf="filteredEntries().length === 0 && !dashService.loading()" class="empty-state">
           <mat-icon>info</mat-icon>
-          <p *ngIf="hasActiveFilters()">No cost basis rates match the current filters.</p>
-          <p *ngIf="!hasActiveFilters()">No cost basis rates configured. Use the Admin tab to add rates.</p>
+          <p *ngIf="hasActiveFilters()">No fee schedule entries match the current filters.</p>
+          <p *ngIf="!hasActiveFilters()">No fee schedule entries configured. Use the Admin tab to add rates.</p>
         </div>
       </div>
     </mat-tab>
 
-    <!-- Summary by TLD Tab -->
-    <mat-tab label="Summary by TLD">
+    <!-- Fees by TLD Tab -->
+    <mat-tab label="Fees by TLD">
       <div class="tab-content">
-        <p class="tab-description">Cost basis rates grouped by TLD.</p>
+        <p class="tab-description">Registry fees grouped by TLD.</p>
+
+        <!-- Fees by TLD Stacked Bar Chart -->
+        <div class="bar-chart" *ngIf="chartData().length > 0">
+          <h3 class="chart-title">Fees by TLD</h3>
+          <div class="chart-legend">
+            <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
+              <span class="legend-swatch" [style.background]="getOperationColor(op)"></span>
+              {{ op }}
+            </span>
+          </div>
+          <div class="chart-rows">
+            <div class="bar-row" *ngFor="let row of chartData()">
+              <span class="bar-label">.{{ row.tld }}</span>
+              <div class="bar-track">
+                <div class="bar-segments" [style.width.%]="row.totalWidthPercent">
+                  <div
+                    class="bar-segment"
+                    *ngFor="let seg of row.segments"
+                    [style.width.%]="(seg.amount / row.total) * 100"
+                    [style.background]="seg.color"
+                    [matTooltip]="seg.operation + ': $' + (seg.amount | number:'1.2-2')"
+                  ></div>
+                </div>
+              </div>
+              <span class="bar-total">${{ row.total | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
 
         <div *ngFor="let group of costBasisByTld()" class="tld-group">
           <h3>{{ group.tld }}</h3>
@@ -150,36 +171,100 @@
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
               <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
             </ng-container>
+            <ng-container matColumnDef="registrarFee">
+              <th mat-header-cell *matHeaderCellDef>Registrar Fee</th>
+              <td mat-cell *matCellDef="let row">
+                <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee | number:'1.2-2' }}</ng-container>
+                <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="rspCut">
+              <th mat-header-cell *matHeaderCellDef>RSP Cut</th>
+              <td mat-cell *matCellDef="let row">
+                <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee - row.costAmount | number:'1.2-2' }}</ng-container>
+                <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
+              </td>
+            </ng-container>
             <ng-container matColumnDef="costAmount">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Net to Registry</th>
               <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }} {{ row.costCurrency }}</td>
             </ng-container>
             <ng-container matColumnDef="notes">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
               <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
             </ng-container>
-            <tr mat-header-row *matHeaderRowDef="['operation', 'registrarId', 'costAmount', 'notes']"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['operation', 'registrarId', 'costAmount', 'notes'];"></tr>
+            <tr mat-header-row *matHeaderRowDef="['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes'];"></tr>
           </table>
         </div>
 
         <div *ngIf="costBasisByTld().length === 0 && !dashService.loading()" class="empty-state">
           <mat-icon>info</mat-icon>
-          <p>No cost basis data available.</p>
+          <p>No fee schedule data available.</p>
         </div>
       </div>
     </mat-tab>
 
-    <!-- Pricing Spread Tab (placeholder for feature flag) -->
-    <mat-tab label="Pricing Spread">
+    <!-- Registrar Markup Tab -->
+    <mat-tab label="Registrar Markup">
       <div class="tab-content">
-        <div class="coming-soon">
-          <mat-icon>lock</mat-icon>
-          <h3>Pricing Spread Analysis</h3>
-          <p>This view compares registrar pricing rules against cost basis rates to show margins.</p>
-          <p class="muted">Available when enabled by your administrator.</p>
+        <p class="tab-description">Registrar pricing vs registry fees. Green = registrar charges above the registry fee. Red = registrar charges below the registry fee.</p>
+
+        <div class="spread-chart" *ngIf="pricingSpreadData().length > 0">
+          <div class="spread-header">
+            <span class="spread-col-label">← Below Fee</span>
+            <span class="spread-col-center">0</span>
+            <span class="spread-col-label">Above Fee →</span>
+          </div>
+          <div class="spread-row" *ngFor="let row of pricingSpreadData()">
+            <span class="spread-label">{{ row.registrarId }} · {{ row.tld }} · {{ row.operation }}</span>
+            <div class="spread-bar-container">
+              <div class="spread-bar-left">
+                <div class="spread-bar-fill spread-discount"
+                  *ngIf="!row.isPositive"
+                  [style.width.%]="row.barWidthPct"
+                ></div>
+              </div>
+              <div class="spread-center-line"></div>
+              <div class="spread-bar-right">
+                <div class="spread-bar-fill spread-margin"
+                  *ngIf="row.isPositive"
+                  [style.width.%]="row.barWidthPct"
+                ></div>
+              </div>
+            </div>
+            <span class="spread-value" [class.spread-positive]="row.isPositive" [class.spread-negative]="!row.isPositive">
+              {{ row.spread >= 0 ? '+' : '' }}{{ row.spread | number:'1.2-2' }} {{ row.currency }}
+            </span>
+          </div>
+        </div>
+
+        <div *ngIf="pricingSpreadData().length === 0 && !dashService.loading()" class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p>No markup data available. Configure pricing rules and fee schedule first.</p>
         </div>
       </div>
+    </mat-tab>
+
+    <!-- Revenue & Billing Tab (ECharts) -->
+    <mat-tab label="Revenue & Billing">
+      <ng-template matTabContent>
+        <app-revenue-billing></app-revenue-billing>
+      </ng-template>
+    </mat-tab>
+
+    <!-- Domain Activity Tab (ECharts) -->
+    <mat-tab label="Domain Activity">
+      <ng-template matTabContent>
+        <app-domain-activity></app-domain-activity>
+      </ng-template>
+    </mat-tab>
+
+    <!-- Forecasting Tab (ECharts) -->
+    <mat-tab label="Forecasting">
+      <ng-template matTabContent>
+        <app-forecasting></app-forecasting>
+      </ng-template>
     </mat-tab>
   </mat-tab-group>
 </div>

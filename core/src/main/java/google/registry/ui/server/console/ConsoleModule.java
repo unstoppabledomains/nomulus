@@ -234,6 +234,12 @@ public final class ConsoleModule {
   }
 
   @Provides
+  @Parameter("months")
+  public static Optional<Integer> provideMonths(HttpServletRequest req) {
+    return extractOptionalIntParameter(req, "months");
+  }
+
+  @Provides
   @Parameter("totalResults")
   public static Optional<Long> provideTotalResults(HttpServletRequest req) {
     return extractOptionalParameter(req, "totalResults").map(Long::valueOf);

@@ -27,6 +27,9 @@ import {
   PricingRule,
   CostBasisEntry,
   AdminData,
+  RevenueBillingData,
+  DomainActivityData,
+  ForecastingData,
 } from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
@@ -401,5 +404,31 @@ export class BackendService {
 
   postRegistryDashAdmin(payload: unknown): Observable<unknown> {
     return this.http.post('/console-api/registry-dash/admin', payload);
+  }
+
+  // --- Registry Dashboard Analytics ---
+
+  getRegistryDashRevenueBilling(months?: number): Observable<RevenueBillingData> {
+    const params = months ? `?months=${months}` : '';
+    return this.http
+      .get<RevenueBillingData>(`/console-api/registry-dash/revenue-billing${params}`)
+      .pipe(catchError((err) => this.errorCatcher<RevenueBillingData>(err)));
+  }
+
+  getRegistryDashDomainActivity(months?: number, granularity?: string): Observable<DomainActivityData> {
+    const parts: string[] = [];
+    if (months) parts.push(`months=${months}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
+    return this.http
+      .get<DomainActivityData>(`/console-api/registry-dash/domain-activity${params}`)
+      .pipe(catchError((err) => this.errorCatcher<DomainActivityData>(err)));
+  }
+
+  getRegistryDashForecasting(months?: number): Observable<ForecastingData> {
+    const params = months ? `?months=${months}` : '';
+    return this.http
+      .get<ForecastingData>(`/console-api/registry-dash/forecasting${params}`)
+      .pipe(catchError((err) => this.errorCatcher<ForecastingData>(err)));
   }
 }

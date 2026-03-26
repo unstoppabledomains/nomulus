@@ -30,24 +30,43 @@
       </mat-card>
     </div>
 
-    @if (overview.domainsByRegistrar.length > 0) {
-      <h2 class="mat-headline-6">Domains by Registrar</h2>
-      <table mat-table [dataSource]="overview.domainsByRegistrar" class="mat-elevation-z1">
-        <ng-container matColumnDef="registrarId">
-          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
-          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
-        </ng-container>
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Name</th>
-          <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-        </ng-container>
-        <ng-container matColumnDef="count">
-          <th mat-header-cell *matHeaderCellDef>Domain Count</th>
-          <td mat-cell *matCellDef="let row">{{ row.count | number }}</td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-      </table>
+    <!-- Registrar Market Share (horizontal bar) -->
+    @if (barChartData().length > 0) {
+      <mat-card appearance="outlined" class="chart-card">
+        <mat-card-content>
+          <h3 class="chart-title">Registrar Market Share</h3>
+          <div class="h-bar-chart">
+            @for (bar of barChartData(); track bar.registrarId) {
+              <div class="h-bar-row">
+                <span class="h-bar-label">{{ bar.name }}</span>
+                <div class="h-bar-track">
+                  <div class="h-bar-fill" [style.width.%]="bar.widthPct" [style.background]="bar.color">
+                    <span class="h-bar-value" *ngIf="bar.widthPct > 20">{{ bar.count | number }}</span>
+                  </div>
+                </div>
+                <span class="h-bar-value-outside" *ngIf="bar.widthPct <= 20">{{ bar.count | number }}</span>
+              </div>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
     }
+
+    <!-- ECharts row: Activity Trend + Renewal Rates -->
+    <div class="charts-row">
+      <mat-card appearance="outlined" class="chart-card" *ngIf="activityLineOptions()">
+        <mat-card-content>
+          <h3 class="chart-title">Domain Activity Trend</h3>
+          <div echarts [options]="activityLineOptions()!" [theme]="'ud-brand'" class="echart"></div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="chart-card" *ngIf="renewalRateOptions()">
+        <mat-card-content>
+          <h3 class="chart-title">Renewal Rate by TLD</h3>
+          <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"></div>
+        </mat-card-content>
+      </mat-card>
+    </div>
   }
 </div>

@@ -100,11 +100,11 @@
     </mat-card-content>
   </mat-card>
 
-  <!-- Cost Basis Management -->
+  <!-- Fee Schedule Management -->
   <mat-card class="admin-card">
     <mat-card-header>
-      <mat-card-title>Cost Basis Rates</mat-card-title>
-      <mat-card-subtitle>What the RSP pays the registry per TLD and operation. NULL registrar = default rate for all registrars.</mat-card-subtitle>
+      <mat-card-title>Fee Schedule</mat-card-title>
+      <mat-card-subtitle>Registry fees charged to registrars per TLD and operation. NULL registrar = default rate for all registrars.</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
       <button mat-raised-button color="primary" (click)="onAddCostBasis()" *ngIf="!showCostBasisForm()">
@@ -113,7 +113,7 @@
 
       <!-- Add/Edit Form -->
       <div *ngIf="showCostBasisForm()" class="cost-basis-form">
-        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Cost Basis Rate</h3>
+        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Fee Schedule Entry</h3>
         <form [formGroup]="costBasisForm" (ngSubmit)="onSaveCostBasis()" class="add-form cost-basis-fields">
           <mat-form-field>
             <mat-label>TLD</mat-label>
@@ -135,7 +135,7 @@
             </mat-select>
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Cost Amount</mat-label>
+            <mat-label>Fee Amount</mat-label>
             <input matInput formControlName="costAmount" type="number" step="0.01">
           </mat-form-field>
           <mat-form-field>
@@ -155,7 +155,7 @@
         </form>
       </div>
 
-      <!-- Cost Basis Table -->
+      <!-- Fee Schedule Table -->
       <table mat-table [dataSource]="costBasisEntries()" class="cost-basis-table" *ngIf="costBasisEntries().length > 0">
         <ng-container matColumnDef="tld">
           <th mat-header-cell *matHeaderCellDef>TLD</th>
@@ -170,7 +170,7 @@
           <td mat-cell *matCellDef="let row">{{ row.registrarId || 'All (default)' }}</td>
         </ng-container>
         <ng-container matColumnDef="costAmount">
-          <th mat-header-cell *matHeaderCellDef>Cost</th>
+          <th mat-header-cell *matHeaderCellDef>Fee</th>
           <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
         </ng-container>
         <ng-container matColumnDef="costCurrency">
@@ -194,7 +194,7 @@
       </table>
 
       <p *ngIf="costBasisEntries().length === 0 && !dashService.loading()" class="empty-state">
-        No cost basis rates configured yet.
+        No fee schedule entries configured yet.
       </p>
     </mat-card-content>
   </mat-card>

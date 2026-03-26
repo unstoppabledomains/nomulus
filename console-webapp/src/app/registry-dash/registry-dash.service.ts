@@ -96,6 +96,55 @@ export interface AdminData {
   systemInfo: SystemInfo;
 }
 
+export interface RevenueDataPoint {
+  month: string;
+  tld: string;
+  operation: string;
+  amount: number;
+  currency: string;
+}
+
+export interface RevenueTotals {
+  totalRevenue: number;
+  currency: string;
+  byOperation: Record<string, number>;
+}
+
+export interface RevenueBillingData {
+  monthlyRevenue: RevenueDataPoint[];
+  totals: RevenueTotals;
+}
+
+export interface ActivityDataPoint {
+  period: string;
+  tld: string;
+  type: string;
+  count: number;
+}
+
+export interface DomainActivityData {
+  activity: ActivityDataPoint[];
+  currentCounts: Record<string, number>;
+}
+
+export interface ExpirationDataPoint {
+  month: string;
+  tld: string;
+  count: number;
+}
+
+export interface RenewalRateEntry {
+  tld: string;
+  renewals: number;
+  deletions: number;
+  renewalRate: number;
+}
+
+export interface ForecastingData {
+  expirationCurve: ExpirationDataPoint[];
+  renewalRates: RenewalRateEntry[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class RegistryDashService {
   overview = signal<OverviewData | undefined>(undefined);
@@ -103,6 +152,9 @@ export class RegistryDashService {
   pricingRules = signal<PricingRule[]>([]);
   costBasis = signal<CostBasisEntry[]>([]);
   adminData = signal<AdminData | undefined>(undefined);
+  revenueBilling = signal<RevenueBillingData | undefined>(undefined);
+  domainActivity = signal<DomainActivityData | undefined>(undefined);
+  forecasting = signal<ForecastingData | undefined>(undefined);
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
@@ -250,5 +302,47 @@ export class RegistryDashService {
       }),
       catchError((err) => this.handleError<unknown>(err))
     );
+  }
+
+  getRevenueBilling(months?: number): Observable<RevenueBillingData> {
+    this.loading.set(true);
+    this.error.set(undefined);
+    return this.backend
+      .getRegistryDashRevenueBilling(months)
+      .pipe(
+        tap((data) => {
+          this.revenueBilling.set(data);
+          this.loading.set(false);
+        }),
+        catchError((err) => this.handleError<RevenueBillingData>(err))
+      );
+  }
+
+  getDomainActivity(months?: number, granularity?: string): Observable<DomainActivityData> {
+    this.loading.set(true);
+    this.error.set(undefined);
+    return this.backend
+      .getRegistryDashDomainActivity(months, granularity)
+      .pipe(
+        tap((data) => {
+          this.domainActivity.set(data);
+          this.loading.set(false);
+        }),
+        catchError((err) => this.handleError<DomainActivityData>(err))
+      );
+  }
+
+  getForecasting(months?: number): Observable<ForecastingData> {
+    this.loading.set(true);
+    this.error.set(undefined);
+    return this.backend
+      .getRegistryDashForecasting(months)
+      .pipe(
+        tap((data) => {
+          this.forecasting.set(data);
+          this.loading.set(false);
+        }),
+        catchError((err) => this.handleError<ForecastingData>(err))
+      );
   }
 }

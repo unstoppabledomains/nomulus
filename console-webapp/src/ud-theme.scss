@@ -1,0 +1,153 @@
+// =============================================================================
+// Unstoppable Domains — Custom Theme Overlay
+// Loaded after theme.scss and styles.scss to override default Material styling.
+// This file is UD-specific and does not exist in upstream google/nomulus.
+// =============================================================================
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap');
+
+:root {
+  // --- Override upstream CSS variables with UD brand values ---
+  --text: #62626A;
+  --primary: #0D67FE;
+  --lightest: #F0F5FF;
+  --light-highlight: #DDDDDF;
+  --lightest-highlight: #F5F9FF;
+  --secondary: #7A7A85;
+  --border: #C8C8CB;
+
+  // --- UD-specific extended tokens ---
+  --ud-accent: #0D67FE;
+  --ud-accent-hover: #0546B7;
+  --ud-accent-active: #0A5FEA;
+  --ud-accent-light: #F0F5FF;
+  --ud-text-primary: #323034;
+  --ud-text-secondary: #62626A;
+  --ud-text-muted: #9191A1;
+  --ud-surface: #FFFFFF;
+  --ud-surface-muted: #F5F5F5;
+  --ud-success: #4A9B30;
+  --ud-success-bg: #f0faf0;
+  --ud-warning: #d97706;
+  --ud-warning-bg: #fffbeb;
+  --ud-error: #c53030;
+  --ud-error-bg: #fef2f2;
+  --ud-border-subtle: #E8E8EA;
+  --ud-radius-sm: 6px;
+  --ud-radius-md: 10px;
+  --ud-radius-lg: 14px;
+  --ud-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --ud-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --ud-transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  // --- Material Component Token Overrides ---
+  // Typography
+  --mat-sys-label-large-font: 'Inter', 'Google Sans', sans-serif;
+  --mat-sys-body-large-font: 'Inter', 'Google Sans Text', sans-serif;
+  --mat-sys-body-medium-font: 'Inter', 'Google Sans Text', sans-serif;
+  --mat-sys-title-large-font: 'Inter', 'Google Sans', sans-serif;
+  --mat-sys-title-medium-font: 'Inter', 'Google Sans', sans-serif;
+  --mat-sys-headline-small-font: 'Inter', 'Google Sans', sans-serif;
+
+  // Card
+  --mat-card-elevated-container-color: var(--ud-surface);
+  --mat-card-elevated-container-shape: var(--ud-radius-lg);
+  --mat-card-outlined-container-color: var(--ud-surface);
+  --mat-card-outlined-container-shape: var(--ud-radius-lg);
+  --mat-card-subtitle-text-color: var(--ud-text-secondary);
+  --mat-card-title-text-color: var(--ud-text-primary);
+
+  // Table
+  --mat-table-background-color: var(--ud-surface);
+  --mat-table-header-headline-color: var(--ud-text-primary);
+  --mat-table-row-item-label-text-color: var(--ud-text-primary);
+  --mat-table-row-item-outline-color: var(--ud-border-subtle);
+
+  // Buttons
+  --mat-filled-button-container-color: var(--ud-accent);
+  --mat-filled-button-label-text-color: #ffffff;
+  --mat-filled-button-container-shape: var(--ud-radius-sm);
+  --mat-outlined-button-outline-color: var(--border);
+  --mat-outlined-button-container-shape: var(--ud-radius-sm);
+  --mat-text-button-label-text-color: var(--ud-accent);
+
+  // Form fields
+  --mat-form-field-container-text-color: var(--ud-text-primary);
+  --mat-form-field-outline-color: var(--border);
+  --mat-form-field-hover-outline-color: var(--ud-accent);
+  --mat-form-field-focus-outline-color: var(--ud-accent);
+  --mat-form-field-container-shape: var(--ud-radius-sm);
+
+  // Tabs
+  --mat-tab-header-active-label-text-color: var(--ud-accent);
+  --mat-tab-header-active-focus-indicator-color: var(--ud-accent);
+  --mat-tab-header-active-hover-indicator-color: var(--ud-accent);
+  --mat-tab-header-inactive-label-text-color: var(--ud-text-secondary);
+
+  // Toolbar
+  --mat-toolbar-container-background-color: var(--ud-surface);
+  --mat-toolbar-container-text-color: var(--ud-text-primary);
+
+  // Sidenav / Navigation
+  --mat-sidenav-container-background-color: var(--ud-surface);
+  --mat-sidenav-container-divider-color: var(--border);
+  --mat-tree-node-text-font: 'Inter', 'Google Sans Text', sans-serif;
+
+  // Select / Option
+  --mat-select-trigger-text-color: var(--ud-text-primary);
+  --mat-option-label-text-color: var(--ud-text-primary);
+  --mat-option-selected-state-label-text-color: var(--ud-accent);
+
+  // Paginator
+  --mat-paginator-container-background-color: var(--ud-surface);
+  --mat-paginator-container-text-color: var(--ud-text-secondary);
+
+  // Checkbox
+  --mat-checkbox-selected-checkmark-color: #ffffff;
+  --mat-checkbox-selected-focus-state-layer-color: var(--ud-accent);
+  --mat-checkbox-selected-hover-state-layer-color: var(--ud-accent);
+
+  // Snackbar
+  --mat-snack-bar-button-color: var(--ud-accent-light);
+}
+
+// --- Global Element Overrides ---
+
+body {
+  font-family: 'Inter', 'Google Sans', Roboto, Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol' !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--ud-text-primary);
+}
+
+// Card polish — subtle shadow + hover elevation
+mat-card,
+.mat-mdc-card {
+  box-shadow: var(--ud-shadow-sm) !important;
+  border: 1px solid var(--ud-border-subtle);
+  transition: box-shadow var(--ud-transition), border-color var(--ud-transition);
+
+  &:hover {
+    box-shadow: var(--ud-shadow-md) !important;
+  }
+}
+
+// Table row hover
+mat-row:hover,
+.mat-mdc-row:hover {
+  background-color: var(--lightest-highlight) !important;
+}
+
+// Button hover refinements
+.mat-mdc-raised-button,
+.mat-mdc-flat-button,
+.mdc-button--unelevated {
+  transition: background-color var(--ud-transition), box-shadow var(--ud-transition);
+}
+
+// Link transitions
+.console-app a {
+  transition: color var(--ud-transition);
+  color: var(--ud-accent);
+}
