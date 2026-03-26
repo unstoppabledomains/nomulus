@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Registry Dashboard extends the Nomulus domain registry with operator-facing analytics and configuration. It introduces 3 new tables that overlay the existing Nomulus data model to provide access control, per-registrar pricing, and cost tracking.
+The Registry Dashboard extends the Nomulus domain registry with operator-facing analytics, per-registrar pricing, financial tracking, and configuration. It introduces a **three-level scoping model** (Registry → TLDs → Users) that overlays the existing Nomulus data model to provide multi-tenant access control.
 
 ---
 
@@ -10,26 +10,40 @@ The Registry Dashboard extends the Nomulus domain registry with operator-facing 
 
 ```mermaid
 erDiagram
-    User ||--o{ RoRegistrarMapping : "scoped by"
-    RoRegistrarMapping }o--|| Registrar : "grants access to"
+    RoRegistry ||--o{ RoRegistryTld : "contains"
+    RoRegistry ||--o{ RoRegistryUser : "grants access to"
+    RoRegistryUser }o--|| User : "references"
+    RoRegistryTld }o--|| Tld : "maps to"
     Registrar }o--o{ Tld : "allowedTlds"
     Domain }o--|| Registrar : "currentSponsorRegistrarId"
     Domain }o--|| Tld : "tld"
     RegistrarPricing }o--|| Registrar : "registrarId"
     RegistrarPricing }o--|| Tld : "tld"
     CostBasis }o--|| Tld : "tld"
+    CostBasis }o--o| Registrar : "registrarId (nullable)"
+
+    RoRegistry {
+        bigint id PK
+        string name UK
+        jsonb settings "feature flags, default '{}'"
+    }
+
+    RoRegistryTld {
+        bigint id PK
+        bigint registryId FK
+        string tld FK
+    }
+
+    RoRegistryUser {
+        bigint id PK
+        bigint registryId FK
+        string userEmailAddress FK
+    }
 
     User {
         string emailAddress PK
         UserRoles userRoles
         string registryLockEmailAddress
-    }
-
-    RoRegistrarMapping {
-        bigint id PK
-        string userEmailAddress FK
-        string registrarId FK
-        timestamptz createdAt
     }
 
     Registrar {
@@ -75,6 +89,7 @@ erDiagram
         bigint id PK
         string tld FK
         string operation "CREATE|RENEW|TRANSFER|RESTORE"
+        string registrarId FK "nullable - NULL means all registrars"
         decimal costAmount "numeric(19,2)"
         string costCurrency
         timestamptz effectiveDate
@@ -88,10 +103,14 @@ erDiagram
 
 ```mermaid
 flowchart TB
-    subgraph Auth ["Authentication & Access Control"]
+    subgraph Auth ["Authentication & Access Control (Three-Level Scoping)"]
         U[User<br/>emailAddress + globalRole]
-        M[RoRegistrarMapping<br/>userEmail -> registrarId]
-        U -->|"REGISTRY_OPERATOR role"| M
+        REG[RoRegistry<br/>named group + settings]
+        RTL[RoRegistryTld<br/>registry → TLD mapping]
+        RU[RoRegistryUser<br/>registry → user mapping]
+        U -->|"REGISTRY_OPERATOR role"| RU
+        RU -->|"belongs to"| REG
+        REG -->|"contains"| RTL
     end
 
     subgraph Core ["Core Nomulus Entities (read-only)"]
@@ -105,13 +124,15 @@ flowchart TB
 
     subgraph Dash ["Registry Dashboard Tables (CRUD)"]
         P[RegistrarPricing<br/>per registrar+tld+operation]
-        C[CostBasis<br/>per tld+operation]
+        C[CostBasis<br/>per tld+operation<br/>optionally per registrar]
     end
 
-    M -->|"scopes access to"| R
+    RTL -->|"scopes access to"| T
+    T -->|"allowedTlds derives"| R
     P -->|"registrarId"| R
     P -->|"tld"| T
     C -->|"tld"| T
+    C -.->|"registrarId (optional)"| R
 
     style Auth fill:#e8f4fd,stroke:#1a73e8
     style Core fill:#fef7e0,stroke:#f9ab00
@@ -131,14 +152,37 @@ sequenceDiagram
 
     Browser->>API: GET /console-api/registry-dash/overview
     API->>API: Check user.globalRole permissions<br/>(VIEW_DASHBOARD_OVERVIEW)
-    API->>Util: getMappedRegistrarIds(user.email)
-    Util->>DB: SELECT registrarId<br/>FROM RoRegistrarMapping<br/>WHERE userEmailAddress = ?
-    DB-->>Util: ["NewRegistrar", "TheRegistrar"]
-    Util-->>API: ImmutableSet of registrar IDs
-    API->>DB: SELECT domain counts<br/>WHERE currentSponsorRegistrarId IN (...)
+    API->>Util: getAccessibleTlds(user.email)
+    Util->>DB: SELECT tld FROM RoRegistryTld rt<br/>JOIN RoRegistryUser ru<br/>ON rt.registryId = ru.registryId<br/>WHERE ru.userEmailAddress = ?
+    DB-->>Util: ["example", "crypto", "nft"]
+    Util->>DB: SELECT registrarId FROM Registrar<br/>WHERE allowedTlds && accessible_tlds
+    DB-->>Util: Derived registrar IDs
+    Util-->>API: ImmutableSet of registrar IDs + TLDs
+    API->>DB: SELECT domain counts<br/>WHERE tld IN (...) AND currentSponsorRegistrarId IN (...)
     DB-->>API: Aggregated results
-    API-->>Browser: JSON response (scoped to mapped registrars)
+    API-->>Browser: JSON response (scoped to registry's TLDs)
 ```
+
+---
+
+## Three-Level Scoping Model
+
+The scoping model replaces the old flat user-to-registrar mapping with a more intuitive registry-centric approach:
+
+```
+RoRegistry (named group, e.g., "registryXYZ")
+├── RoRegistryTld → which TLDs belong to this registry
+│   ├── "example"
+│   ├── "crypto"
+│   └── "nft"
+└── RoRegistryUser → which users can see this registry's data
+    ├── "alice@example.com"
+    └── "bob@example.com"
+```
+
+**Access chain:** `User → RoRegistryUser → RoRegistry → RoRegistryTld → Tld → Registrar` (registrars derived via `allowedTlds`)
+
+**Key benefit:** Adding a TLD to a registry instantly grants visibility to all registry users. No need to manage individual registrar mappings.
 
 ---
 
@@ -149,7 +193,7 @@ sequenceDiagram
 | Table | Primary Key | Dashboard-Relevant Fields | Notes |
 |-------|-------------|--------------------------|-------|
 | `Tld` | `tld_name` (String) | `tld_name`, `tld_unicode`, `invoicing_enabled` | No registry operator field exists. Nomulus assumes single operator. |
-| `Registrar` | `registrar_id` (String) | `registrar_id`, `registrar_name`, `type`, `state`, `allowed_tlds`, `iana_identifier` | `allowed_tlds` is the key relationship: maps registrar -> TLDs |
+| `Registrar` | `registrar_id` (String) | `registrar_id`, `registrar_name`, `type`, `state`, `allowed_tlds`, `iana_identifier` | `allowed_tlds` is the key relationship: maps registrar → TLDs |
 | `Domain` | `repo_id` (String) | `domain_name`, `tld`, `current_sponsor_registrar_id`, `creation_time`, `deletion_time` | Links domain to both its TLD and sponsoring registrar |
 | `User` | `email_address` (String) | `email_address`, `user_roles` (contains `globalRole` + `registrarRoles`) | `globalRole = REGISTRY_OPERATOR` for dashboard users |
 
@@ -157,91 +201,99 @@ sequenceDiagram
 
 | Table | Primary Key | Unique Constraint | Purpose |
 |-------|-------------|-------------------|---------|
-| `RegistryDashboardRoRegistrarMapping` | `id` (bigserial) | `(user_email_address, registrar_id)` | Maps RO users to registrars they can view |
+| `RoRegistry` | `id` (bigserial) | `(name)` | Named registry group with JSONB settings |
+| `RoRegistryTld` | `id` (bigserial) | `(registry_id, tld)` | Maps a registry to its TLDs |
+| `RoRegistryUser` | `id` (bigserial) | `(registry_id, user_email_address)` | Maps a registry to its users |
 | `RegistryDashboardRegistrarPricing` | `id` (bigserial) | `(registrar_id, tld, operation, effective_date)` | Per-registrar pricing overrides |
-| `RegistryDashboardCostBasis` | `id` (bigserial) | `(tld, operation, effective_date)` | Registry cost basis per TLD/operation |
+| `RegistryDashboardCostBasis` | `id` (bigserial) | `COALESCE(registrar_id, '') + tld + operation + effective_date` | Registry cost basis, optionally per-registrar |
+
+### Schema Migrations
+
+| Migration | Description |
+|-----------|-------------|
+| V221 | Initial pricing + cost basis + registrar mapping tables |
+| V222 | TLD mapping table |
+| V223 | Three-level refactor (RoRegistry, RoRegistryTld, RoRegistryUser) |
+| V224 | Add `registrar_id` to CostBasis (nullable), add `settings` JSONB to RoRegistry |
 
 ---
 
 ## Key Relationships Explained
 
-### 1. User -> Registrars (via RoRegistrarMapping)
+### 1. User → Registry → TLDs (Three-Level Scoping)
 
-There is **no direct FK** between `User` and `Registrar`. Access is controlled through `RegistryDashboardRoRegistrarMapping`:
+Access is controlled through the registry scoping chain:
 
 ```
-User.emailAddress  --->  RoRegistrarMapping.userEmailAddress
-                         RoRegistrarMapping.registrarId  --->  Registrar.registrarId
+User.emailAddress  →  RoRegistryUser.userEmailAddress
+                       RoRegistryUser.registryId  →  RoRegistry.id
+                                                      RoRegistry.id  →  RoRegistryTld.registryId
+                                                                        RoRegistryTld.tld  →  Tld.tldStr
 ```
 
-One user can be mapped to **many registrars**. One registrar can be viewed by **many users**.
+One user can belong to **multiple registries**. One registry can contain **many TLDs** and **many users**.
 
-### 2. Registrar -> TLDs (via allowedTlds)
+### 2. Registry → Registrars (Derived)
+
+Registrars are **derived** from the TLD assignments, not directly mapped:
+
+```
+RoRegistryTld.tld = "example"
+    → Registrar WHERE "example" IN (allowedTlds)
+    → ["registrar1", "registrar2", "registrar3"]
+```
+
+### 3. Registrar → TLDs (via allowedTlds)
 
 `Registrar.allowedTlds` is a `Set<String>` stored as a column (not a join table). It contains TLD strings that match `Tld.tldStr`.
-
-```
-Registrar.allowedTlds = {"example", "tld", "xn--q9jyb4c"}
-                                 |
-                                 v
-                         Tld.tld_name = "example"
-                         Tld.tld_name = "tld"
-                         Tld.tld_name = "xn--q9jyb4c"
-```
-
-### 3. Domain -> Registrar + TLD
-
-Every domain links to exactly one registrar and one TLD:
-
-```
-Domain.currentSponsorRegistrarId  --->  Registrar.registrarId
-Domain.tld                        --->  Tld.tldStr
-```
 
 ### 4. Pricing: Registrar + TLD + Operation
 
 Pricing rules are scoped to a specific registrar, TLD, and operation type:
 
 ```
-RegistrarPricing.registrarId  --->  Registrar.registrarId
-RegistrarPricing.tld          --->  Tld.tldStr
-RegistrarPricing.operation    =     "CREATE" | "RENEW" | "TRANSFER" | "RESTORE"
+RegistrarPricing.registrarId  →  Registrar.registrarId
+RegistrarPricing.tld          →  Tld.tldStr
+RegistrarPricing.operation    =  "CREATE" | "RENEW" | "TRANSFER" | "RESTORE"
 ```
 
-### 5. Cost Basis: TLD + Operation
+### 5. Cost Basis: TLD + Operation + Optional Registrar
 
-Cost basis is scoped to a TLD and operation (not per-registrar, since cost is the same regardless of registrar):
+Cost basis can be scoped globally (NULL registrar_id = applies to all registrars) or per-registrar:
 
 ```
-CostBasis.tld        --->  Tld.tldStr
-CostBasis.operation  =     "CREATE" | "RENEW" | "TRANSFER" | "RESTORE"
+CostBasis.tld           →  Tld.tldStr
+CostBasis.operation     =  "CREATE" | "RENEW" | "TRANSFER" | "RESTORE"
+CostBasis.registrarId   →  Registrar.registrarId (nullable)
 ```
+
+The unique constraint uses `COALESCE(registrar_id, '')` to ensure only one default rate per TLD/operation and one override per registrar/TLD/operation.
 
 ---
 
 ## Derived Relationships
 
-The dashboard can derive several useful views from the existing data:
-
 ```mermaid
 flowchart LR
     subgraph input ["What Admin Configures"]
-        MAP["RoRegistrarMapping<br/>user -> registrar"]
+        REG["RoRegistry<br/>name + settings"]
+        TLD_MAP["RoRegistryTld<br/>registry → TLDs"]
+        USR_MAP["RoRegistryUser<br/>registry → users"]
+        COST["CostBasis<br/>TLD + operation costs<br/>(optionally per-registrar)"]
     end
 
     subgraph derived ["What the System Can Derive"]
-        REG["Registrars<br/>(from mapping)"]
-        TLDS["TLDs<br/>(from Registrar.allowedTlds)"]
+        REGS["Registrars<br/>(from Registrar.allowedTlds ∩ registry TLDs)"]
         DOMS["Domain counts<br/>(from Domain table)"]
         PRICE["Pricing rules<br/>(from RegistrarPricing)"]
-        COST["Cost basis<br/>(from CostBasis)"]
+        MARGIN["Pricing spread<br/>(price - cost)"]
     end
 
-    MAP --> REG
-    REG -->|"allowedTlds"| TLDS
-    REG -->|"currentSponsorRegistrarId"| DOMS
-    REG --> PRICE
-    TLDS --> COST
+    TLD_MAP --> REGS
+    REGS -->|"currentSponsorRegistrarId"| DOMS
+    REGS --> PRICE
+    PRICE --> MARGIN
+    COST --> MARGIN
 
     style input fill:#e8f4fd,stroke:#1a73e8
     style derived fill:#f3e8fd,stroke:#7b1fa2
@@ -249,13 +301,25 @@ flowchart LR
 
 | From | Derive | Query Pattern |
 |------|--------|---------------|
-| User email | Mapped registrar IDs | `SELECT registrarId FROM RoRegistrarMapping WHERE userEmailAddress = ?` |
-| Registrar IDs | Registrar details | `SELECT * FROM Registrar WHERE registrarId IN (...)` |
-| Registrar IDs | Relevant TLDs | `SELECT DISTINCT allowedTlds FROM Registrar WHERE registrarId IN (...)` |
-| Registrar IDs | Domain counts | `SELECT COUNT(*), currentSponsorRegistrarId FROM Domain WHERE currentSponsorRegistrarId IN (...) GROUP BY currentSponsorRegistrarId` |
+| User email | Registry IDs | `SELECT registryId FROM RoRegistryUser WHERE userEmailAddress = ?` |
+| Registry IDs | Accessible TLDs | `SELECT tld FROM RoRegistryTld WHERE registryId IN (...)` |
+| TLDs | Registrar IDs | `SELECT registrarId FROM Registrar WHERE allowedTlds && accessible_tlds` |
+| Registrar IDs | Domain counts | `SELECT COUNT(*), currentSponsorRegistrarId FROM Domain WHERE currentSponsorRegistrarId IN (...) GROUP BY ...` |
 | Registrar + TLD | Pricing | `SELECT * FROM RegistrarPricing WHERE registrarId = ? AND tld = ? AND isActive = true` |
-| TLD | Cost basis | `SELECT * FROM CostBasis WHERE tld = ?` |
+| TLD (+ optional registrar) | Cost basis | `SELECT * FROM CostBasis WHERE tld = ? AND (registrarId = ? OR registrarId IS NULL)` |
 | Pricing - Cost | **Margin** | `pricing.priceAmount - costBasis.costAmount` (computed in UI) |
+
+---
+
+## Frontend Tabs
+
+| Tab | Route | Component | Key Features |
+|-----|-------|-----------|-------------|
+| Overview | `/registry-dash/overview` | `OverviewComponent` | Summary cards, domain count by registrar |
+| Portfolio | `/registry-dash/portfolio` | `PortfolioComponent` | Registrar list with details |
+| Pricing | `/registry-dash/pricing` | `PricingComponent` | CRUD, sorting, filtering, default price comparison, diff column |
+| Financials | `/registry-dash/financials` | `FinancialsComponent` | 3 sub-tabs: Cost Basis Rates (sorting + filtering), Summary by TLD, Pricing Spread (placeholder). Metric cards, stacked bar chart. |
+| Admin | `/registry-dash/admin` | `AdminComponent` | Registry/TLD/user management, cost basis CRUD with registrar-scoped entries |
 
 ---
 
@@ -265,26 +329,6 @@ flowchart LR
 
 These roles have **no visibility** into the Registry Dashboard. The nav item is hidden entirely.
 
-```mermaid
-flowchart LR
-    subgraph roles ["Roles Without Dashboard Access"]
-        NONE["NONE<br/>(registrar partner)"]
-        SA["SUPPORT_AGENT"]
-        SL["SUPPORT_LEAD"]
-    end
-
-    BLOCKED["Registry Dashboard<br/>HIDDEN"]
-
-    NONE -.->|"no access"| BLOCKED
-    SA -.->|"no access"| BLOCKED
-    SL -.->|"no access"| BLOCKED
-
-    style NONE fill:#ea4335,color:#fff
-    style SA fill:#f9ab00,color:#000
-    style SL fill:#f9ab00,color:#000
-    style BLOCKED fill:#555,color:#fff,stroke-dasharray: 5 5
-```
-
 - `NONE` users only see registrar-scoped views (Domains, Settings, Billing, etc.)
 - `SUPPORT_AGENT` and `SUPPORT_LEAD` have broad operational permissions but the dashboard is not part of their workflow
 - The `REGISTRY_DASH` element is added to `DISABLED_ELEMENTS_PER_ROLE` for all three roles
@@ -293,7 +337,7 @@ flowchart LR
 
 ### Registry Operator Access (REGISTRY_OPERATOR)
 
-Dashboard users who view and manage data **scoped to their mapped registrars**.
+Dashboard users who view and manage data **scoped to their registry's TLDs**.
 
 ```mermaid
 flowchart TD
@@ -303,7 +347,7 @@ flowchart TD
         OV["Overview<br/>VIEW_DASHBOARD_OVERVIEW"]
         PF["Portfolio<br/>VIEW_REGISTRAR_PORTFOLIO"]
         PR["Pricing<br/>VIEW_PRICING + MANAGE_PRICING"]
-        CB["Cost Basis<br/>MANAGE_COST_BASIS"]
+        FIN["Financials<br/>MANAGE_COST_BASIS (read-only view)"]
     end
 
     subgraph hidden ["Hidden From This Role"]
@@ -314,7 +358,7 @@ flowchart TD
         REGS["Registrar Management"]
     end
 
-    RO -->|"full access"| OV & PF & PR & CB
+    RO -->|"full access"| OV & PF & PR & FIN
     RO -.->|"hidden"| ADM & OTE & SUSP & USERS & REGS
 
     style RO fill:#1a73e8,color:#fff
@@ -327,15 +371,7 @@ flowchart TD
     style REGS fill:#ea4335,color:#fff
 ```
 
-**Data scoping:** All queries are filtered through `RegistryDashAccessUtil.getMappedRegistrarIds(user.email)`. An RO user only sees registrars they've been mapped to via the Admin panel.
-
-| Permission | Access | Used By |
-|------------|--------|---------|
-| VIEW_DASHBOARD_OVERVIEW | Read | Overview tab - aggregate domain counts, registrar summary |
-| VIEW_REGISTRAR_PORTFOLIO | Read | Portfolio tab - registrar details, states, TLD assignments |
-| VIEW_PRICING | Read | Pricing tab - view per-registrar pricing rules |
-| MANAGE_PRICING | Write | Pricing tab - create/edit pricing rules |
-| MANAGE_COST_BASIS | Write | Cost Basis tab - create/edit cost basis entries |
+**Data scoping:** All queries are filtered through `RegistryDashAccessUtil` which resolves user → registry → TLDs → registrars. An RO user only sees data within their registry's TLD assignments.
 
 ---
 
@@ -351,13 +387,15 @@ flowchart TD
         OV["Overview<br/>VIEW_DASHBOARD_OVERVIEW"]
         PF["Portfolio<br/>VIEW_REGISTRAR_PORTFOLIO"]
         PR["Pricing<br/>VIEW_PRICING + MANAGE_PRICING"]
-        CB["Cost Basis<br/>MANAGE_COST_BASIS"]
+        FIN["Financials<br/>MANAGE_COST_BASIS"]
     end
 
-    subgraph admin ["Admin-Only Capabilities"]
+    subgraph admin ["Admin Tab Capabilities"]
         ADM["Admin Tab"]
-        MAP["Manage User-Registrar Mappings<br/>(CRUD on RoRegistrarMapping)"]
-        SYS["View System Reference<br/>(all TLDs + all registrars)"]
+        MREG["Create/Delete Registries"]
+        MTLD["Assign TLDs to Registries"]
+        MUSR["Manage Registry Users"]
+        MCB["Cost Basis CRUD<br/>(with registrar-scoped entries)"]
     end
 
     subgraph also ["Also Has Access To"]
@@ -368,9 +406,9 @@ flowchart TD
         EPP["EPP Commands"]
     end
 
-    FTE -->|"full access"| OV & PF & PR & CB
+    FTE -->|"full access"| OV & PF & PR & FIN
     FTE -->|"admin only"| ADM
-    ADM --> MAP & SYS
+    ADM --> MREG & MTLD & MUSR & MCB
     FTE -->|"plus all console features"| OTE & SUSP & USERS & REGS & EPP
 
     style FTE fill:#34a853,color:#fff
@@ -380,11 +418,12 @@ flowchart TD
 ```
 
 **Key difference from REGISTRY_OPERATOR:** FTE users can see the Admin tab, which allows them to:
-- **Create** user-to-registrar mappings (grant RO users access)
-- **Delete** existing mappings (revoke access)
-- **View** all TLDs and registrars in the system as reference data
+- **Create/delete** named registries (groups)
+- **Assign TLDs** to registries (dropdown filtered by availability)
+- **Manage users** within registries
+- **CRUD cost basis** entries with optional registrar-scoped overrides
 
-FTE users are **not scoped** by `RoRegistrarMapping` — they see all data across all registrars.
+FTE users are **not scoped** by registry membership — they see all data across all registrars.
 
 ---
 
@@ -397,19 +436,35 @@ FTE users are **not scoped** by `RoRegistrarMapping` — they see all data acros
 | VIEW_PRICING | Y | Y | - | - | - |
 | MANAGE_PRICING | Y | Y | - | - | - |
 | MANAGE_COST_BASIS | Y | Y | - | - | - |
-| Admin tab (manage mappings) | Y | - | - | - | - |
+| Admin tab (manage registries/TLDs/users/cost basis) | Y | - | - | - | - |
 | Dashboard nav visible | Y | Y | - | - | - |
+
+---
+
+## API Endpoints
+
+| Method | Path | Action Class | Description |
+|--------|------|-------------|-------------|
+| GET | `/console-api/registry-dash/overview` | `RegistryDashOverviewAction` | Aggregate domain counts, registrar summary |
+| GET | `/console-api/registry-dash/portfolio` | `RegistryDashPortfolioAction` | Registrar details, states, TLD assignments |
+| GET, POST, PUT | `/console-api/registry-dash/pricing` | `RegistryDashPricingAction` | Pricing rules CRUD |
+| GET, POST, PUT | `/console-api/registry-dash/cost-basis` | `RegistryDashCostBasisAction` | Cost basis CRUD (supports registrar-scoped entries) |
+| GET, POST | `/console-api/registry-dash/admin` | `RegistryDashAdminAction` | Registry/TLD/user management |
 
 ---
 
 ## Important Design Notes
 
-1. **No multi-operator support in Nomulus core.** The `Tld` entity has no `registryOperator` field. Nomulus assumes a single entity operates all TLDs. The `RoRegistrarMapping` table bridges this gap by scoping dashboard access per user.
+1. **Three-level scoping replaces flat mappings.** The old `RoRegistrarMapping` table was replaced in V223 with `RoRegistry` → `RoRegistryTld` + `RoRegistryUser`. This is more intuitive: assign TLDs to a registry, assign users to a registry, and registrars are derived automatically.
 
-2. **`allowedTlds` is not a join table.** It's a `Set<String>` stored directly on the `Registrar` entity. This means there's no separate `Registrar_Tld` mapping table to query.
+2. **No multi-operator support in Nomulus core.** The `Tld` entity has no `registryOperator` field. Nomulus assumes a single entity operates all TLDs. The `RoRegistry` scoping model bridges this gap.
 
-3. **Soft references, not foreign keys.** The dashboard tables use `registrarId` and `tld` as string columns, not as database-level foreign keys to `Registrar` and `Tld` tables. This follows the Nomulus convention of loose coupling.
+3. **`allowedTlds` is not a join table.** It's a `Set<String>` stored directly on the `Registrar` entity. Registrars are derived from TLD assignments, not mapped directly.
 
-4. **Pricing vs. Cost Basis scope.** Pricing is per-registrar (each registrar can have different prices). Cost basis is per-TLD (the registry's cost is the same regardless of which registrar originates the domain).
+4. **Soft references, not foreign keys.** The dashboard tables use `registrarId` and `tld` as string columns, not as database-level foreign keys to `Registrar` and `Tld` tables. This follows the Nomulus convention of loose coupling.
 
-5. **Future consideration: TLD-based scoping.** Instead of mapping users to registrars directly, mapping users to TLDs would be more intuitive (`Registry -> TLDs -> Registrars`). From a TLD mapping, registrars can be derived via `Registrar.allowedTlds`. This would reduce admin overhead (5 TLD mappings vs 50+ registrar mappings).
+5. **Cost basis: global vs per-registrar.** A cost basis entry with `registrar_id = NULL` is the default rate for that TLD/operation. An entry with a specific `registrar_id` is an override for that registrar. The COALESCE-based unique index enforces at most one default and one override per registrar.
+
+6. **RoRegistry.settings is JSONB.** The `settings` column stores feature flags and configuration as a JSON object (e.g., enabling/disabling pricing spread visibility). Default is `'{}'`.
+
+7. **Upstream compatibility.** All dashboard-specific files are UD-only (prefixed or in UD-specific directories). Schema migrations V221-V224 are additive. Merge conflict risk with upstream `google/nomulus` is minimal.
