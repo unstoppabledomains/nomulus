@@ -20,10 +20,10 @@ import { MatTableDataSource } from '@angular/material/table';
 import { RegistryDashService, CostBasisEntry } from '../registry-dash.service';
 
 const OPERATION_COLORS: Record<string, string> = {
-  CREATE: '#1a73e8',
-  RENEW: '#34a853',
-  TRANSFER: '#fbbc04',
-  RESTORE: '#ea4335',
+  CREATE: '#0D67FE',
+  RENEW: '#059669',
+  TRANSFER: '#d97706',
+  RESTORE: '#dc2626',
 };
 
 @Component({
@@ -112,7 +112,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
         operation: e.operation,
         amount: e.costAmount,
         widthPercent: (e.costAmount / maxTotal) * 100,
-        color: OPERATION_COLORS[e.operation] || '#9e9e9e',
+        color: OPERATION_COLORS[e.operation] || '#9191A1',
       }));
       return {
         tld: group.tld,
@@ -155,6 +155,6 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
   }
 
   getOperationColor(operation: string): string {
-    return OPERATION_COLORS[operation] || '#9e9e9e';
+    return OPERATION_COLORS[operation] || '#9191A1';
   }
 }

@@ -1,3 +1,5 @@
+@use '../ud-mixins' as ud;
+
 .registry-dash-pricing {
   .pricing-header {
     display: flex;
@@ -11,16 +13,12 @@
   }
 
   .error-banner {
-    color: #d32f2f;
-    background: #fce4ec;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+    @include ud.error-banner;
   }
 
   .pricing-form-card {
     margin-bottom: 1.5rem;
-    border-radius: 12px;
+    border-radius: var(--ud-radius-lg);
   }
 
   .form-title {
@@ -46,7 +44,7 @@
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: rgba(0, 0, 0, 0.54);
+      color: var(--ud-text-secondary);
       margin-bottom: 0.75rem;
     }
 
@@ -93,24 +91,24 @@
   }
 
   .active-icon {
-    color: #2e7d32;
+    color: var(--ud-success);
   }
 
   .inactive-icon {
-    color: #9e9e9e;
+    color: var(--ud-text-muted);
   }
 
   .diff-discount {
-    color: #2e7d32;
+    color: var(--ud-success);
     font-weight: 500;
   }
 
   .diff-premium {
-    color: #d32f2f;
+    color: var(--ud-error);
     font-weight: 500;
   }
 
   .diff-zero {
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--ud-text-muted);
   }
 }

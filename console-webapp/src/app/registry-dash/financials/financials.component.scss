@@ -1,3 +1,5 @@
+@use '../ud-mixins' as ud;
+
 .financials-container {
   padding: 24px;
 
@@ -9,7 +11,7 @@
 
   .subtitle {
     margin: 0 0 24px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--ud-text-secondary);
     font-size: 14px;
   }
 }
@@ -28,13 +30,13 @@
   .metric-value {
     font-size: 28px;
     font-weight: 600;
-    color: #1a73e8;
+    color: var(--ud-accent);
     line-height: 1.2;
   }
 
   .metric-label {
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--ud-text-secondary);
     margin-top: 4px;
   }
 }
@@ -42,8 +44,8 @@
 // Bar chart
 .bar-chart {
   margin-bottom: 32px;
-  background: #fafafa;
-  border-radius: 8px;
+  background: var(--ud-surface-muted);
+  border-radius: var(--ud-radius-md);
   padding: 20px 24px;
 
   .chart-title {
@@ -97,7 +99,7 @@
 .bar-track {
   flex: 1;
   height: 28px;
-  background: #e8e8e8;
+  background: var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -152,7 +154,7 @@
 
 .tab-description {
   margin: 0 0 16px;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--ud-text-secondary);
   font-size: 13px;
 }
 
@@ -171,32 +173,18 @@
     margin: 0 0 8px;
     font-size: 16px;
     font-weight: 500;
-    color: #1a73e8;
+    color: var(--ud-accent);
   }
 }
 
 .empty-state {
-  text-align: center;
-  padding: 48px 0;
-  color: rgba(0, 0, 0, 0.54);
-
-  mat-icon {
-    font-size: 48px;
-    height: 48px;
-    width: 48px;
-    margin-bottom: 16px;
-  }
-
-  p {
-    margin: 8px 0;
-    font-size: 14px;
-  }
+  @include ud.empty-state;
 }
 
 .coming-soon {
   text-align: center;
   padding: 48px 0;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--ud-text-secondary);
 
   mat-icon {
     font-size: 48px;
@@ -207,12 +195,13 @@
 
   h3 {
     margin: 8px 0;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--ud-text-primary);
   }
 
   .muted {
     font-size: 13px;
     font-style: italic;
+    color: var(--ud-text-muted);
   }
 }
 
@@ -223,9 +212,5 @@
 }
 
 .error-banner {
-  background: #fce4ec;
-  color: #c62828;
-  padding: 12px 16px;
-  border-radius: 4px;
-  margin-bottom: 16px;
+  @include ud.error-banner;
 }

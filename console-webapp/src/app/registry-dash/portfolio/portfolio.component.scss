@@ -1,10 +1,8 @@
+@use '../ud-mixins' as ud;
+
 .registry-dash-portfolio {
   .error-banner {
-    color: #d32f2f;
-    background: #fce4ec;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+    @include ud.error-banner;
   }
 
   table {
@@ -19,17 +17,14 @@
   }
 
   .state-active {
-    background: #e8f5e9;
-    color: #2e7d32;
+    @include ud.status-badge(var(--ud-success-bg), var(--ud-success));
   }
 
   .state-suspended {
-    background: #fff3e0;
-    color: #e65100;
+    @include ud.status-badge(var(--ud-warning-bg), var(--ud-warning));
   }
 
   .state-pending {
-    background: #e3f2fd;
-    color: #1565c0;
+    @include ud.status-badge(var(--ud-accent-light), var(--ud-accent));
   }
 }
