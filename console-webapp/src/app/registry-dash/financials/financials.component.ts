@@ -18,6 +18,10 @@ import { MaterialModule } from '../../material.module';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { RegistryDashService, CostBasisEntry } from '../registry-dash.service';
+import { OverviewComponent } from '../overview/overview.component';
+import { RevenueBillingComponent } from './revenue-billing/revenue-billing.component';
+import { DomainActivityComponent } from './domain-activity/domain-activity.component';
+import { ForecastingComponent } from './forecasting/forecasting.component';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -26,15 +30,10 @@ const OPERATION_COLORS: Record<string, string> = {
   RESTORE: '#192B55',
 };
 
-const TLD_COLORS = [
-  '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
-  '#00C9FF', '#0A5FEA', '#4A9B30', '#9191A1',
-];
-
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, MatSortModule],
+  imports: [CommonModule, MaterialModule, MatSortModule, OverviewComponent, RevenueBillingComponent, DomainActivityComponent, ForecastingComponent],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
 })
@@ -82,7 +81,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     this.filterTld() !== 'all' || this.filterOperation() !== 'all' || this.filterRegistrar() !== 'all'
   );
 
-  // Group cost basis by TLD for the summary view
+  // Group fee schedule by TLD for the summary view
   costBasisByTld = computed(() => {
     const entries = this.costBasisEntries();
     const grouped = new Map<string, CostBasisEntry[]>();
@@ -97,6 +96,27 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
       totalCost: items.reduce((sum, e) => sum + e.costAmount, 0),
     }));
   });
+
+  // Build a lookup from pricing rules: tld+operation -> avg registrar fee
+  pricingLookup = computed(() => {
+    const rules = this.dashService.pricingRules();
+    const lookup = new Map<string, { totalPrice: number; count: number }>();
+    for (const r of rules) {
+      const key = `${r.tld}:${r.operation}`;
+      const entry = lookup.get(key) ?? { totalPrice: 0, count: 0 };
+      entry.totalPrice += r.priceAmount;
+      entry.count++;
+      lookup.set(key, entry);
+    }
+    return lookup;
+  });
+
+  // Get the average registrar fee for a given tld+operation
+  getRegistrarFee(tld: string, operation: string): number | null {
+    const entry = this.pricingLookup()?.get(`${tld}:${operation}`);
+    if (!entry || entry.count === 0) return null;
+    return entry.totalPrice / entry.count;
+  }
 
   // Summary metrics
   totalTlds = computed(() => this.uniqueTlds().length);
@@ -128,24 +148,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     });
   });
 
-  // TLD cost distribution donut for Summary tab
-  tldCostDonut = computed(() => {
-    const byTld = this.costBasisByTld();
-    const total = byTld.reduce((s, g) => s + g.totalCost, 0);
-    if (total === 0) return { segments: [], gradient: 'conic-gradient(var(--ud-border-subtle) 0deg 360deg)', total: 0 };
-    let startDeg = 0;
-    const segments = byTld.map((g, i) => {
-      const pct = g.totalCost / total;
-      const deg = pct * 360;
-      const seg = { tld: g.tld, cost: g.totalCost, pct, startDeg, deg, color: TLD_COLORS[i % TLD_COLORS.length] };
-      startDeg += deg;
-      return seg;
-    });
-    const stops = segments.map(s => `${s.color} ${s.startDeg}deg ${s.startDeg + s.deg}deg`);
-    return { segments, gradient: `conic-gradient(${stops.join(', ')})`, total };
-  });
-
-  // Pricing spread data — compare registrar prices to cost basis
+  // Registrar markup — compare registrar prices to registry fees
   pricingSpreadData = computed(() => {
     const rules = this.dashService.pricingRules();
     const costBasis = this.costBasisEntries();
@@ -189,7 +192,7 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     }));
   });
 
-  costBasisColumns = ['tld', 'operation', 'registrarId', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
+  costBasisColumns = ['tld', 'operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
 
   constructor(public dashService: RegistryDashService) {
     // Sync filtered entries into dataSource

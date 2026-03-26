@@ -1,0 +1,66 @@
+<!-- Copyright 2024 The Nomulus Authors. All Rights Reserved.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License. -->
+
+<div class="forecasting-container">
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Forecast Horizon Toggle -->
+  <div class="time-range">
+    <mat-button-toggle-group [value]="selectedMonths()" (change)="onMonthsChange($event.value)">
+      <mat-button-toggle [value]="6">6m</mat-button-toggle>
+      <mat-button-toggle [value]="12">12m</mat-button-toggle>
+      <mat-button-toggle [value]="24">24m</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metric-cards" *ngIf="data()">
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ avgRenewalRate() | number:'1.1-1' }}%</div>
+        <div class="metric-label">Avg Renewal Rate</div>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <div class="metric-value">{{ domainsAtRisk() | number }}</div>
+        <div class="metric-label">Domains at Risk</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" *ngIf="data()">
+    <div class="chart-container" *ngIf="expirationCurveOptions()">
+      <h3>Domain Expirations by TLD</h3>
+      <div echarts [options]="expirationCurveOptions()!" [theme]="'ud-brand'" class="chart"></div>
+    </div>
+    <div class="chart-container" *ngIf="netGrowthOptions()">
+      <h3>Net Growth Projection</h3>
+      <div echarts [options]="netGrowthOptions()!" [theme]="'ud-brand'" class="chart"></div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!data() && !dashService.loading() && !dashService.error()" class="empty-state">
+    <mat-icon>info</mat-icon>
+    <p>No forecasting data available for the selected period.</p>
+  </div>
+</div>
