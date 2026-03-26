@@ -1,0 +1,222 @@
+<div class="registry-dash-pricing">
+  @if (dashService.loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (dashService.error()) {
+    <div class="error-banner">{{ dashService.error() }}</div>
+  }
+
+  <div class="pricing-header">
+    <h2 class="mat-headline-6">Registrar Pricing Rules</h2>
+    <button mat-raised-button color="primary" (click)="openAddForm()">
+      <mat-icon>add</mat-icon> Add Rule
+    </button>
+  </div>
+
+  @if (showForm()) {
+    <mat-card appearance="outlined" class="pricing-form-card">
+      <mat-card-content>
+        <div class="form-title">{{ editingRule() ? 'Edit' : 'Add' }} Pricing Rule</div>
+        <form [formGroup]="pricingForm" (ngSubmit)="onSubmit()" class="pricing-form">
+
+          <div class="form-section">
+            <div class="section-label">Registrar &amp; TLD</div>
+            <div class="section-fields cols-4">
+              <mat-form-field class="span-2">
+                <mat-label>Registrar</mat-label>
+                @if (editingRule()) {
+                  <input matInput formControlName="registrarId" readonly>
+                } @else {
+                  <mat-select formControlName="registrarId">
+                    @for (r of registrars(); track r.registrarId) {
+                      <mat-option [value]="r.registrarId">{{ r.registrarName }} ({{ r.registrarId }})</mat-option>
+                    }
+                  </mat-select>
+                }
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>TLD</mat-label>
+                @if (editingRule()) {
+                  <input matInput formControlName="tld" readonly>
+                } @else {
+                  <mat-select formControlName="tld">
+                    @for (tld of availableTlds(); track tld) {
+                      <mat-option [value]="tld">{{ tld }}</mat-option>
+                    }
+                  </mat-select>
+                }
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Operation</mat-label>
+                <mat-select formControlName="operation" [disabled]="!!editingRule()">
+                  <mat-option value="CREATE">CREATE</mat-option>
+                  <mat-option value="RENEW">RENEW</mat-option>
+                  <mat-option value="TRANSFER">TRANSFER</mat-option>
+                  <mat-option value="RESTORE">RESTORE</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="form-section">
+            <div class="section-label">Pricing</div>
+            <div class="section-fields cols-4">
+              <mat-form-field>
+                <mat-label>Price</mat-label>
+                <input matInput type="number" formControlName="priceAmount" step="0.01">
+                <span matTextPrefix>$&nbsp;</span>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Currency</mat-label>
+                <mat-select formControlName="priceCurrency">
+                  <mat-option value="USD">USD</mat-option>
+                  <mat-option value="EUR">EUR</mat-option>
+                  <mat-option value="GBP">GBP</mat-option>
+                  <mat-option value="JPY">JPY</mat-option>
+                  <mat-option value="CAD">CAD</mat-option>
+                  <mat-option value="AUD">AUD</mat-option>
+                  <mat-option value="CHF">CHF</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <div class="active-toggle span-2">
+                <mat-checkbox formControlName="isActive">Active</mat-checkbox>
+              </div>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="form-section">
+            <div class="section-label">Validity Period</div>
+            <div class="section-fields cols-4">
+              <mat-form-field>
+                <mat-label>Effective Date</mat-label>
+                <input matInput [matDatepicker]="effectiveDatePicker" formControlName="effectiveDate">
+                <mat-datepicker-toggle matIconSuffix [for]="effectiveDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #effectiveDatePicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Effective Time</mat-label>
+                <input matInput [matTimepicker]="effectiveTimePicker" formControlName="effectiveDate">
+                <mat-timepicker-toggle matIconSuffix [for]="effectiveTimePicker"></mat-timepicker-toggle>
+                <mat-timepicker #effectiveTimePicker></mat-timepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Expiry Date</mat-label>
+                <input matInput [matDatepicker]="expiryDatePicker" formControlName="expiryDate">
+                <mat-datepicker-toggle matIconSuffix [for]="expiryDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #expiryDatePicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Expiry Time</mat-label>
+                <input matInput [matTimepicker]="expiryTimePicker" formControlName="expiryDate">
+                <mat-timepicker-toggle matIconSuffix [for]="expiryTimePicker"></mat-timepicker-toggle>
+                <mat-timepicker #expiryTimePicker></mat-timepicker>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-button type="button" (click)="cancelForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit"
+              [disabled]="!pricingForm.valid">Save</button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <div class="pricing-filters">
+    <mat-form-field>
+      <mat-label>Filter by Registrar</mat-label>
+      <mat-select [value]="filterRegistrar()" (selectionChange)="filterRegistrar.set($event.value)">
+        <mat-option value="all">All Registrars</mat-option>
+        @for (reg of uniqueRegistrars(); track reg) {
+          <mat-option [value]="reg">{{ reg }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Filter by TLD</mat-label>
+      <mat-select [value]="filterTld()" (selectionChange)="filterTld.set($event.value)">
+        <mat-option value="all">All TLDs</mat-option>
+        @for (tld of uniqueTlds(); track tld) {
+          <mat-option [value]="tld">{{ tld }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    @if (filterRegistrar() !== 'all' || filterTld() !== 'all') {
+      <button mat-button (click)="clearFilters()">
+        <mat-icon>clear</mat-icon> Clear Filters
+      </button>
+    }
+  </div>
+
+  @if (filteredRules().length > 0) {
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z1">
+      <ng-container matColumnDef="registrarId">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
+        <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+      </ng-container>
+      <ng-container matColumnDef="tld">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>TLD</th>
+        <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
+      </ng-container>
+      <ng-container matColumnDef="operation">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
+        <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+      </ng-container>
+      <ng-container matColumnDef="priceAmount">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Price</th>
+        <td mat-cell *matCellDef="let row">{{ row.priceAmount | number:'1.2-2' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="defaultPrice">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Default</th>
+        <td mat-cell *matCellDef="let row">
+          {{ row.defaultPrice != null ? (row.defaultPrice | number:'1.2-2') : 'N/A' }}
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="difference">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Diff</th>
+        <td mat-cell *matCellDef="let row" [class]="getDifferenceClass(row)">
+          @if (getDifference(row) !== null) {
+            {{ getDifference(row)! >= 0 ? '+' : '' }}{{ getDifference(row) | number:'1.2-2' }}
+          } @else {
+            -
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="priceCurrency">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Currency</th>
+        <td mat-cell *matCellDef="let row">{{ row.priceCurrency }}</td>
+      </ng-container>
+      <ng-container matColumnDef="effectiveDate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Effective</th>
+        <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'short' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="isActive">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+        <td mat-cell *matCellDef="let row">
+          <mat-icon [class]="row.isActive ? 'active-icon' : 'inactive-icon'">
+            {{ row.isActive ? 'check_circle' : 'cancel' }}
+          </mat-icon>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-icon-button (click)="openEditForm(row)" matTooltip="Edit">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  } @else if (!dashService.loading()) {
+    <p class="secondary-text">No pricing rules configured.</p>
+  }
+</div>

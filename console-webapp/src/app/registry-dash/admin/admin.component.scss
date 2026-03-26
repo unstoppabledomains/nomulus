@@ -1,0 +1,125 @@
+.admin-container {
+  padding: 16px;
+  max-width: 1200px;
+}
+
+.admin-card {
+  margin-bottom: 24px;
+}
+
+.error-banner {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.add-form {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.add-form mat-form-field {
+  flex: 1;
+  min-width: 200px;
+}
+
+.registrars-table {
+  width: 100%;
+}
+
+.registry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.registry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+
+  &.selected {
+    border-color: #1976d2;
+    background-color: rgba(25, 118, 210, 0.08);
+  }
+}
+
+.registry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.registry-name {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.registry-meta {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.detail-card {
+  border-left: 4px solid #1976d2;
+}
+
+.empty-state {
+  color: rgba(0, 0, 0, 0.54);
+  text-align: center;
+  padding: 24px;
+}
+
+h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.cost-basis-table {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.cost-basis-form {
+  margin-bottom: 16px;
+}
+
+.cost-basis-fields {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cost-basis-fields mat-form-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding-top: 8px;
+}

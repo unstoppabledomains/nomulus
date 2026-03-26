@@ -59,8 +59,8 @@ dependencyLocking {
 }
 
 node {
-  download = false
-  version = "22.7.0"
+  download = true
+  version = "22.12.0"
 }
 
 wrapper {

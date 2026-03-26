@@ -1,0 +1,116 @@
+.registry-dash-pricing {
+  .pricing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+
+    h2 {
+      margin: 0;
+    }
+  }
+
+  .error-banner {
+    color: #d32f2f;
+    background: #fce4ec;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .pricing-form-card {
+    margin-bottom: 1.5rem;
+    border-radius: 12px;
+  }
+
+  .form-title {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 1.25rem;
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  .pricing-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    mat-divider {
+      margin: 0.5rem 0;
+    }
+  }
+
+  .form-section {
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(0, 0, 0, 0.54);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-fields {
+      &.cols-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0 1rem;
+        align-items: start;
+      }
+
+      .span-2 {
+        grid-column: span 2;
+      }
+    }
+  }
+
+  .active-toggle {
+    display: flex;
+    align-items: center;
+    padding-top: 0.75rem;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .pricing-filters {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+
+    mat-form-field {
+      min-width: 200px;
+    }
+  }
+
+  table {
+    width: 100%;
+  }
+
+  .active-icon {
+    color: #2e7d32;
+  }
+
+  .inactive-icon {
+    color: #9e9e9e;
+  }
+
+  .diff-discount {
+    color: #2e7d32;
+    font-weight: 500;
+  }
+
+  .diff-premium {
+    color: #d32f2f;
+    font-weight: 500;
+  }
+
+  .diff-zero {
+    color: rgba(0, 0, 0, 0.54);
+  }
+}

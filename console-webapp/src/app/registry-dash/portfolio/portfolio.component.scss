@@ -1,0 +1,35 @@
+.registry-dash-portfolio {
+  .error-banner {
+    color: #d32f2f;
+    background: #fce4ec;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  .state-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+  }
+
+  .state-active {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .state-suspended {
+    background: #fff3e0;
+    color: #e65100;
+  }
+
+  .state-pending {
+    background: #e3f2fd;
+    color: #1565c0;
+  }
+}

@@ -73,5 +73,15 @@ public enum ConsolePermission {
   /** Viewing a record of actions performed in the UI for a particular registrar. */
   VIEW_ACTIVITY_LOG,
   /** View and perform registry locks. */
-  REGISTRY_LOCK
+  REGISTRY_LOCK,
+  /** View the registry dashboard overview (aggregate metrics). */
+  VIEW_DASHBOARD_OVERVIEW,
+  /** View registrar portfolio in the registry dashboard. */
+  VIEW_REGISTRAR_PORTFOLIO,
+  /** View per-registrar pricing rules in the registry dashboard. */
+  VIEW_PRICING,
+  /** Create/edit per-registrar pricing rules in the registry dashboard. */
+  MANAGE_PRICING,
+  /** Create/edit cost basis entries in the registry dashboard. */
+  MANAGE_COST_BASIS
 }

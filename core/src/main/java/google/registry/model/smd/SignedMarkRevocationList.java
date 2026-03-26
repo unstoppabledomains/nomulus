@@ -21,7 +21,6 @@ import static google.registry.util.DateTimeUtils.isBeforeOrAt;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import google.registry.model.ImmutableObject;
-// UD CUSTOMIZATION: RST support - per-TLD SMDR list retrieval for ICANN Registry Services Technical
 import google.registry.tmch.RstTmchUtils;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;

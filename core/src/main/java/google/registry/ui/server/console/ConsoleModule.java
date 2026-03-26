@@ -21,10 +21,13 @@ import static google.registry.request.RequestParameters.extractRequiredParameter
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import dagger.Module;
 import dagger.Provides;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarPoc;
+import google.registry.model.registrydash.RegistryDashboardCostBasis;
+import google.registry.model.registrydash.RegistryDashboardRegistrarPricing;
 import google.registry.request.OptionalJsonPayload;
 import google.registry.request.Parameter;
 import google.registry.request.RequestScope;
@@ -34,6 +37,7 @@ import google.registry.security.XsrfTokenManager;
 import google.registry.ui.server.SendEmailUtils;
 import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordData;
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
+import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
 import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
@@ -296,5 +300,106 @@ public final class ConsoleModule {
   public static Optional<String> provideNewPassword(
       Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload.map(e -> gson.fromJson(e, String.class));
+  }
+
+  @Provides
+  @Parameter("registryDashPricing")
+  public static Optional<RegistryDashboardRegistrarPricing> provideRegistryDashPricing(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          RegistryDashboardRegistrarPricing p = new RegistryDashboardRegistrarPricing();
+          if (obj.has("registrarId")) {
+            p.setRegistrarId(obj.get("registrarId").getAsString());
+          }
+          if (obj.has("tld")) {
+            p.setTld(obj.get("tld").getAsString());
+          }
+          if (obj.has("operation")) {
+            p.setOperation(obj.get("operation").getAsString());
+          }
+          if (obj.has("priceAmount")) {
+            p.setPriceAmount(obj.get("priceAmount").getAsBigDecimal());
+          }
+          if (obj.has("priceCurrency")) {
+            p.setPriceCurrency(obj.get("priceCurrency").getAsString());
+          }
+          if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
+              && !obj.get("effectiveDate").getAsString().isEmpty()) {
+            p.setEffectiveDate(
+                java.time.ZonedDateTime.parse(obj.get("effectiveDate").getAsString()));
+          }
+          if (obj.has("expiryDate") && !obj.get("expiryDate").isJsonNull()
+              && !obj.get("expiryDate").getAsString().isEmpty()) {
+            p.setExpiryDate(
+                java.time.ZonedDateTime.parse(obj.get("expiryDate").getAsString()));
+          }
+          if (obj.has("isActive")) {
+            p.setActive(obj.get("isActive").getAsBoolean());
+          }
+          return p;
+        });
+  }
+
+  @Provides
+  @Parameter("registryDashCostBasis")
+  public static Optional<RegistryDashboardCostBasis> provideRegistryDashCostBasis(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
+          if (obj.has("tld")) {
+            cb.setTld(obj.get("tld").getAsString());
+          }
+          if (obj.has("operation")) {
+            cb.setOperation(obj.get("operation").getAsString());
+          }
+          if (obj.has("costAmount")) {
+            cb.setCostAmount(obj.get("costAmount").getAsBigDecimal());
+          }
+          if (obj.has("costCurrency")) {
+            cb.setCostCurrency(obj.get("costCurrency").getAsString());
+          }
+          if (obj.has("effectiveDate") && !obj.get("effectiveDate").isJsonNull()
+              && !obj.get("effectiveDate").getAsString().isEmpty()) {
+            cb.setEffectiveDate(
+                java.time.ZonedDateTime.parse(obj.get("effectiveDate").getAsString()));
+          }
+          if (obj.has("notes") && !obj.get("notes").isJsonNull()) {
+            cb.setNotes(obj.get("notes").getAsString());
+          }
+          if (obj.has("registrarId") && !obj.get("registrarId").isJsonNull()) {
+            cb.setRegistrarId(obj.get("registrarId").getAsString());
+          }
+          if (obj.has("id") && !obj.get("id").isJsonNull()) {
+            try {
+              var idField = RegistryDashboardCostBasis.class.getDeclaredField("id");
+              idField.setAccessible(true);
+              idField.set(cb, obj.get("id").getAsLong());
+            } catch (Exception ex) {
+              // Ignore - id will be auto-generated for new entries
+            }
+          }
+          return cb;
+        });
+  }
+
+  @Provides
+  @Parameter("registryDashAdmin")
+  public static Optional<RegistryDashAdminAction.AdminPayload> provideRegistryDashAdmin(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(
+        e -> {
+          JsonObject obj = e.getAsJsonObject();
+          return new RegistryDashAdminAction.AdminPayload(
+              obj.has("action") ? obj.get("action").getAsString() : null,
+              obj.has("registryId") ? obj.get("registryId").getAsLong() : null,
+              obj.has("registryName") ? obj.get("registryName").getAsString() : null,
+              obj.has("tld") ? obj.get("tld").getAsString() : null,
+              obj.has("userEmail") ? obj.get("userEmail").getAsString() : null,
+              obj.has("id") ? obj.get("id").getAsLong() : null);
+        });
   }
 }

@@ -65,6 +65,8 @@ export class NavigationComponent {
       return RESTRICTED_ELEMENTS.REGISTRAR_ELEMENT;
     } else if (node.path === PATHS.UsersComponent) {
       return RESTRICTED_ELEMENTS.USERS;
+    } else if (node.path === PATHS.RegistryDash) {
+      return RESTRICTED_ELEMENTS.REGISTRY_DASH;
     }
     return null;
   }

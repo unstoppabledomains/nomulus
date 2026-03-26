@@ -21,6 +21,13 @@ import { DomainLocksResult } from 'src/app/domains/registryLock.service';
 import { RegistryLockVerificationResponse } from 'src/app/lock/registryLockVerify.service';
 import { OteCreateResponse } from 'src/app/ote/newOte.component';
 import { OteStatusResponse } from 'src/app/ote/oteStatus.component';
+import {
+  OverviewData,
+  PortfolioEntry,
+  PricingRule,
+  CostBasisEntry,
+  AdminData,
+} from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
   Registrar,
@@ -324,5 +331,75 @@ export class BackendService {
       `/console-api/password-reset-verify?resetRequestVerificationCode=${verificationCode}`,
       newPassword
     );
+  }
+
+  // --- Registry Dashboard ---
+
+  getRegistryDashOverview(): Observable<OverviewData> {
+    return this.http
+      .get<OverviewData>('/console-api/registry-dash/overview')
+      .pipe(catchError((err) => this.errorCatcher<OverviewData>(err)));
+  }
+
+  getRegistryDashPortfolio(): Observable<PortfolioEntry[]> {
+    return this.http
+      .get<PortfolioEntry[]>('/console-api/registry-dash/portfolio')
+      .pipe(catchError((err) => this.errorCatcher<PortfolioEntry[]>(err)));
+  }
+
+  getRegistryDashPricing(): Observable<PricingRule[]> {
+    return this.http
+      .get<PricingRule[]>('/console-api/registry-dash/pricing')
+      .pipe(catchError((err) => this.errorCatcher<PricingRule[]>(err)));
+  }
+
+  createRegistryDashPricing(rule: PricingRule): Observable<PricingRule> {
+    return this.http.post<PricingRule>(
+      '/console-api/registry-dash/pricing',
+      rule
+    );
+  }
+
+  updateRegistryDashPricing(rule: PricingRule): Observable<PricingRule> {
+    return this.http.put<PricingRule>(
+      '/console-api/registry-dash/pricing',
+      rule
+    );
+  }
+
+  getRegistryDashCostBasis(): Observable<CostBasisEntry[]> {
+    return this.http
+      .get<CostBasisEntry[]>('/console-api/registry-dash/cost-basis')
+      .pipe(catchError((err) => this.errorCatcher<CostBasisEntry[]>(err)));
+  }
+
+  createRegistryDashCostBasis(
+    entry: CostBasisEntry
+  ): Observable<CostBasisEntry> {
+    return this.http.post<CostBasisEntry>(
+      '/console-api/registry-dash/cost-basis',
+      entry
+    );
+  }
+
+  updateRegistryDashCostBasis(
+    entry: CostBasisEntry
+  ): Observable<CostBasisEntry> {
+    return this.http.put<CostBasisEntry>(
+      '/console-api/registry-dash/cost-basis',
+      entry
+    );
+  }
+
+  // --- Registry Dashboard Admin ---
+
+  getRegistryDashAdmin(): Observable<AdminData> {
+    return this.http
+      .get<AdminData>('/console-api/registry-dash/admin')
+      .pipe(catchError((err) => this.errorCatcher<AdminData>(err)));
+  }
+
+  postRegistryDashAdmin(payload: unknown): Observable<unknown> {
+    return this.http.post('/console-api/registry-dash/admin', payload);
   }
 }

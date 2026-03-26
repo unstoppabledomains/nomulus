@@ -1,0 +1,53 @@
+<div class="registry-dash-overview">
+  @if (dashService.loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (dashService.error()) {
+    <div class="error-banner">{{ dashService.error() }}</div>
+  }
+
+  @if (dashService.overview(); as overview) {
+    <div class="summary-cards">
+      <mat-card appearance="outlined">
+        <mat-card-content>
+          <h3>
+            <mat-icon class="secondary-text">domain</mat-icon>
+            Total Domains
+          </h3>
+          <p class="stat-value">{{ overview.totalDomains | number }}</p>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-content>
+          <h3>
+            <mat-icon class="secondary-text">account_circle</mat-icon>
+            Active Registrars
+          </h3>
+          <p class="stat-value">{{ overview.activeRegistrars | number }}</p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    @if (overview.domainsByRegistrar.length > 0) {
+      <h2 class="mat-headline-6">Domains by Registrar</h2>
+      <table mat-table [dataSource]="overview.domainsByRegistrar" class="mat-elevation-z1">
+        <ng-container matColumnDef="registrarId">
+          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+        </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+        </ng-container>
+        <ng-container matColumnDef="count">
+          <th mat-header-cell *matHeaderCellDef>Domain Count</th>
+          <td mat-cell *matCellDef="let row">{{ row.count | number }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    }
+  }
+</div>
