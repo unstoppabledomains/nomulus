@@ -30,7 +30,6 @@ import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
-import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -57,7 +56,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
                WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
                WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN ('DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE') THEN 'DELETES'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
                WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
@@ -76,7 +77,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
                WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
                WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN ('DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE') THEN 'DELETES'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
                WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
