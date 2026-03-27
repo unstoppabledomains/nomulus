@@ -119,7 +119,7 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
             Map<String, Object> entry = new HashMap<>();
             entry.put("registrarId", r.getRegistrarId());
             entry.put("registrarName", r.getRegistrarName());
-            entry.put("state", r.getState().toString());
+            entry.put("state", r.getState() != null ? r.getState().toString() : "ACTIVE");
             entry.put("domainCount", countMap.getOrDefault(r.getRegistrarId(), 0L));
             entry.put("allowedTlds", r.getAllowedTlds());
             portfolio.add(entry);

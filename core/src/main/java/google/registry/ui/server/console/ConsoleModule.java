@@ -328,6 +328,9 @@ public final class ConsoleModule {
         e -> {
           JsonObject obj = e.getAsJsonObject();
           RegistryDashboardRegistrarPricing p = new RegistryDashboardRegistrarPricing();
+          if (obj.has("id") && !obj.get("id").isJsonNull()) {
+            p.setId(obj.get("id").getAsLong());
+          }
           if (obj.has("registrarId")) {
             p.setRegistrarId(obj.get("registrarId").getAsString());
           }
