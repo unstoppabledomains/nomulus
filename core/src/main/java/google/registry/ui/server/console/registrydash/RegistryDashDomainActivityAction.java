@@ -30,7 +30,6 @@ import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -58,7 +57,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
                WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
                WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN ('DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE') THEN 'DELETES'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
                WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
@@ -77,7 +78,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
                WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
                WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN ('DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE') THEN 'DELETES'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
                WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
@@ -164,7 +167,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
             Number count = (Number) row[3];
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("period", period.atZone(ZoneOffset.UTC).toLocalDate().toString().substring(0, 7));
+            String monthStr = period.atZone(ZoneOffset.UTC)
+                .toLocalDate().toString().substring(0, 7);
+            entry.put("period", monthStr);
             entry.put("tld", tld);
             entry.put("type", type);
             entry.put("count", count.longValue());

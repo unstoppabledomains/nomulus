@@ -143,7 +143,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             String cur = (String) row[4];
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("month", month.atZone(ZoneOffset.UTC).toLocalDate().toString().substring(0, 7));
+            String monthStr = month.atZone(ZoneOffset.UTC)
+                .toLocalDate().toString().substring(0, 7);
+            entry.put("month", monthStr);
             entry.put("tld", tld);
             entry.put("operation", operation);
             entry.put("amount", amount);

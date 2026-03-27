@@ -32,7 +32,6 @@ import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -79,7 +78,8 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
   private static final String RENEWAL_RATES_NATIVE_ALL =
       """
       SELECT d.tld,
-             COUNT(CASE WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 1 END) AS renewals,
+             COUNT(CASE WHEN dh.history_type IN (
+               'DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 1 END) AS renewals,
              COUNT(CASE WHEN dh.history_type = 'DOMAIN_DELETE' THEN 1 END) AS deletions
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
@@ -91,7 +91,8 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
   private static final String RENEWAL_RATES_NATIVE_SCOPED =
       """
       SELECT d.tld,
-             COUNT(CASE WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 1 END) AS renewals,
+             COUNT(CASE WHEN dh.history_type IN (
+               'DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 1 END) AS renewals,
              COUNT(CASE WHEN dh.history_type = 'DOMAIN_DELETE' THEN 1 END) AS deletions
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
@@ -137,7 +138,8 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
         () -> {
           // Expiration curve — uses JPQL (date_trunc works on DateTime via Hibernate)
           org.joda.time.DateTime endDate =
-              org.joda.time.DateTime.now().plusMonths(forecastMonths);
+              org.joda.time.DateTime.now(org.joda.time.DateTimeZone.UTC)
+                  .plusMonths(forecastMonths);
           @SuppressWarnings("unchecked")
           List<Object[]> expirationResults =
               isAdmin
