@@ -31,7 +31,8 @@ import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -134,8 +135,8 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
     }
 
     int lookbackMonths = months.orElse(12);
-    Timestamp startDate =
-        Timestamp.from(ZonedDateTime.now(java.time.ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
+    Instant startDate =
+        ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant();
 
     tm().transact(
         () -> {
@@ -155,13 +156,13 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
 
           List<Map<String, Object>> activity = new ArrayList<>();
           for (Object[] row : activityResults) {
-            Timestamp period = (Timestamp) row[0];
+            Instant period = (Instant) row[0];
             String tld = (String) row[1];
             String type = (String) row[2];
             Number count = (Number) row[3];
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("period", period.toLocalDateTime().toLocalDate().toString().substring(0, 7));
+            entry.put("period", period.atZone(ZoneOffset.UTC).toLocalDate().toString().substring(0, 7));
             entry.put("tld", tld);
             entry.put("type", type);
             entry.put("count", count.longValue());
