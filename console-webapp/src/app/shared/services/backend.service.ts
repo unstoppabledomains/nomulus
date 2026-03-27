@@ -408,8 +408,11 @@ export class BackendService {
 
   // --- Registry Dashboard Analytics ---
 
-  getRegistryDashRevenueBilling(months?: number): Observable<RevenueBillingData> {
-    const params = months ? `?months=${months}` : '';
+  getRegistryDashRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length ? `?${parts.join('&')}` : '';
     return this.http
       .get<RevenueBillingData>(`/console-api/registry-dash/revenue-billing${params}`)
       .pipe(catchError((err) => this.errorCatcher<RevenueBillingData>(err)));

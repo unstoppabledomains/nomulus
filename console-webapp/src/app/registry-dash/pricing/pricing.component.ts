@@ -38,6 +38,7 @@ export class PricingComponent implements AfterViewInit {
     'difference',
     'priceCurrency',
     'effectiveDate',
+    'expiryDate',
     'isActive',
     'actions',
   ];

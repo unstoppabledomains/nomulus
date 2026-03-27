@@ -126,4 +126,10 @@ core/**/registrar_dbg*.css
 
 
 # AI-generated content not for git
-AI-generated-content-not-for-git/** 
+AI-generated-content-not-for-git/**
+
+# Superpowers brainstorm artifacts
+.superpowers/
+
+# Local dev test data (ephemeral, Testcontainers-only)
+local-test-data-setup.sql

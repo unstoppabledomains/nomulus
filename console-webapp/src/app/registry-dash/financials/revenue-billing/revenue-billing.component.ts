@@ -31,6 +31,23 @@ const TLD_COLORS = [
   '#00C9FF', '#0A5FEA', '#4A9B30', '#9191A1',
 ];
 
+export interface RangeConfigEntry {
+  lookbackHours: number;
+  granularity: string;
+}
+
+export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
+  '6h': { lookbackHours: 6, granularity: '15min' },
+  '12h': { lookbackHours: 12, granularity: 'hour' },
+  '1d': { lookbackHours: 24, granularity: 'hour' },
+  '7d': { lookbackHours: 168, granularity: 'day' },
+  '30d': { lookbackHours: 720, granularity: 'day' },
+  '3m': { lookbackHours: 2160, granularity: 'month' },
+  '6m': { lookbackHours: 4380, granularity: 'month' },
+  '12m': { lookbackHours: 8760, granularity: 'month' },
+  '24m': { lookbackHours: 17520, granularity: 'month' },
+};
+
 @Component({
   selector: 'app-revenue-billing',
   standalone: true,
@@ -40,7 +57,8 @@ const TLD_COLORS = [
   styleUrls: ['./revenue-billing.component.scss'],
 })
 export class RevenueBillingComponent implements OnInit {
-  selectedMonths = signal(12);
+  selectedRange = signal('12m');
+  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.revenueBilling());
 
@@ -52,16 +70,16 @@ export class RevenueBillingComponent implements OnInit {
 
   avgMonthlyRevenue = computed(() => {
     const d = this.data();
-    if (!d || d.monthlyRevenue.length === 0) return 0;
-    const months = new Set(d.monthlyRevenue.map(p => p.month));
-    return months.size > 0 ? d.totals.totalRevenue / months.size : 0;
+    if (!d || d.periodRevenue.length === 0) return 0;
+    const periods = new Set(d.periodRevenue.map(p => p.period));
+    return periods.size > 0 ? d.totals.totalRevenue / periods.size : 0;
   });
 
   topTld = computed(() => {
     const d = this.data();
-    if (!d || d.monthlyRevenue.length === 0) return '—';
+    if (!d || d.periodRevenue.length === 0) return '—';
     const byTld = new Map<string, number>();
-    for (const pt of d.monthlyRevenue) {
+    for (const pt of d.periodRevenue) {
       byTld.set(pt.tld, (byTld.get(pt.tld) ?? 0) + pt.amount);
     }
     let best = '';
@@ -80,38 +98,38 @@ export class RevenueBillingComponent implements OnInit {
   // ECharts: Revenue area chart (one series per TLD)
   revenueLineOptions = computed(() => {
     const d = this.data();
-    if (!d || d.monthlyRevenue.length === 0) return null;
+    if (!d || d.periodRevenue.length === 0) return null;
 
     // Group by TLD
     const tldMap = new Map<string, Map<string, number>>();
-    const allMonths = new Set<string>();
-    for (const pt of d.monthlyRevenue) {
-      allMonths.add(pt.month);
+    const allPeriods = new Set<string>();
+    for (const pt of d.periodRevenue) {
+      allPeriods.add(pt.period);
       if (!tldMap.has(pt.tld)) tldMap.set(pt.tld, new Map());
-      const monthMap = tldMap.get(pt.tld)!;
-      monthMap.set(pt.month, (monthMap.get(pt.month) ?? 0) + pt.amount);
+      const periodMap = tldMap.get(pt.tld)!;
+      periodMap.set(pt.period, (periodMap.get(pt.period) ?? 0) + pt.amount);
     }
 
-    const months = [...allMonths].sort();
+    const periods = [...allPeriods].sort();
     const tlds = [...tldMap.keys()].sort();
 
     const series = tlds.map((tld, i) => {
-      const monthMap = tldMap.get(tld)!;
+      const periodMap = tldMap.get(tld)!;
       return {
         name: tld,
         type: 'line' as const,
         stack: 'revenue',
         areaStyle: { opacity: 0.15 },
         emphasis: { focus: 'series' as const },
-        data: months.map(m => monthMap.get(m) ?? 0),
+        data: periods.map(m => periodMap.get(m) ?? 0),
         color: TLD_COLORS[i % TLD_COLORS.length],
       };
     });
 
     return {
       tooltip: { trigger: 'axis' as const },
-      legend: { data: tlds },
-      xAxis: { type: 'category' as const, data: months },
+      legend: { type: 'scroll' as const, bottom: 0, data: tlds },
+      xAxis: { type: 'category' as const, data: periods },
       yAxis: { type: 'value' as const },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
       series,
@@ -143,10 +161,13 @@ export class RevenueBillingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedMonths changes
+    // Refetch when selectedRange changes
     effect(() => {
-      const months = this.selectedMonths();
-      this.dashService.getRevenueBilling(months).subscribe();
+      const range = this.selectedRange();
+      const config = RANGE_CONFIG[range];
+      if (config) {
+        this.dashService.getRevenueBilling(config.lookbackHours, config.granularity).subscribe();
+      }
     });
   }
 
@@ -154,7 +175,7 @@ export class RevenueBillingComponent implements OnInit {
     // Initial fetch is handled by the effect above
   }
 
-  onMonthsChange(months: number) {
-    this.selectedMonths.set(months);
+  onRangeChange(range: string) {
+    this.selectedRange.set(range);
   }
 }
