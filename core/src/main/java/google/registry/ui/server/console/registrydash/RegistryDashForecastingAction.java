@@ -32,7 +32,7 @@ import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Timestamp;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -167,8 +167,9 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           }
 
           // Renewal rates — native SQL (history_type is a string column)
-          Timestamp startDate =
-              Timestamp.from(ZonedDateTime.now(java.time.ZoneOffset.UTC).minusMonths(12).toInstant());
+          java.sql.Timestamp startDate =
+              java.sql.Timestamp.from(
+                  ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant());
           @SuppressWarnings("unchecked")
           List<Object[]> renewalResults =
               isAdmin
