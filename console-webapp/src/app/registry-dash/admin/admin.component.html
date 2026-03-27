@@ -103,8 +103,8 @@
   <!-- Fee Schedule Management -->
   <mat-card class="admin-card">
     <mat-card-header>
-      <mat-card-title>Fee Schedule</mat-card-title>
-      <mat-card-subtitle>Registry fees charged to registrars per TLD and operation. NULL registrar = default rate for all registrars.</mat-card-subtitle>
+      <mat-card-title>Fee Schedule (Defaults)</mat-card-title>
+      <mat-card-subtitle>Default registry fees charged to all registrars per TLD and operation. These are the baseline rates applied when no registrar-specific pricing rule exists. To set custom pricing for individual registrars, use the Pricing tab.</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
       <button mat-raised-button color="primary" (click)="onAddCostBasis()" *ngIf="!showCostBasisForm()">

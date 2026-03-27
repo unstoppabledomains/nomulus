@@ -34,13 +34,20 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
-/** Returns monthly revenue and billing data for the registry dashboard. */
+/**
+ * Returns revenue and billing data for the registry dashboard with configurable granularity.
+ *
+ * <p>Supports lookbackHours + granularity params for fine-grained time windows. The legacy
+ * "months" param is still accepted for backward compatibility.
+ */
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashRevenueBillingAction.PATH,
@@ -50,9 +57,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/revenue-billing";
 
-  private static final String MONTHLY_REVENUE_ALL =
+  private static final Set<String> VALID_GRANULARITIES = Set.of("15min", "hour", "day", "month");
+
+  // --- Standard granularity SQL (hour, day, month) ---
+
+  private static final String REVENUE_ALL_TEMPLATE =
       """
-      SELECT date_trunc('month', b.event_time) AS month,
+      SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              b.cost_currency
@@ -60,13 +71,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
       WHERE b.event_time >= :startDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
-      GROUP BY date_trunc('month', b.event_time), d.tld, b.reason, b.cost_currency
-      ORDER BY month, d.tld
+      GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
+      ORDER BY period, d.tld
       """;
 
-  private static final String MONTHLY_REVENUE_SCOPED =
+  private static final String REVENUE_SCOPED_TEMPLATE =
       """
-      SELECT date_trunc('month', b.event_time) AS month,
+      SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              b.cost_currency
@@ -75,18 +86,69 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       WHERE b.event_time >= :startDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
-      GROUP BY date_trunc('month', b.event_time), d.tld, b.reason, b.cost_currency
-      ORDER BY month, d.tld
+      GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
+      ORDER BY period, d.tld
+      """;
+
+  // --- 15-minute bucket SQL ---
+
+  private static final String REVENUE_15MIN_ALL =
+      """
+      SELECT date_trunc('hour', b.event_time)
+               + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
+             d.tld, b.reason,
+             SUM(b.cost_amount) AS total_amount,
+             b.cost_currency
+      FROM "BillingEvent" b
+      JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      WHERE b.event_time >= :startDate
+        AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
+      GROUP BY period, d.tld, b.reason, b.cost_currency
+      ORDER BY period, d.tld
+      """;
+
+  private static final String REVENUE_15MIN_SCOPED =
+      """
+      SELECT date_trunc('hour', b.event_time)
+               + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
+             d.tld, b.reason,
+             SUM(b.cost_amount) AS total_amount,
+             b.cost_currency
+      FROM "BillingEvent" b
+      JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      WHERE b.event_time >= :startDate
+        AND d.tld IN :tlds
+        AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
+      GROUP BY period, d.tld, b.reason, b.cost_currency
+      ORDER BY period, d.tld
       """;
 
   private final Optional<Integer> months;
+  private final Optional<Integer> lookbackHours;
+  private final Optional<String> granularity;
+  private final java.time.Clock clock;
 
   @Inject
   public RegistryDashRevenueBillingAction(
       ConsoleApiParams consoleApiParams,
-      @Parameter("months") Optional<Integer> months) {
+      @Parameter("months") Optional<Integer> months,
+      @Parameter("lookbackHours") Optional<Integer> lookbackHours,
+      @Parameter("granularity") Optional<String> granularity) {
+    this(consoleApiParams, months, lookbackHours, granularity, java.time.Clock.systemUTC());
+  }
+
+  /** Constructor that accepts a clock for testing. */
+  RegistryDashRevenueBillingAction(
+      ConsoleApiParams consoleApiParams,
+      Optional<Integer> months,
+      Optional<Integer> lookbackHours,
+      Optional<String> granularity,
+      java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
+    this.lookbackHours = lookbackHours;
+    this.granularity = granularity;
+    this.clock = clock;
   }
 
   @Override
@@ -102,55 +164,82 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
-      empty.put("monthlyRevenue", List.of());
+      empty.put("periodRevenue", List.of());
       empty.put("totals", Map.of("totalRevenue", 0, "currency", "USD", "byOperation", Map.of()));
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(empty));
       consoleApiParams.response().setStatus(SC_OK);
       return;
     }
 
-    int lookbackMonths = months.orElse(12);
-    java.sql.Timestamp startDate =
-        java.sql.Timestamp.from(
-            ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
+    // Resolve lookback period: prefer lookbackHours, fall back to months param
+    int hoursBack;
+    if (lookbackHours.isPresent()) {
+      hoursBack = Math.max(1, Math.min(lookbackHours.get(), 17520));
+    } else {
+      int lookbackMonths = months.orElse(12);
+      hoursBack = lookbackMonths * 730;
+    }
 
+    // Resolve and validate granularity
+    String gran = granularity.orElse("month");
+    if (!VALID_GRANULARITIES.contains(gran)) {
+      gran = "month";
+    }
+
+    Instant startInstant = ZonedDateTime.now(clock)
+        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    java.sql.Timestamp startDate = java.sql.Timestamp.from(startInstant);
+
+    String resolvedGran = gran;
     tm().transact(
         () -> {
-          @SuppressWarnings("unchecked")
-          List<Object[]> results =
-              isAdmin
-                  ? tm().getEntityManager()
-                      .createNativeQuery(MONTHLY_REVENUE_ALL)
-                      .setParameter("startDate", startDate)
-                      .getResultList()
-                  : tm().getEntityManager()
-                      .createNativeQuery(MONTHLY_REVENUE_SCOPED)
-                      .setParameter("startDate", startDate)
-                      .setParameter("tlds", tlds)
-                      .getResultList();
+          String sql = buildSql(resolvedGran, isAdmin);
 
-          List<Map<String, Object>> monthlyRevenue = new ArrayList<>();
+          @SuppressWarnings("unchecked")
+          List<Object[]> results;
+          if (isAdmin) {
+            results = tm().getEntityManager()
+                .createNativeQuery(sql)
+                .setParameter("startDate", startDate)
+                .getResultList();
+          } else {
+            results = tm().getEntityManager()
+                .createNativeQuery(sql)
+                .setParameter("startDate", startDate)
+                .setParameter("tlds", tlds)
+                .getResultList();
+          }
+
+          List<Map<String, Object>> periodRevenue = new ArrayList<>();
           BigDecimal totalRevenue = BigDecimal.ZERO;
           Map<String, BigDecimal> byOperation = new HashMap<>();
           String currency = "USD";
 
           for (Object[] row : results) {
-            java.sql.Timestamp monthTs = (java.sql.Timestamp) row[0];
-            Instant month = monthTs.toInstant();
+            // PostgreSQL may return Timestamp, Instant, or OffsetDateTime depending on the query
+            Instant periodInstant;
+            Object periodRaw = row[0];
+            if (periodRaw instanceof java.sql.Timestamp ts) {
+              periodInstant = ts.toInstant();
+            } else if (periodRaw instanceof Instant inst) {
+              periodInstant = inst;
+            } else if (periodRaw instanceof java.time.OffsetDateTime odt) {
+              periodInstant = odt.toInstant();
+            } else {
+              periodInstant = Instant.parse(periodRaw.toString());
+            }
             String tld = (String) row[1];
             String operation = (String) row[2];
             BigDecimal amount = (BigDecimal) row[3];
             String cur = (String) row[4];
 
             Map<String, Object> entry = new HashMap<>();
-            String monthStr = month.atZone(ZoneOffset.UTC)
-                .toLocalDate().toString().substring(0, 7);
-            entry.put("month", monthStr);
+            entry.put("period", formatPeriod(periodInstant, resolvedGran));
             entry.put("tld", tld);
             entry.put("operation", operation);
             entry.put("amount", amount);
             entry.put("currency", cur);
-            monthlyRevenue.add(entry);
+            periodRevenue.add(entry);
 
             totalRevenue = totalRevenue.add(amount);
             byOperation.merge(operation, amount, BigDecimal::add);
@@ -163,11 +252,32 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
           totals.put("byOperation", byOperation);
 
           Map<String, Object> response = new HashMap<>();
-          response.put("monthlyRevenue", monthlyRevenue);
+          response.put("periodRevenue", periodRevenue);
           response.put("totals", totals);
 
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
           consoleApiParams.response().setStatus(SC_OK);
         });
+  }
+
+  private static String buildSql(String granularity, boolean isAdmin) {
+    if ("15min".equals(granularity)) {
+      return isAdmin ? REVENUE_15MIN_ALL : REVENUE_15MIN_SCOPED;
+    }
+    // For hour, day, month — use the template with String.format
+    // These values are from a validated allowlist, safe to interpolate
+    String truncArg = granularity;
+    return isAdmin
+        ? String.format(REVENUE_ALL_TEMPLATE, truncArg, truncArg)
+        : String.format(REVENUE_SCOPED_TEMPLATE, truncArg, truncArg);
+  }
+
+  private static String formatPeriod(Instant instant, String granularity) {
+    ZonedDateTime zdt = instant.atZone(ZoneOffset.UTC);
+    return switch (granularity) {
+      case "month" -> zdt.toLocalDate().toString().substring(0, 7);
+      case "day" -> zdt.toLocalDate().toString();
+      default -> instant.toString();
+    };
   }
 }

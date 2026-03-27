@@ -97,7 +97,7 @@ export interface AdminData {
 }
 
 export interface RevenueDataPoint {
-  month: string;
+  period: string;
   tld: string;
   operation: string;
   amount: number;
@@ -111,7 +111,7 @@ export interface RevenueTotals {
 }
 
 export interface RevenueBillingData {
-  monthlyRevenue: RevenueDataPoint[];
+  periodRevenue: RevenueDataPoint[];
   totals: RevenueTotals;
 }
 
@@ -304,11 +304,11 @@ export class RegistryDashService {
     );
   }
 
-  getRevenueBilling(months?: number): Observable<RevenueBillingData> {
+  getRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashRevenueBilling(months)
+      .getRegistryDashRevenueBilling(lookbackHours, granularity)
       .pipe(
         tap((data) => {
           this.revenueBilling.set(data);

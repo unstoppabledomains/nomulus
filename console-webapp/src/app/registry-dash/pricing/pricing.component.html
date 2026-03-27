@@ -8,10 +8,13 @@
   }
 
   <div class="pricing-header">
-    <h2 class="mat-headline-6">Registrar Pricing Rules</h2>
-    <button mat-raised-button color="primary" (click)="openAddForm()">
-      <mat-icon>add</mat-icon> Add Rule
-    </button>
+    <div class="pricing-header-row">
+      <h2 class="mat-headline-6">Registrar Pricing Rules</h2>
+      <button mat-raised-button color="primary" (click)="openAddForm()">
+        <mat-icon>add</mat-icon> Add Rule
+      </button>
+    </div>
+    <p class="pricing-description">Custom pricing overrides for specific registrars. These rules take precedence over the default fee schedule (set on the Admin tab). When a registrar has a pricing rule for a given TLD and operation, the custom price is charged instead of the default.</p>
   </div>
 
   @if (showForm()) {
@@ -196,6 +199,10 @@
       <ng-container matColumnDef="effectiveDate">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Effective</th>
         <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'short' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="expiryDate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Expires</th>
+        <td mat-cell *matCellDef="let row">{{ row.expiryDate ? (row.expiryDate | date:'short') : 'Never' }}</td>
       </ng-container>
       <ng-container matColumnDef="isActive">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>

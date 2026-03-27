@@ -23,11 +23,8 @@
 
   <!-- Time Range Toggle -->
   <div class="time-range">
-    <mat-button-toggle-group [value]="selectedMonths()" (change)="onMonthsChange($event.value)">
-      <mat-button-toggle [value]="3">3m</mat-button-toggle>
-      <mat-button-toggle [value]="6">6m</mat-button-toggle>
-      <mat-button-toggle [value]="12">12m</mat-button-toggle>
-      <mat-button-toggle [value]="24">24m</mat-button-toggle>
+    <mat-button-toggle-group [value]="selectedRange()" (change)="onRangeChange($event.value)">
+      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">{{ key }}</mat-button-toggle>
     </mat-button-toggle-group>
   </div>
 

@@ -2,13 +2,23 @@
 
 .registry-dash-pricing {
   .pricing-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 1rem;
+
+    .pricing-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
     h2 {
       margin: 0;
+    }
+
+    .pricing-description {
+      margin: 0.25rem 0 0;
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 0.875rem;
+      line-height: 1.4;
     }
   }
 

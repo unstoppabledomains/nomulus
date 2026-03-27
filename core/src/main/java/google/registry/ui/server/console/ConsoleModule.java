@@ -240,6 +240,18 @@ public final class ConsoleModule {
   }
 
   @Provides
+  @Parameter("lookbackHours")
+  public static Optional<Integer> provideLookbackHours(HttpServletRequest req) {
+    return extractOptionalIntParameter(req, "lookbackHours");
+  }
+
+  @Provides
+  @Parameter("granularity")
+  public static Optional<String> provideGranularity(HttpServletRequest req) {
+    return extractOptionalParameter(req, "granularity");
+  }
+
+  @Provides
   @Parameter("totalResults")
   public static Optional<Long> provideTotalResults(HttpServletRequest req) {
     return extractOptionalParameter(req, "totalResults").map(Long::valueOf);
@@ -316,6 +328,9 @@ public final class ConsoleModule {
         e -> {
           JsonObject obj = e.getAsJsonObject();
           RegistryDashboardRegistrarPricing p = new RegistryDashboardRegistrarPricing();
+          if (obj.has("id") && !obj.get("id").isJsonNull()) {
+            p.setId(obj.get("id").getAsLong());
+          }
           if (obj.has("registrarId")) {
             p.setRegistrarId(obj.get("registrarId").getAsString());
           }
