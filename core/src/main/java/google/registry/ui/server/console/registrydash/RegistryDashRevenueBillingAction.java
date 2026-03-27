@@ -31,7 +31,8 @@ import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -109,8 +110,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     }
 
     int lookbackMonths = months.orElse(12);
-    Timestamp startDate =
-        Timestamp.from(ZonedDateTime.now(java.time.ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
+    Instant startDate =
+        ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant();
 
     tm().transact(
         () -> {
@@ -133,14 +134,14 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
           String currency = "USD";
 
           for (Object[] row : results) {
-            Timestamp month = (Timestamp) row[0];
+            Instant month = (Instant) row[0];
             String tld = (String) row[1];
             String operation = (String) row[2];
             BigDecimal amount = (BigDecimal) row[3];
             String cur = (String) row[4];
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("month", month.toLocalDateTime().toLocalDate().toString().substring(0, 7));
+            entry.put("month", month.atZone(ZoneOffset.UTC).toLocalDate().toString().substring(0, 7));
             entry.put("tld", tld);
             entry.put("operation", operation);
             entry.put("amount", amount);
