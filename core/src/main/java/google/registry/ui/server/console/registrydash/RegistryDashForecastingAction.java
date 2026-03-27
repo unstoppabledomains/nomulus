@@ -165,8 +165,9 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           }
 
           // Renewal rates — native SQL (history_type is a string column)
-          Instant startDate =
-              ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant();
+          java.sql.Timestamp startDate =
+              java.sql.Timestamp.from(
+                  ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant());
           @SuppressWarnings("unchecked")
           List<Object[]> renewalResults =
               isAdmin

@@ -110,8 +110,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     }
 
     int lookbackMonths = months.orElse(12);
-    Instant startDate =
-        ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant();
+    java.sql.Timestamp startDate =
+        java.sql.Timestamp.from(
+            ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
 
     tm().transact(
         () -> {
@@ -134,7 +135,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
           String currency = "USD";
 
           for (Object[] row : results) {
-            Instant month = (Instant) row[0];
+            java.sql.Timestamp monthTs = (java.sql.Timestamp) row[0];
+            Instant month = monthTs.toInstant();
             String tld = (String) row[1];
             String operation = (String) row[2];
             BigDecimal amount = (BigDecimal) row[3];
