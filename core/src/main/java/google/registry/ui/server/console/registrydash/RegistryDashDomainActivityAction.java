@@ -135,8 +135,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
     }
 
     int lookbackMonths = months.orElse(12);
-    Instant startDate =
-        ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant();
+    java.sql.Timestamp startDate =
+        java.sql.Timestamp.from(
+            ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
 
     tm().transact(
         () -> {
@@ -156,7 +157,8 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
 
           List<Map<String, Object>> activity = new ArrayList<>();
           for (Object[] row : activityResults) {
-            Instant period = (Instant) row[0];
+            java.sql.Timestamp periodTs = (java.sql.Timestamp) row[0];
+            Instant period = periodTs.toInstant();
             String tld = (String) row[1];
             String type = (String) row[2];
             Number count = (Number) row[3];
