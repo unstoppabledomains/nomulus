@@ -29,19 +29,23 @@ import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-d
   styleUrls: ['./pricing.component.scss'],
 })
 export class PricingComponent implements AfterViewInit {
-  displayedColumns = [
-    'registrarId',
-    'tld',
-    'operation',
-    'priceAmount',
-    'defaultPrice',
-    'difference',
-    'priceCurrency',
-    'effectiveDate',
-    'expiryDate',
-    'isActive',
-    'actions',
+  private static readonly MONEY_COLUMN_KEYS: Record<string, string> = {
+    priceAmount: 'pricing.priceAmount',
+    defaultPrice: 'pricing.defaultPrice',
+    difference: 'pricing.difference',
+  };
+
+  private static readonly ALL_COLUMNS = [
+    'registrarId', 'tld', 'operation', 'priceAmount', 'defaultPrice',
+    'difference', 'priceCurrency', 'effectiveDate', 'expiryDate', 'isActive', 'actions',
   ];
+
+  displayedColumns = computed(() => {
+    return PricingComponent.ALL_COLUMNS.filter(col => {
+      const key = PricingComponent.MONEY_COLUMN_KEYS[col];
+      return !key || this.dashService.isColumnVisible(key);
+    });
+  });
 
   @ViewChild(MatSort) sort!: MatSort;
   dataSource = new MatTableDataSource<PricingRule>([]);

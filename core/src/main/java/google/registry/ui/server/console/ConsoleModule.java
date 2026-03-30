@@ -420,7 +420,8 @@ public final class ConsoleModule {
               obj.has("registryName") ? obj.get("registryName").getAsString() : null,
               obj.has("tld") ? obj.get("tld").getAsString() : null,
               obj.has("userEmail") ? obj.get("userEmail").getAsString() : null,
-              obj.has("id") ? obj.get("id").getAsLong() : null);
+              obj.has("id") ? obj.get("id").getAsLong() : null,
+              obj.has("settings") ? obj.get("settings").getAsString() : null);
         });
   }
 }

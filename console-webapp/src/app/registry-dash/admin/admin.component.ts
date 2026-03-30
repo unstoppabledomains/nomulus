@@ -63,6 +63,21 @@ export class AdminComponent implements OnInit {
 
   operations = ['CREATE', 'RENEW', 'RESTORE', 'TRANSFER'];
 
+  // Column visibility settings
+  static readonly VISIBILITY_KEYS = [
+    { key: 'pricing.priceAmount', label: 'Pricing: Price' },
+    { key: 'pricing.defaultPrice', label: 'Pricing: Default Price' },
+    { key: 'pricing.difference', label: 'Pricing: Difference' },
+    { key: 'financials.registrarFee', label: 'Financials: Registrar Fee' },
+    { key: 'financials.rspCut', label: 'Financials: RSP Cut' },
+    { key: 'financials.costAmount', label: 'Financials: Net to Registry' },
+    { key: 'financials.registrarMarkup', label: 'Financials: Registrar Markup tab' },
+    { key: 'financials.revenueBilling', label: 'Financials: Revenue & Billing tab' },
+    { key: 'financials.avgFeeMetric', label: 'Financials: Avg Fee metric card' },
+  ];
+  visibilityKeys = AdminComponent.VISIBILITY_KEYS;
+  visibilityToggles = signal<Record<string, boolean>>({});
+
   constructor(public dashService: RegistryDashService) {}
 
   ngOnInit() {
@@ -92,6 +107,7 @@ export class AdminComponent implements OnInit {
 
   onSelectRegistry(registry: RoRegistry) {
     this.selectedRegistry.set(registry);
+    this.loadVisibilityToggles();
   }
 
   onAddTld() {
@@ -202,5 +218,41 @@ export class AdminComponent implements OnInit {
   onCancelCostBasis() {
     this.showCostBasisForm.set(false);
     this.editingCostBasis.set(undefined);
+  }
+
+  /** Load visibility toggles from the selected registry's settings. */
+  loadVisibilityToggles() {
+    const registry = this.selectedRegistry();
+    if (!registry) return;
+    try {
+      const settings = registry.settings ? JSON.parse(registry.settings) : {};
+      const cv = settings.columnVisibility ?? {};
+      // Default all keys to true if absent
+      const toggles: Record<string, boolean> = {};
+      for (const item of AdminComponent.VISIBILITY_KEYS) {
+        toggles[item.key] = cv[item.key] !== false;
+      }
+      this.visibilityToggles.set(toggles);
+    } catch {
+      this.visibilityToggles.set({});
+    }
+  }
+
+  onVisibilityToggle(key: string, checked: boolean) {
+    this.visibilityToggles.update(v => ({ ...v, [key]: checked }));
+  }
+
+  onSaveVisibility() {
+    const registry = this.selectedRegistry();
+    if (!registry?.id) return;
+    const toggles = this.visibilityToggles();
+    const columnVisibility: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(toggles)) {
+      if (!value) columnVisibility[key] = false;
+    }
+    const settings = JSON.stringify({ columnVisibility });
+    this.dashService.updateSettings(registry.id, settings).subscribe(() => {
+      this.refreshSelectedRegistry();
+    });
   }
 }

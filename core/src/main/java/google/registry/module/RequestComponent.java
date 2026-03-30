@@ -138,6 +138,7 @@ import google.registry.ui.server.console.registrydash.RegistryDashOverviewAction
 import google.registry.ui.server.console.registrydash.RegistryDashPortfolioAction;
 import google.registry.ui.server.console.registrydash.RegistryDashPricingAction;
 import google.registry.ui.server.console.registrydash.RegistryDashRevenueBillingAction;
+import google.registry.ui.server.console.registrydash.RegistryDashSettingsAction;
 import google.registry.ui.server.console.settings.ContactAction;
 import google.registry.ui.server.console.settings.RdapRegistrarFieldsAction;
 import google.registry.ui.server.console.settings.SecurityAction;
@@ -335,6 +336,8 @@ interface RequestComponent {
   RegistryDashDomainActivityAction registryDashDomainActivityAction();
 
   RegistryDashForecastingAction registryDashForecastingAction();
+
+  RegistryDashSettingsAction registryDashSettingsAction();
 
   RegistrarsAction registrarsAction();
 

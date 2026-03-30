@@ -121,3 +121,24 @@ h3 {
   width: 100%;
   padding-top: 8px;
 }
+
+.section-description {
+  font-size: 13px;
+  color: var(--ud-text-secondary);
+  margin-bottom: 12px;
+}
+
+.visibility-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.toggle-row {
+  padding: 4px 0;
+}
+
+.save-visibility-btn {
+  margin-top: 8px;
+}

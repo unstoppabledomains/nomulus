@@ -406,6 +406,22 @@ export class BackendService {
     return this.http.post('/console-api/registry-dash/admin', payload);
   }
 
+  // --- Registry Dashboard Settings ---
+
+  getRegistryDashSettings(): Observable<Record<string, any>> {
+    return this.http
+      .get<Record<string, any>>('/console-api/registry-dash/settings')
+      .pipe(catchError((err) => this.errorCatcher<Record<string, any>>(err)));
+  }
+
+  updateRegistryDashSettings(registryId: number, settings: string): Observable<unknown> {
+    return this.http.post('/console-api/registry-dash/admin', {
+      action: 'updateSettings',
+      registryId,
+      settings,
+    });
+  }
+
   // --- Registry Dashboard Analytics ---
 
   getRegistryDashRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {

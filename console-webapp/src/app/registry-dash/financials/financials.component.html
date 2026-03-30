@@ -24,7 +24,7 @@
         <div class="metric-label">Operation Types</div>
       </mat-card-content>
     </mat-card>
-    <mat-card class="metric-card">
+    <mat-card class="metric-card" *ngIf="dashService.isColumnVisible('financials.avgFeeMetric')">
       <mat-card-content>
         <div class="metric-value">{{ averageCost() | number:'1.2-2' }}</div>
         <div class="metric-label">Avg Fee / Operation</div>
@@ -115,8 +115,8 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
             <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
           </ng-container>
-          <tr mat-header-row *matHeaderRowDef="costBasisColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: costBasisColumns;"></tr>
+          <tr mat-header-row *matHeaderRowDef="costBasisColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: costBasisColumns();"></tr>
         </table>
 
         <div *ngIf="filteredEntries().length === 0 && !dashService.loading()" class="empty-state">
@@ -193,8 +193,8 @@
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
               <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
             </ng-container>
-            <tr mat-header-row *matHeaderRowDef="['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes']"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes'];"></tr>
+            <tr mat-header-row *matHeaderRowDef="byTldColumns()"></tr>
+            <tr mat-row *matRowDef="let row; columns: byTldColumns();"></tr>
           </table>
         </div>
 
@@ -206,7 +206,7 @@
     </mat-tab>
 
     <!-- Registrar Markup Tab -->
-    <mat-tab label="Registrar Markup">
+    <mat-tab label="Registrar Markup" *ngIf="dashService.isColumnVisible('financials.registrarMarkup')">
       <div class="tab-content">
         <p class="tab-description">Registrar pricing vs registry fees. Green = registrar charges above the registry fee. Red = registrar charges below the registry fee.</p>
 
@@ -247,7 +247,7 @@
     </mat-tab>
 
     <!-- Revenue & Billing Tab (ECharts) -->
-    <mat-tab label="Revenue & Billing">
+    <mat-tab label="Revenue & Billing" *ngIf="dashService.isColumnVisible('financials.revenueBilling')">
       <ng-template matTabContent>
         <app-revenue-billing></app-revenue-billing>
       </ng-template>

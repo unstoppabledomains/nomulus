@@ -88,6 +88,7 @@ CONSOLE  /console-api/registry-dash/overview                RegistryDashOverview
 CONSOLE  /console-api/registry-dash/portfolio               RegistryDashPortfolioAction                    GET                 n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/pricing                 RegistryDashPricingAction                      GET,POST,PUT        n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/revenue-billing         RegistryDashRevenueBillingAction               GET                 n  USER PUBLIC
+CONSOLE  /console-api/registry-dash/settings                RegistryDashSettingsAction                     GET                 n  USER PUBLIC
 CONSOLE  /console-api/registry-lock                         ConsoleRegistryLockAction                      GET,POST            n  USER PUBLIC
 CONSOLE  /console-api/registry-lock-verify                  ConsoleRegistryLockVerifyAction                GET                 n  USER PUBLIC
 CONSOLE  /console-api/settings/contacts                     ContactAction                                  GET,POST,DELETE,PUT n  USER PUBLIC

@@ -97,6 +97,22 @@
         </mat-chip>
       </mat-chip-set>
       <p *ngIf="selectedRegistry()!.users.length === 0" class="empty-state">No users assigned yet.</p>
+
+      <!-- Column Visibility Settings -->
+      <h3>Column Visibility</h3>
+      <p class="section-description">Toggle which dollar-value columns and tabs are visible for users of this registry.</p>
+      <div class="visibility-toggles">
+        <div *ngFor="let item of visibilityKeys" class="toggle-row">
+          <mat-slide-toggle
+            [checked]="visibilityToggles()[item.key] !== false"
+            (change)="onVisibilityToggle(item.key, $event.checked)">
+            {{ item.label }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+      <button mat-raised-button color="primary" (click)="onSaveVisibility()" class="save-visibility-btn">
+        Save Visibility Settings
+      </button>
     </mat-card-content>
   </mat-card>
 

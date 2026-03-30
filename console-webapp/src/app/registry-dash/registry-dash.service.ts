@@ -78,6 +78,7 @@ export interface RoRegistry {
   createdAt?: string;
   tlds: RoRegistryTld[];
   users: RoRegistryUser[];
+  settings?: string;
 }
 
 export interface SystemRegistrar {
@@ -155,6 +156,7 @@ export class RegistryDashService {
   revenueBilling = signal<RevenueBillingData | undefined>(undefined);
   domainActivity = signal<DomainActivityData | undefined>(undefined);
   forecasting = signal<ForecastingData | undefined>(undefined);
+  columnVisibility = signal<Record<string, boolean>>({});
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
@@ -176,6 +178,34 @@ export class RegistryDashService {
     this.error.set(msg);
     this.loading.set(false);
     return throwError(() => err);
+  }
+
+  /** Returns true if the given column key is visible. Absent key = visible. */
+  isColumnVisible(key: string): boolean {
+    return this.columnVisibility()[key] !== false;
+  }
+
+  getSettings(): Observable<Record<string, any>> {
+    return this.backend
+      .getRegistryDashSettings()
+      .pipe(
+        tap((settings) => {
+          this.columnVisibility.set(settings?.['columnVisibility'] ?? {});
+        }),
+        catchError((err) => this.handleError<Record<string, any>>(err))
+      );
+  }
+
+  updateSettings(registryId: number, settings: string): Observable<unknown> {
+    return this.backend.updateRegistryDashSettings(registryId, settings).pipe(
+      tap(() => {
+        try {
+          const parsed = JSON.parse(settings);
+          this.columnVisibility.set(parsed?.['columnVisibility'] ?? {});
+        } catch { /* ignore parse errors */ }
+      }),
+      catchError((err) => this.handleError<unknown>(err))
+    );
   }
 
   getOverview(): Observable<OverviewData> {

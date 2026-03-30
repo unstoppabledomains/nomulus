@@ -192,7 +192,31 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     }));
   });
 
-  costBasisColumns = ['tld', 'operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
+  private static readonly COST_MONEY_KEYS: Record<string, string> = {
+    registrarFee: 'financials.registrarFee',
+    rspCut: 'financials.rspCut',
+    costAmount: 'financials.costAmount',
+  };
+
+  private static readonly ALL_COST_COLUMNS = [
+    'tld', 'operation', 'registrarId', 'registrarFee', 'rspCut',
+    'costAmount', 'costCurrency', 'effectiveDate', 'notes',
+  ];
+
+  costBasisColumns = computed(() => {
+    return FinancialsComponent.ALL_COST_COLUMNS.filter(col => {
+      const key = FinancialsComponent.COST_MONEY_KEYS[col];
+      return !key || this.dashService.isColumnVisible(key);
+    });
+  });
+
+  byTldColumns = computed(() => {
+    const all = ['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes'];
+    return all.filter(col => {
+      const key = FinancialsComponent.COST_MONEY_KEYS[col];
+      return !key || this.dashService.isColumnVisible(key);
+    });
+  });
 
   constructor(public dashService: RegistryDashService) {
     // Sync filtered entries into dataSource
