@@ -103,7 +103,8 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private static final String ACTIVITY_15MIN_ALL =
       """
       SELECT date_trunc('hour', dtr.reporting_time)
-               + floor(extract(minute from dtr.reporting_time) / 15) * interval '15 minutes' AS period,
+               + floor(extract(minute from dtr.reporting_time) / 15)
+               * interval '15 minutes' AS period,
              dtr.tld,
              CASE
                WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
@@ -125,7 +126,8 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private static final String ACTIVITY_15MIN_SCOPED =
       """
       SELECT date_trunc('hour', dtr.reporting_time)
-               + floor(extract(minute from dtr.reporting_time) / 15) * interval '15 minutes' AS period,
+               + floor(extract(minute from dtr.reporting_time) / 15)
+               * interval '15 minutes' AS period,
              dtr.tld,
              CASE
                WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
