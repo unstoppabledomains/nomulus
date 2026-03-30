@@ -102,6 +102,7 @@ export class DomainActivityComponent implements OnInit {
     }
 
     const tlds = [...tldSet].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
     const types = [...typeSet].sort();
 
     const series = types.map(type => ({
@@ -114,7 +115,7 @@ export class DomainActivityComponent implements OnInit {
     return {
       tooltip: { trigger: 'axis' as const },
       legend: { data: types },
-      xAxis: { type: 'category' as const, data: tlds, axisLabel: { rotate: 30 } },
+      xAxis: { type: 'category' as const, data: tldLabels, axisLabel: { rotate: 30 } },
       yAxis: { type: 'value' as const },
       series,
     };
@@ -129,7 +130,7 @@ export class DomainActivityComponent implements OnInit {
 
     // Sort descending by count
     entries.sort((a, b) => b[1] - a[1]);
-    const tlds = entries.map(([tld]) => tld);
+    const tlds = entries.map(([tld]) => `.${tld}`);
     const counts = entries.map(([, count]) => count);
 
     return {

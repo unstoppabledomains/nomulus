@@ -113,10 +113,11 @@ export class RevenueBillingComponent implements OnInit {
     const periods = [...allPeriods].sort();
     const tlds = [...tldMap.keys()].sort();
 
+    const tldLabels = tlds.map(t => `.${t}`);
     const series = tlds.map((tld, i) => {
       const periodMap = tldMap.get(tld)!;
       return {
-        name: tld,
+        name: `.${tld}`,
         type: 'line' as const,
         stack: 'revenue',
         areaStyle: { opacity: 0.15 },
@@ -128,7 +129,7 @@ export class RevenueBillingComponent implements OnInit {
 
     return {
       tooltip: { trigger: 'axis' as const },
-      legend: { type: 'scroll' as const, bottom: 0, data: tlds },
+      legend: { type: 'scroll' as const, bottom: 0, data: tldLabels },
       xAxis: { type: 'category' as const, data: periods },
       yAxis: { type: 'value' as const },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],

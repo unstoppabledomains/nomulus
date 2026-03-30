@@ -255,11 +255,12 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
       data.get(pt.tld)!.set(pt.type, (data.get(pt.tld)!.get(pt.type) ?? 0) + pt.count);
     }
     const tlds = [...tldSet].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
     const types = [...typeSet].sort();
     return {
       tooltip: { trigger: 'axis' as const },
       legend: { data: types },
-      xAxis: { type: 'category' as const, data: tlds, axisLabel: { rotate: 30 } },
+      xAxis: { type: 'category' as const, data: tldLabels, axisLabel: { rotate: 30 } },
       yAxis: { type: 'value' as const },
       series: types.map(type => ({
         name: type,
@@ -283,13 +284,14 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     }
     const months = [...monthSet].sort();
     const tlds = [...tldMap.keys()].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
     return {
       tooltip: { trigger: 'axis' as const },
-      legend: { data: tlds },
+      legend: { data: tldLabels },
       xAxis: { type: 'category' as const, data: months },
       yAxis: { type: 'value' as const },
       series: tlds.map((tld, i) => ({
-        name: tld,
+        name: `.${tld}`,
         type: 'line' as const,
         stack: 'expirations',
         areaStyle: { opacity: 0.3 },

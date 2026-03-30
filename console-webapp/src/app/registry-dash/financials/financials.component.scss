@@ -1,6 +1,7 @@
 @use '../ud-mixins' as ud;
 
 .financials-container {
+  @include ud.header-help-icon;
   padding: 24px;
 
   h2 {

@@ -75,10 +75,11 @@ export class ForecastingComponent implements OnInit {
     const months = [...monthSet].sort();
     const tlds = [...tldMap.keys()].sort();
 
+    const tldLabels = tlds.map(t => `.${t}`);
     const series = tlds.map((tld, i) => {
       const monthMap = tldMap.get(tld)!;
       return {
-        name: tld,
+        name: `.${tld}`,
         type: 'line' as const,
         stack: 'expirations',
         areaStyle: { opacity: 0.3 },
@@ -90,7 +91,7 @@ export class ForecastingComponent implements OnInit {
 
     return {
       tooltip: { trigger: 'axis' as const },
-      legend: { data: tlds },
+      legend: { data: tldLabels },
       xAxis: { type: 'category' as const, data: months },
       yAxis: { type: 'value' as const },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],

@@ -55,6 +55,18 @@
   }
 }
 
+@mixin header-help-icon {
+  .header-help {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+    vertical-align: middle;
+    margin-left: 2px;
+    color: rgba(0, 0, 0, 0.38);
+    cursor: help;
+  }
+}
+
 @mixin status-badge($bg, $color) {
   padding: 2px 10px;
   border-radius: 100px;

@@ -93,7 +93,7 @@ export class OverviewComponent {
     const d = this.dashService.forecasting();
     if (!d || d.renewalRates.length === 0) return null;
     const sorted = [...d.renewalRates].sort((a, b) => b.renewalRate - a.renewalRate);
-    const tlds = sorted.map(r => r.tld);
+    const tlds = sorted.map(r => `.${r.tld}`);
     const rates = sorted.map(r => r.renewalRate);
     return {
       tooltip: {
