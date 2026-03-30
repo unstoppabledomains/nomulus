@@ -318,11 +318,11 @@ export class RegistryDashService {
       );
   }
 
-  getDomainActivity(months?: number, granularity?: string): Observable<DomainActivityData> {
+  getDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashDomainActivity(months, granularity)
+      .getRegistryDashDomainActivity(lookbackHours, granularity)
       .pipe(
         tap((data) => {
           this.domainActivity.set(data);
@@ -332,11 +332,11 @@ export class RegistryDashService {
       );
   }
 
-  getForecasting(months?: number): Observable<ForecastingData> {
+  getForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashForecasting(months)
+      .getRegistryDashForecasting(lookbackHours, granularity)
       .pipe(
         tap((data) => {
           this.forecasting.set(data);

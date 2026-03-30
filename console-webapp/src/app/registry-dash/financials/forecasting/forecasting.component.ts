@@ -18,6 +18,7 @@ import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
+import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
 
 const TLD_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -33,7 +34,8 @@ const TLD_COLORS = [
   styleUrls: ['./forecasting.component.scss'],
 })
 export class ForecastingComponent implements OnInit {
-  selectedMonths = signal(12);
+  selectedRange = signal('12m');
+  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.forecasting());
 
@@ -143,10 +145,13 @@ export class ForecastingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedMonths changes
+    // Refetch when selectedRange changes
     effect(() => {
-      const months = this.selectedMonths();
-      this.dashService.getForecasting(months).subscribe();
+      const range = this.selectedRange();
+      const config = RANGE_CONFIG[range];
+      if (config) {
+        this.dashService.getForecasting(config.lookbackHours, config.granularity).subscribe();
+      }
     });
     // Fetch domain activity data for net growth chart
     this.dashService.getDomainActivity().subscribe();
@@ -156,7 +161,7 @@ export class ForecastingComponent implements OnInit {
     // Initial fetch is handled by the effect above
   }
 
-  onMonthsChange(months: number) {
-    this.selectedMonths.set(months);
+  onRangeChange(range: string) {
+    this.selectedRange.set(range);
   }
 }

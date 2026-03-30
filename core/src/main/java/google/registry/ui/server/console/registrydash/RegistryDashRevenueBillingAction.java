@@ -188,7 +188,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
 
     Instant startInstant = ZonedDateTime.now(clock)
         .minus(hoursBack, ChronoUnit.HOURS).toInstant();
-    java.sql.Timestamp startDate = java.sql.Timestamp.from(startInstant);
+    Instant startDate = startInstant;
 
     String resolvedGran = gran;
     tm().transact(

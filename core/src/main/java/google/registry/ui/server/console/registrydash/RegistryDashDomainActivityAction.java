@@ -33,11 +33,13 @@ import jakarta.inject.Inject;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Returns domain transaction activity data for the registry dashboard. */
 @Action(
@@ -49,13 +51,17 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/domain-activity";
 
-  private static final String ACTIVITY_ALL =
+  private static final Set<String> VALID_GRANULARITIES = Set.of("15min", "hour", "day", "month");
+
+  // --- Standard granularity SQL (hour, day, month) ---
+
+  private static final String ACTIVITY_ALL_TEMPLATE =
       """
-      SELECT date_trunc('month', dtr.reporting_time) AS period,
+      SELECT date_trunc('%s', dtr.reporting_time) AS period,
              dtr.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
+               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
+               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
                WHEN dtr.report_field IN (
                  'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
@@ -70,13 +76,60 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       ORDER BY period, dtr.tld
       """;
 
-  private static final String ACTIVITY_SCOPED =
+  private static final String ACTIVITY_SCOPED_TEMPLATE =
       """
-      SELECT date_trunc('month', dtr.reporting_time) AS period,
+      SELECT date_trunc('%s', dtr.reporting_time) AS period,
              dtr.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%' THEN 'RENEWS'
+               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
+               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
+               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
+               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               ELSE 'OTHER'
+             END AS activity_type,
+             SUM(dtr.report_amount) AS total_count
+      FROM "DomainTransactionRecord" dtr
+      WHERE dtr.reporting_time >= :startDate
+        AND dtr.tld IN :tlds
+      GROUP BY period, dtr.tld, activity_type
+      ORDER BY period, dtr.tld
+      """;
+
+  // --- 15-minute bucket SQL ---
+
+  private static final String ACTIVITY_15MIN_ALL =
+      """
+      SELECT date_trunc('hour', dtr.reporting_time)
+               + floor(extract(minute from dtr.reporting_time) / 15) * interval '15 minutes' AS period,
+             dtr.tld,
+             CASE
+               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
+               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
+               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
+               WHEN dtr.report_field IN (
+                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
+               ) THEN 'DELETES'
+               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               ELSE 'OTHER'
+             END AS activity_type,
+             SUM(dtr.report_amount) AS total_count
+      FROM "DomainTransactionRecord" dtr
+      WHERE dtr.reporting_time >= :startDate
+      GROUP BY period, dtr.tld, activity_type
+      ORDER BY period, dtr.tld
+      """;
+
+  private static final String ACTIVITY_15MIN_SCOPED =
+      """
+      SELECT date_trunc('hour', dtr.reporting_time)
+               + floor(extract(minute from dtr.reporting_time) / 15) * interval '15 minutes' AS period,
+             dtr.tld,
+             CASE
+               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
+               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
                WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
                WHEN dtr.report_field IN (
                  'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
@@ -108,13 +161,19 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       """;
 
   private final Optional<Integer> months;
+  private final Optional<Integer> lookbackHours;
+  private final Optional<String> granularity;
 
   @Inject
   public RegistryDashDomainActivityAction(
       ConsoleApiParams consoleApiParams,
-      @Parameter("months") Optional<Integer> months) {
+      @Parameter("months") Optional<Integer> months,
+      @Parameter("lookbackHours") Optional<Integer> lookbackHours,
+      @Parameter("granularity") Optional<String> granularity) {
     super(consoleApiParams);
     this.months = months;
+    this.lookbackHours = lookbackHours;
+    this.granularity = granularity;
   }
 
   @Override
@@ -137,39 +196,64 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       return;
     }
 
-    int lookbackMonths = months.orElse(12);
-    java.sql.Timestamp startDate =
-        java.sql.Timestamp.from(
-            ZonedDateTime.now(ZoneOffset.UTC).minusMonths(lookbackMonths).toInstant());
+    // Resolve lookback period: prefer lookbackHours, fall back to months param
+    int hoursBack;
+    if (lookbackHours.isPresent()) {
+      hoursBack = Math.max(1, Math.min(lookbackHours.get(), 17520));
+    } else {
+      int lookbackMonths = months.orElse(12);
+      hoursBack = lookbackMonths * 730;
+    }
 
+    // Resolve and validate granularity
+    String gran = granularity.orElse("month");
+    if (!VALID_GRANULARITIES.contains(gran)) {
+      gran = "month";
+    }
+
+    Instant startDate = ZonedDateTime.now(ZoneOffset.UTC)
+        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
+
+    String resolvedGran = gran;
     tm().transact(
         () -> {
+          String sql = buildSql(resolvedGran, isAdmin);
+
           // Activity data from DomainTransactionRecord
           @SuppressWarnings("unchecked")
-          List<Object[]> activityResults =
-              isAdmin
-                  ? tm().getEntityManager()
-                      .createNativeQuery(ACTIVITY_ALL)
-                      .setParameter("startDate", startDate)
-                      .getResultList()
-                  : tm().getEntityManager()
-                      .createNativeQuery(ACTIVITY_SCOPED)
-                      .setParameter("startDate", startDate)
-                      .setParameter("tlds", tlds)
-                      .getResultList();
+          List<Object[]> activityResults;
+          if (isAdmin) {
+            activityResults = tm().getEntityManager()
+                .createNativeQuery(sql)
+                .setParameter("startDate", startDate)
+                .getResultList();
+          } else {
+            activityResults = tm().getEntityManager()
+                .createNativeQuery(sql)
+                .setParameter("startDate", startDate)
+                .setParameter("tlds", tlds)
+                .getResultList();
+          }
 
           List<Map<String, Object>> activity = new ArrayList<>();
           for (Object[] row : activityResults) {
-            java.sql.Timestamp periodTs = (java.sql.Timestamp) row[0];
-            Instant period = periodTs.toInstant();
+            Instant period;
+            Object periodRaw = row[0];
+            if (periodRaw instanceof java.sql.Timestamp ts) {
+              period = ts.toInstant();
+            } else if (periodRaw instanceof Instant inst) {
+              period = inst;
+            } else if (periodRaw instanceof java.time.OffsetDateTime odt) {
+              period = odt.toInstant();
+            } else {
+              period = Instant.parse(periodRaw.toString());
+            }
             String tld = (String) row[1];
             String type = (String) row[2];
             Number count = (Number) row[3];
 
             Map<String, Object> entry = new HashMap<>();
-            String monthStr = period.atZone(ZoneOffset.UTC)
-                .toLocalDate().toString().substring(0, 7);
-            entry.put("period", monthStr);
+            entry.put("period", formatPeriod(period, resolvedGran));
             entry.put("tld", tld);
             entry.put("type", type);
             entry.put("count", count.longValue());
@@ -200,5 +284,25 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
           consoleApiParams.response().setStatus(SC_OK);
         });
+  }
+
+  private static String buildSql(String granularity, boolean isAdmin) {
+    if ("15min".equals(granularity)) {
+      return isAdmin ? ACTIVITY_15MIN_ALL : ACTIVITY_15MIN_SCOPED;
+    }
+    // For hour, day, month — use the template with String.format
+    // These values are from a validated allowlist, safe to interpolate
+    return isAdmin
+        ? String.format(ACTIVITY_ALL_TEMPLATE, granularity)
+        : String.format(ACTIVITY_SCOPED_TEMPLATE, granularity);
+  }
+
+  private static String formatPeriod(Instant instant, String granularity) {
+    ZonedDateTime zdt = instant.atZone(ZoneOffset.UTC);
+    return switch (granularity) {
+      case "month" -> zdt.toLocalDate().toString().substring(0, 7);
+      case "day" -> zdt.toLocalDate().toString();
+      default -> instant.toString();
+    };
   }
 }

@@ -418,9 +418,9 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<RevenueBillingData>(err)));
   }
 
-  getRegistryDashDomainActivity(months?: number, granularity?: string): Observable<DomainActivityData> {
+  getRegistryDashDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
     const parts: string[] = [];
-    if (months) parts.push(`months=${months}`);
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
     if (granularity) parts.push(`granularity=${granularity}`);
     const params = parts.length > 0 ? `?${parts.join('&')}` : '';
     return this.http
@@ -428,8 +428,11 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<DomainActivityData>(err)));
   }
 
-  getRegistryDashForecasting(months?: number): Observable<ForecastingData> {
-    const params = months ? `?months=${months}` : '';
+  getRegistryDashForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
     return this.http
       .get<ForecastingData>(`/console-api/registry-dash/forecasting${params}`)
       .pipe(catchError((err) => this.errorCatcher<ForecastingData>(err)));

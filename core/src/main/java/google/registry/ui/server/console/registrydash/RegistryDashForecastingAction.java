@@ -32,13 +32,16 @@ import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Returns domain expiration forecasting and renewal rate data for the registry dashboard. */
 @Action(
@@ -50,30 +53,67 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/forecasting";
 
-  private static final String EXPIRATION_CURVE_ALL =
+  private static final Set<String> VALID_GRANULARITIES = Set.of("15min", "hour", "day", "month");
+
+  // --- Expiration curve: standard granularity (hour, day, month) via JPQL ---
+
+  private static final String EXPIRATION_CURVE_ALL_TEMPLATE =
       """
-      SELECT date_trunc('month', d.registrationExpirationTime) AS exp_month,
+      SELECT date_trunc('%s', d.registrationExpirationTime) AS exp_period,
              d.tld, COUNT(d) AS domain_count
       FROM Domain d
       WHERE d.deletionTime > CURRENT_TIMESTAMP
         AND d.registrationExpirationTime > CURRENT_TIMESTAMP
         AND d.registrationExpirationTime < :endDate
-      GROUP BY exp_month, d.tld
-      ORDER BY exp_month
+      GROUP BY exp_period, d.tld
+      ORDER BY exp_period
       """;
 
-  private static final String EXPIRATION_CURVE_SCOPED =
+  private static final String EXPIRATION_CURVE_SCOPED_TEMPLATE =
       """
-      SELECT date_trunc('month', d.registrationExpirationTime) AS exp_month,
+      SELECT date_trunc('%s', d.registrationExpirationTime) AS exp_period,
              d.tld, COUNT(d) AS domain_count
       FROM Domain d
       WHERE d.deletionTime > CURRENT_TIMESTAMP
         AND d.registrationExpirationTime > CURRENT_TIMESTAMP
         AND d.registrationExpirationTime < :endDate
         AND d.tld IN :tlds
-      GROUP BY exp_month, d.tld
-      ORDER BY exp_month
+      GROUP BY exp_period, d.tld
+      ORDER BY exp_period
       """;
+
+  // --- Expiration curve: 15-minute buckets via native SQL ---
+
+  private static final String EXPIRATION_CURVE_15MIN_ALL =
+      """
+      SELECT date_trunc('hour', d.registration_expiration_time)
+               + floor(extract(minute from d.registration_expiration_time) / 15)
+                 * interval '15 minutes' AS exp_period,
+             d.tld, COUNT(*) AS domain_count
+      FROM "Domain" d
+      WHERE d.deletion_time > CURRENT_TIMESTAMP
+        AND d.registration_expiration_time > CURRENT_TIMESTAMP
+        AND d.registration_expiration_time < :endDate
+      GROUP BY exp_period, d.tld
+      ORDER BY exp_period
+      """;
+
+  private static final String EXPIRATION_CURVE_15MIN_SCOPED =
+      """
+      SELECT date_trunc('hour', d.registration_expiration_time)
+               + floor(extract(minute from d.registration_expiration_time) / 15)
+                 * interval '15 minutes' AS exp_period,
+             d.tld, COUNT(*) AS domain_count
+      FROM "Domain" d
+      WHERE d.deletion_time > CURRENT_TIMESTAMP
+        AND d.registration_expiration_time > CURRENT_TIMESTAMP
+        AND d.registration_expiration_time < :endDate
+        AND d.tld IN :tlds
+      GROUP BY exp_period, d.tld
+      ORDER BY exp_period
+      """;
+
+  // --- Renewal rates (always looks back 12 months) ---
 
   private static final String RENEWAL_RATES_NATIVE_ALL =
       """
@@ -103,13 +143,19 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
       """;
 
   private final Optional<Integer> months;
+  private final Optional<Integer> lookbackHours;
+  private final Optional<String> granularity;
 
   @Inject
   public RegistryDashForecastingAction(
       ConsoleApiParams consoleApiParams,
-      @Parameter("months") Optional<Integer> months) {
+      @Parameter("months") Optional<Integer> months,
+      @Parameter("lookbackHours") Optional<Integer> lookbackHours,
+      @Parameter("granularity") Optional<String> granularity) {
     super(consoleApiParams);
     this.months = months;
+    this.lookbackHours = lookbackHours;
+    this.granularity = granularity;
   }
 
   @Override
@@ -132,44 +178,93 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
       return;
     }
 
-    int forecastMonths = months.orElse(12);
+    // Resolve forecast horizon: prefer lookbackHours (used as forward horizon), fall back to months
+    int hoursForward;
+    if (lookbackHours.isPresent()) {
+      hoursForward = Math.max(1, Math.min(lookbackHours.get(), 17520));
+    } else {
+      int forecastMonths = months.orElse(12);
+      hoursForward = forecastMonths * 730;
+    }
+
+    // Resolve and validate granularity
+    String gran = granularity.orElse("month");
+    if (!VALID_GRANULARITIES.contains(gran)) {
+      gran = "month";
+    }
+
+    String resolvedGran = gran;
+    boolean use15min = "15min".equals(resolvedGran);
 
     tm().transact(
         () -> {
-          // Expiration curve — uses JPQL (date_trunc works on DateTime via Hibernate)
-          org.joda.time.DateTime endDate =
-              org.joda.time.DateTime.now(org.joda.time.DateTimeZone.UTC)
-                  .plusMonths(forecastMonths);
+          // Expiration curve
+          ZonedDateTime endZdt = ZonedDateTime.now(ZoneOffset.UTC)
+              .plus(hoursForward, ChronoUnit.HOURS);
+
           @SuppressWarnings("unchecked")
-          List<Object[]> expirationResults =
-              isAdmin
-                  ? tm().getEntityManager()
-                      .createQuery(EXPIRATION_CURVE_ALL)
-                      .setParameter("endDate", endDate)
-                      .getResultList()
-                  : tm().getEntityManager()
-                      .createQuery(EXPIRATION_CURVE_SCOPED)
-                      .setParameter("endDate", endDate)
-                      .setParameter("tlds", tlds)
-                      .getResultList();
+          List<Object[]> expirationResults;
+          if (use15min) {
+            // Native SQL for 15-minute buckets
+            Instant endInstant = endZdt.toInstant();
+            if (isAdmin) {
+              expirationResults = tm().getEntityManager()
+                  .createNativeQuery(EXPIRATION_CURVE_15MIN_ALL)
+                  .setParameter("endDate", endInstant)
+                  .getResultList();
+            } else {
+              expirationResults = tm().getEntityManager()
+                  .createNativeQuery(EXPIRATION_CURVE_15MIN_SCOPED)
+                  .setParameter("endDate", endInstant)
+                  .setParameter("tlds", tlds)
+                  .getResultList();
+            }
+          } else {
+            // JPQL for standard granularities (hour, day, month)
+            String jpqlAll = String.format(EXPIRATION_CURVE_ALL_TEMPLATE, resolvedGran);
+            String jpqlScoped = String.format(EXPIRATION_CURVE_SCOPED_TEMPLATE, resolvedGran);
+            org.joda.time.DateTime endDate =
+                org.joda.time.DateTime.now(org.joda.time.DateTimeZone.UTC)
+                    .plusHours(hoursForward);
+            if (isAdmin) {
+              expirationResults = tm().getEntityManager()
+                  .createQuery(jpqlAll)
+                  .setParameter("endDate", endDate)
+                  .getResultList();
+            } else {
+              expirationResults = tm().getEntityManager()
+                  .createQuery(jpqlScoped)
+                  .setParameter("endDate", endDate)
+                  .setParameter("tlds", tlds)
+                  .getResultList();
+            }
+          }
 
           List<Map<String, Object>> expirationCurve = new ArrayList<>();
           for (Object[] row : expirationResults) {
-            Object monthVal = row[0];
+            Instant periodInstant;
+            Object periodRaw = row[0];
+            if (periodRaw instanceof java.sql.Timestamp ts) {
+              periodInstant = ts.toInstant();
+            } else if (periodRaw instanceof Instant inst) {
+              periodInstant = inst;
+            } else if (periodRaw instanceof java.time.OffsetDateTime odt) {
+              periodInstant = odt.toInstant();
+            } else {
+              periodInstant = Instant.parse(periodRaw.toString());
+            }
             String tld = (String) row[1];
-            long count = (Long) row[2];
+            long count = ((Number) row[2]).longValue();
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("month", monthVal.toString().substring(0, 7));
+            entry.put("month", formatPeriod(periodInstant, resolvedGran));
             entry.put("tld", tld);
             entry.put("count", count);
             expirationCurve.add(entry);
           }
 
-          // Renewal rates — native SQL (history_type is a string column)
-          java.sql.Timestamp startDate =
-              java.sql.Timestamp.from(
-                  ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant());
+          // Renewal rates — native SQL, always looks back 12 months
+          Instant startDate = ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant();
           @SuppressWarnings("unchecked")
           List<Object[]> renewalResults =
               isAdmin
@@ -209,5 +304,14 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
           consoleApiParams.response().setStatus(SC_OK);
         });
+  }
+
+  private static String formatPeriod(Instant instant, String granularity) {
+    ZonedDateTime zdt = instant.atZone(ZoneOffset.UTC);
+    return switch (granularity) {
+      case "month" -> zdt.toLocalDate().toString().substring(0, 7);
+      case "day" -> zdt.toLocalDate().toString();
+      default -> instant.toString();
+    };
   }
 }
