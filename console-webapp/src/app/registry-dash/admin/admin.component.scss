@@ -139,6 +139,9 @@ h3 {
   padding: 4px 0;
 }
 
-.save-visibility-btn {
+.visibility-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
   margin-top: 8px;
 }

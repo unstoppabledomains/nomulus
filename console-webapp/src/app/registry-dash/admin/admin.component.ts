@@ -76,6 +76,11 @@ export class AdminComponent implements OnInit {
     { key: 'financials.avgFeeMetric', label: 'Financials: Avg Fee metric card' },
   ];
   visibilityKeys = AdminComponent.VISIBILITY_KEYS;
+
+  // My View — FTE session-only toggles (not persisted, not per-registry)
+  myViewToggles = signal<Record<string, boolean>>({});
+
+  // Per-registry policy toggles (persisted to DB)
   visibilityToggles = signal<Record<string, boolean>>({});
 
   constructor(public dashService: RegistryDashService) {}
@@ -83,6 +88,35 @@ export class AdminComponent implements OnInit {
   ngOnInit() {
     this.dashService.getAdminData().subscribe();
     this.dashService.getCostBasis().subscribe();
+    this.loadMyViewToggles();
+  }
+
+  // --- My View (FTE session-only) ---
+
+  /** Load My View toggles from the current session state. */
+  private loadMyViewToggles() {
+    const cv = this.dashService.columnVisibility();
+    const toggles: Record<string, boolean> = {};
+    for (const item of AdminComponent.VISIBILITY_KEYS) {
+      toggles[item.key] = cv[item.key] !== false;
+    }
+    this.myViewToggles.set(toggles);
+  }
+
+  onMyViewToggle(key: string, checked: boolean) {
+    this.myViewToggles.update(v => ({ ...v, [key]: checked }));
+    // Apply to session immediately
+    const toggles = this.myViewToggles();
+    const cv: Record<string, boolean> = {};
+    for (const [k, value] of Object.entries(toggles)) {
+      if (!value) cv[k] = false;
+    }
+    this.dashService.columnVisibility.set(cv);
+  }
+
+  onResetMyView() {
+    this.dashService.columnVisibility.set({ ...RegistryDashService.DEFAULT_VISIBILITY });
+    this.loadMyViewToggles();
   }
 
   onCreateRegistry() {
@@ -220,14 +254,15 @@ export class AdminComponent implements OnInit {
     this.editingCostBasis.set(undefined);
   }
 
-  /** Load visibility toggles from the selected registry's settings. */
+  // --- Per-Registry Policy (persisted to DB) ---
+
+  /** Load per-registry visibility toggles from the registry's persisted settings (merged with defaults). */
   loadVisibilityToggles() {
     const registry = this.selectedRegistry();
     if (!registry) return;
     try {
       const settings = registry.settings ? JSON.parse(registry.settings) : {};
-      const cv = settings.columnVisibility ?? {};
-      // Default all keys to true if absent
+      const cv = { ...RegistryDashService.DEFAULT_VISIBILITY, ...(settings.columnVisibility ?? {}) };
       const toggles: Record<string, boolean> = {};
       for (const item of AdminComponent.VISIBILITY_KEYS) {
         toggles[item.key] = cv[item.key] !== false;

@@ -156,7 +156,13 @@ export class RegistryDashService {
   revenueBilling = signal<RevenueBillingData | undefined>(undefined);
   domainActivity = signal<DomainActivityData | undefined>(undefined);
   forecasting = signal<ForecastingData | undefined>(undefined);
-  columnVisibility = signal<Record<string, boolean>>({});
+  /** Default visibility — Registrar Fee and RSP Cut hidden by default. */
+  static readonly DEFAULT_VISIBILITY: Record<string, boolean> = {
+    'financials.registrarFee': false,
+    'financials.rspCut': false,
+  };
+
+  columnVisibility = signal<Record<string, boolean>>({ ...RegistryDashService.DEFAULT_VISIBILITY });
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
@@ -190,7 +196,9 @@ export class RegistryDashService {
       .getRegistryDashSettings()
       .pipe(
         tap((settings) => {
-          this.columnVisibility.set(settings?.['columnVisibility'] ?? {});
+          const cv = settings?.['columnVisibility'] ?? {};
+          // Merge: defaults first, then explicit settings override
+          this.columnVisibility.set({ ...RegistryDashService.DEFAULT_VISIBILITY, ...cv });
         }),
         catchError((err) => this.handleError<Record<string, any>>(err))
       );

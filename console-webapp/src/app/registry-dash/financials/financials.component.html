@@ -36,7 +36,56 @@
     <!-- Overview Tab -->
     <mat-tab label="Overview">
       <ng-template matTabContent>
-        <app-registry-dash-overview></app-registry-dash-overview>
+        <div class="tab-content overview-tab">
+          <!-- Overview Metric Cards -->
+          <div class="metric-cards" *ngIf="dashService.revenueBilling() || dashService.domainActivity() || dashService.forecasting()">
+            <mat-card class="metric-card" *ngIf="dashService.isColumnVisible('financials.revenueBilling')">
+              <mat-card-content>
+                <div class="metric-value">{{ overviewTotalRevenue() | number:'1.2-2' }} {{ overviewCurrency() }}</div>
+                <div class="metric-label">Total Revenue (12m)</div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-value" [class.positive]="overviewNetGrowth() >= 0" [class.negative]="overviewNetGrowth() < 0">
+                  {{ overviewNetGrowth() >= 0 ? '+' : '' }}{{ overviewNetGrowth() | number }}
+                </div>
+                <div class="metric-label">Net Domain Growth (12m)</div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-value">{{ overviewAvgRenewalRate() | number:'1.1-1' }}%</div>
+                <div class="metric-label">Avg Renewal Rate</div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+
+          <!-- Overview Charts -->
+          <div class="charts-row" *ngIf="overviewRevenueByOpOptions() && dashService.isColumnVisible('financials.revenueBilling')">
+            <div class="chart-container">
+              <h3>Revenue by Operation</h3>
+              <div echarts [options]="overviewRevenueByOpOptions()!" [theme]="'ud-brand'" class="chart"></div>
+            </div>
+          </div>
+          <div class="charts-row" *ngIf="overviewActivityByTldOptions()">
+            <div class="chart-container">
+              <h3>Domain Activity by TLD</h3>
+              <div echarts [options]="overviewActivityByTldOptions()!" [theme]="'ud-brand'" class="chart"></div>
+            </div>
+          </div>
+          <div class="charts-row" *ngIf="overviewExpirationsOptions()">
+            <div class="chart-container">
+              <h3>Upcoming Domain Expirations</h3>
+              <div echarts [options]="overviewExpirationsOptions()!" [theme]="'ud-brand'" class="chart"></div>
+            </div>
+          </div>
+
+          <div *ngIf="!dashService.revenueBilling() && !dashService.domainActivity() && !dashService.forecasting() && !dashService.loading()" class="empty-state">
+            <mat-icon>info</mat-icon>
+            <p>No financial data available yet.</p>
+          </div>
+        </div>
       </ng-template>
     </mat-tab>
 

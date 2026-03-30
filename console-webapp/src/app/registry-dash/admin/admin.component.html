@@ -9,6 +9,26 @@
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
+  <!-- My View — FTE session-only column visibility -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>My View</mat-card-title>
+      <mat-card-subtitle>Session-only toggles that control what you see on Pricing and Financials tabs. Not persisted — resets on page reload.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="visibility-toggles">
+        <div *ngFor="let item of visibilityKeys" class="toggle-row">
+          <mat-slide-toggle
+            [checked]="myViewToggles()[item.key] !== false"
+            (change)="onMyViewToggle(item.key, $event.checked)">
+            {{ item.label }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+      <button mat-button (click)="onResetMyView()">Reset to All Visible</button>
+    </mat-card-content>
+  </mat-card>
+
   <!-- Registries Section -->
   <mat-card class="admin-card">
     <mat-card-header>
@@ -98,9 +118,9 @@
       </mat-chip-set>
       <p *ngIf="selectedRegistry()!.users.length === 0" class="empty-state">No users assigned yet.</p>
 
-      <!-- Column Visibility Settings -->
-      <h3>Column Visibility</h3>
-      <p class="section-description">Toggle which dollar-value columns and tabs are visible for users of this registry.</p>
+      <!-- Column Visibility Policy (per-registry, persisted) -->
+      <h3>Column Visibility Policy</h3>
+      <p class="section-description">Controls what non-FTE users of this registry can see. Saved to the database.</p>
       <div class="visibility-toggles">
         <div *ngFor="let item of visibilityKeys" class="toggle-row">
           <mat-slide-toggle
@@ -110,9 +130,11 @@
           </mat-slide-toggle>
         </div>
       </div>
-      <button mat-raised-button color="primary" (click)="onSaveVisibility()" class="save-visibility-btn">
-        Save Visibility Settings
-      </button>
+      <div class="visibility-actions">
+        <button mat-raised-button color="primary" (click)="onSaveVisibility()">
+          Save for Registry Users
+        </button>
+      </div>
     </mat-card-content>
   </mat-card>
 
