@@ -18,6 +18,7 @@ import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
+import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
 
 const TLD_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -33,7 +34,8 @@ const TLD_COLORS = [
   styleUrls: ['./forecasting.component.scss'],
 })
 export class ForecastingComponent implements OnInit {
-  selectedMonths = signal(12);
+  selectedRange = signal('12m');
+  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.forecasting());
 
@@ -73,10 +75,11 @@ export class ForecastingComponent implements OnInit {
     const months = [...monthSet].sort();
     const tlds = [...tldMap.keys()].sort();
 
+    const tldLabels = tlds.map(t => `.${t}`);
     const series = tlds.map((tld, i) => {
       const monthMap = tldMap.get(tld)!;
       return {
-        name: tld,
+        name: `.${tld}`,
         type: 'line' as const,
         stack: 'expirations',
         areaStyle: { opacity: 0.3 },
@@ -88,7 +91,7 @@ export class ForecastingComponent implements OnInit {
 
     return {
       tooltip: { trigger: 'axis' as const },
-      legend: { data: tlds },
+      legend: { data: tldLabels },
       xAxis: { type: 'category' as const, data: months },
       yAxis: { type: 'value' as const },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
@@ -143,10 +146,13 @@ export class ForecastingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedMonths changes
+    // Refetch when selectedRange changes
     effect(() => {
-      const months = this.selectedMonths();
-      this.dashService.getForecasting(months).subscribe();
+      const range = this.selectedRange();
+      const config = RANGE_CONFIG[range];
+      if (config) {
+        this.dashService.getForecasting(config.lookbackHours, config.granularity).subscribe();
+      }
     });
     // Fetch domain activity data for net growth chart
     this.dashService.getDomainActivity().subscribe();
@@ -156,7 +162,7 @@ export class ForecastingComponent implements OnInit {
     // Initial fetch is handled by the effect above
   }
 
-  onMonthsChange(months: number) {
-    this.selectedMonths.set(months);
+  onRangeChange(range: string) {
+    this.selectedRange.set(range);
   }
 }

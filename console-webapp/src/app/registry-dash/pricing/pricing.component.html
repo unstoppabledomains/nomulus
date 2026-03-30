@@ -14,7 +14,7 @@
         <mat-icon>add</mat-icon> Add Rule
       </button>
     </div>
-    <p class="pricing-description">Custom pricing overrides for specific registrars. These rules take precedence over the default fee schedule (set on the Admin tab). When a registrar has a pricing rule for a given TLD and operation, the custom price is charged instead of the default.</p>
+    <p class="pricing-description">Custom pricing overrides for specific registrars. These rules take precedence over the Nomulus TLD default price. When a registrar has a pricing rule for a given TLD and operation, the custom price is charged instead of the Nomulus default. Hover over column headers for details.</p>
   </div>
 
   @if (showForm()) {
@@ -45,7 +45,7 @@
                 } @else {
                   <mat-select formControlName="tld">
                     @for (tld of availableTlds(); track tld) {
-                      <mat-option [value]="tld">{{ tld }}</mat-option>
+                      <mat-option [value]="tld">.{{ tld }}</mat-option>
                     }
                   </mat-select>
                 }
@@ -147,7 +147,7 @@
       <mat-select [value]="filterTld()" (selectionChange)="filterTld.set($event.value)">
         <mat-option value="all">All TLDs</mat-option>
         @for (tld of uniqueTlds(); track tld) {
-          <mat-option [value]="tld">{{ tld }}</mat-option>
+          <mat-option [value]="tld">.{{ tld }}</mat-option>
         }
       </mat-select>
     </mat-form-field>
@@ -166,24 +166,24 @@
       </ng-container>
       <ng-container matColumnDef="tld">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>TLD</th>
-        <td mat-cell *matCellDef="let row">{{ row.tld }}</td>
+        <td mat-cell *matCellDef="let row">.{{ row.tld }}</td>
       </ng-container>
       <ng-container matColumnDef="operation">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
         <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
       </ng-container>
       <ng-container matColumnDef="priceAmount">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Price</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Price <mat-icon class="header-help" matTooltip="The custom price this registrar pays for this TLD/operation. Overrides the Nomulus default.">help_outline</mat-icon></th>
         <td mat-cell *matCellDef="let row">{{ row.priceAmount | number:'1.2-2' }}</td>
       </ng-container>
       <ng-container matColumnDef="defaultPrice">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Default</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Default <mat-icon class="header-help" matTooltip="The Nomulus TLD default price. This is what registrars are charged if no custom pricing rule exists.">help_outline</mat-icon></th>
         <td mat-cell *matCellDef="let row">
           {{ row.defaultPrice != null ? (row.defaultPrice | number:'1.2-2') : 'N/A' }}
         </td>
       </ng-container>
       <ng-container matColumnDef="difference">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Diff</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Diff <mat-icon class="header-help" matTooltip="Price minus Default. Negative means the registrar pays less than the Nomulus default (a discount).">help_outline</mat-icon></th>
         <td mat-cell *matCellDef="let row" [class]="getDifferenceClass(row)">
           @if (getDifference(row) !== null) {
             {{ getDifference(row)! >= 0 ? '+' : '' }}{{ getDifference(row) | number:'1.2-2' }}
@@ -220,8 +220,8 @@
           </button>
         </td>
       </ng-container>
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
     </table>
   } @else if (!dashService.loading()) {
     <p class="secondary-text">No pricing rules configured.</p>

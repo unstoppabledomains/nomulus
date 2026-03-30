@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { MaterialModule } from '../material.module';
+import { RegistryDashService } from './registry-dash.service';
 
 @Component({
   selector: 'app-registry-dash',
@@ -22,6 +23,12 @@ import { MaterialModule } from '../material.module';
   templateUrl: './registry-dash.component.html',
   styleUrls: ['./registry-dash.component.scss'],
 })
-export class RegistryDashComponent {
+export class RegistryDashComponent implements OnInit {
   static readonly PATH = 'registry-dash';
+
+  constructor(private dashService: RegistryDashService) {}
+
+  ngOnInit() {
+    this.dashService.getSettings().subscribe();
+  }
 }

@@ -125,6 +125,7 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
               userList.add(uMap);
             }
             regMap.put("users", userList);
+            regMap.put("settings", reg.getSettings());
 
             registryList.add(regMap);
           }
@@ -188,6 +189,7 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       case "removeTld" -> handleRemoveTld(payload);
       case "addUser" -> handleAddUser(payload);
       case "removeUser" -> handleRemoveUser(payload);
+      case "updateSettings" -> handleUpdateSettings(payload);
       default -> setFailedResponse("Unknown action: " + action, SC_BAD_REQUEST);
     }
   }
@@ -284,6 +286,29 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
         });
   }
 
+  private void handleUpdateSettings(AdminPayload payload) {
+    if (payload.registryId() == null) {
+      setFailedResponse("registryId is required", SC_BAD_REQUEST);
+      return;
+    }
+    if (payload.settings() == null) {
+      setFailedResponse("settings is required", SC_BAD_REQUEST);
+      return;
+    }
+    tm().transact(
+        () -> {
+          RoRegistry existing =
+              tm().getEntityManager().find(RoRegistry.class, payload.registryId());
+          if (existing == null) {
+            setFailedResponse("Registry not found", SC_BAD_REQUEST);
+            return;
+          }
+          existing.setSettings(payload.settings());
+          tm().getEntityManager().merge(existing);
+          consoleApiParams.response().setStatus(SC_OK);
+        });
+  }
+
   /** Payload record for all admin POST operations. */
   public record AdminPayload(
       String action,
@@ -291,5 +316,6 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       String registryName,
       String tld,
       String userEmail,
-      Long id) {}
+      Long id,
+      String settings) {}
 }

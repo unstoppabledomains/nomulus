@@ -78,6 +78,7 @@ export interface RoRegistry {
   createdAt?: string;
   tlds: RoRegistryTld[];
   users: RoRegistryUser[];
+  settings?: string;
 }
 
 export interface SystemRegistrar {
@@ -155,6 +156,13 @@ export class RegistryDashService {
   revenueBilling = signal<RevenueBillingData | undefined>(undefined);
   domainActivity = signal<DomainActivityData | undefined>(undefined);
   forecasting = signal<ForecastingData | undefined>(undefined);
+  /** Default visibility — Registrar Fee and RSP Cut hidden by default. */
+  static readonly DEFAULT_VISIBILITY: Record<string, boolean> = {
+    'financials.registrarFee': false,
+    'financials.rspCut': false,
+  };
+
+  columnVisibility = signal<Record<string, boolean>>({ ...RegistryDashService.DEFAULT_VISIBILITY });
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
@@ -176,6 +184,36 @@ export class RegistryDashService {
     this.error.set(msg);
     this.loading.set(false);
     return throwError(() => err);
+  }
+
+  /** Returns true if the given column key is visible. Absent key = visible. */
+  isColumnVisible(key: string): boolean {
+    return this.columnVisibility()[key] !== false;
+  }
+
+  getSettings(): Observable<Record<string, any>> {
+    return this.backend
+      .getRegistryDashSettings()
+      .pipe(
+        tap((settings) => {
+          const cv = settings?.['columnVisibility'] ?? {};
+          // Merge: defaults first, then explicit settings override
+          this.columnVisibility.set({ ...RegistryDashService.DEFAULT_VISIBILITY, ...cv });
+        }),
+        catchError((err) => this.handleError<Record<string, any>>(err))
+      );
+  }
+
+  updateSettings(registryId: number, settings: string): Observable<unknown> {
+    return this.backend.updateRegistryDashSettings(registryId, settings).pipe(
+      tap(() => {
+        try {
+          const parsed = JSON.parse(settings);
+          this.columnVisibility.set(parsed?.['columnVisibility'] ?? {});
+        } catch { /* ignore parse errors */ }
+      }),
+      catchError((err) => this.handleError<unknown>(err))
+    );
   }
 
   getOverview(): Observable<OverviewData> {
@@ -318,11 +356,11 @@ export class RegistryDashService {
       );
   }
 
-  getDomainActivity(months?: number, granularity?: string): Observable<DomainActivityData> {
+  getDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashDomainActivity(months, granularity)
+      .getRegistryDashDomainActivity(lookbackHours, granularity)
       .pipe(
         tap((data) => {
           this.domainActivity.set(data);
@@ -332,11 +370,11 @@ export class RegistryDashService {
       );
   }
 
-  getForecasting(months?: number): Observable<ForecastingData> {
+  getForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashForecasting(months)
+      .getRegistryDashForecasting(lookbackHours, granularity)
       .pipe(
         tap((data) => {
           this.forecasting.set(data);

@@ -37,8 +37,8 @@ import google.registry.security.XsrfTokenManager;
 import google.registry.ui.server.SendEmailUtils;
 import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordData;
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
-import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
+import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
 import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
 import jakarta.servlet.http.HttpServletRequest;
@@ -420,7 +420,8 @@ public final class ConsoleModule {
               obj.has("registryName") ? obj.get("registryName").getAsString() : null,
               obj.has("tld") ? obj.get("tld").getAsString() : null,
               obj.has("userEmail") ? obj.get("userEmail").getAsString() : null,
-              obj.has("id") ? obj.get("id").getAsLong() : null);
+              obj.has("id") ? obj.get("id").getAsLong() : null,
+              obj.has("settings") ? obj.get("settings").getAsString() : null);
         });
   }
 }

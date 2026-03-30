@@ -18,6 +18,7 @@ import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService, ActivityDataPoint } from '../../registry-dash.service';
+import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',
@@ -41,7 +42,8 @@ const TLD_COLORS = [
   styleUrls: ['./domain-activity.component.scss'],
 })
 export class DomainActivityComponent implements OnInit {
-  selectedMonths = signal(12);
+  selectedRange = signal('12m');
+  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.domainActivity());
 
@@ -100,6 +102,7 @@ export class DomainActivityComponent implements OnInit {
     }
 
     const tlds = [...tldSet].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
     const types = [...typeSet].sort();
 
     const series = types.map(type => ({
@@ -112,7 +115,7 @@ export class DomainActivityComponent implements OnInit {
     return {
       tooltip: { trigger: 'axis' as const },
       legend: { data: types },
-      xAxis: { type: 'category' as const, data: tlds, axisLabel: { rotate: 30 } },
+      xAxis: { type: 'category' as const, data: tldLabels, axisLabel: { rotate: 30 } },
       yAxis: { type: 'value' as const },
       series,
     };
@@ -127,7 +130,7 @@ export class DomainActivityComponent implements OnInit {
 
     // Sort descending by count
     entries.sort((a, b) => b[1] - a[1]);
-    const tlds = entries.map(([tld]) => tld);
+    const tlds = entries.map(([tld]) => `.${tld}`);
     const counts = entries.map(([, count]) => count);
 
     return {
@@ -151,10 +154,13 @@ export class DomainActivityComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedMonths changes
+    // Refetch when selectedRange changes
     effect(() => {
-      const months = this.selectedMonths();
-      this.dashService.getDomainActivity(months).subscribe();
+      const range = this.selectedRange();
+      const config = RANGE_CONFIG[range];
+      if (config) {
+        this.dashService.getDomainActivity(config.lookbackHours, config.granularity).subscribe();
+      }
     });
   }
 
@@ -162,7 +168,7 @@ export class DomainActivityComponent implements OnInit {
     // Initial fetch is handled by the effect above
   }
 
-  onMonthsChange(months: number) {
-    this.selectedMonths.set(months);
+  onRangeChange(range: string) {
+    this.selectedRange.set(range);
   }
 }

@@ -1,6 +1,7 @@
 @use '../ud-mixins' as ud;
 
 .financials-container {
+  @include ud.header-help-icon;
   padding: 24px;
 
   h2 {
@@ -416,6 +417,32 @@
   &.spread-negative {
     color: var(--ud-error);
   }
+}
+
+// Overview tab ECharts
+.overview-tab {
+  .charts-row {
+    margin-bottom: 24px;
+  }
+
+  .chart-container {
+    background: var(--ud-surface-muted);
+    border-radius: var(--ud-radius-md);
+    padding: 16px 20px;
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .chart {
+      height: 280px;
+    }
+  }
+
+  .positive { color: var(--ud-success); }
+  .negative { color: var(--ud-error); }
 }
 
 .loading {

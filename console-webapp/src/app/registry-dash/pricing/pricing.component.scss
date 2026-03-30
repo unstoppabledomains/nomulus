@@ -1,6 +1,8 @@
 @use '../ud-mixins' as ud;
 
 .registry-dash-pricing {
+  @include ud.header-help-icon;
+
   .pricing-header {
     margin-bottom: 1rem;
 
@@ -109,12 +111,12 @@
   }
 
   .diff-discount {
-    color: var(--ud-success);
+    color: var(--ud-error);
     font-weight: 500;
   }
 
   .diff-premium {
-    color: var(--ud-error);
+    color: var(--ud-success);
     font-weight: 500;
   }
 

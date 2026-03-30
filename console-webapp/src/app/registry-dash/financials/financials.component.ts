@@ -17,8 +17,9 @@ import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../../material.module';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
+import { NgxEchartsDirective } from 'ngx-echarts';
+import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
 import { RegistryDashService, CostBasisEntry } from '../registry-dash.service';
-import { OverviewComponent } from '../overview/overview.component';
 import { RevenueBillingComponent } from './revenue-billing/revenue-billing.component';
 import { DomainActivityComponent } from './domain-activity/domain-activity.component';
 import { ForecastingComponent } from './forecasting/forecasting.component';
@@ -30,10 +31,24 @@ const OPERATION_COLORS: Record<string, string> = {
   RESTORE: '#192B55',
 };
 
+const ACTIVITY_COLORS: Record<string, string> = {
+  CREATES: '#0D67FE',
+  RENEWS: '#0546B7',
+  TRANSFERS: '#65A1DA',
+  DELETES: '#192B55',
+  RESTORES: '#00C9FF',
+};
+
+const TLD_COLORS = [
+  '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
+  '#00C9FF', '#0A5FEA', '#4A9B30', '#9191A1',
+];
+
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, MatSortModule, OverviewComponent, RevenueBillingComponent, DomainActivityComponent, ForecastingComponent],
+  imports: [CommonModule, MaterialModule, MatSortModule, NgxEchartsDirective, RevenueBillingComponent, DomainActivityComponent, ForecastingComponent],
+  providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
 })
@@ -192,7 +207,135 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
     }));
   });
 
-  costBasisColumns = ['tld', 'operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'costCurrency', 'effectiveDate', 'notes'];
+  private static readonly COST_MONEY_KEYS: Record<string, string> = {
+    registrarFee: 'financials.registrarFee',
+    rspCut: 'financials.rspCut',
+    costAmount: 'financials.costAmount',
+  };
+
+  private static readonly ALL_COST_COLUMNS = [
+    'tld', 'operation', 'registrarId', 'registrarFee', 'rspCut',
+    'costAmount', 'costCurrency', 'effectiveDate', 'notes',
+  ];
+
+  // --- Financials Overview charts (one per sub-tab) ---
+
+  /** From Revenue & Billing: Revenue by Operation bar chart */
+  overviewRevenueByOpOptions = computed(() => {
+    const d = this.dashService.revenueBilling();
+    if (!d) return null;
+    const byOp = d.totals.byOperation;
+    const operations = Object.keys(byOp);
+    if (operations.length === 0) return null;
+    return {
+      tooltip: { trigger: 'axis' as const },
+      xAxis: { type: 'category' as const, data: operations },
+      yAxis: { type: 'value' as const },
+      series: [{
+        type: 'bar' as const,
+        data: operations.map(op => ({
+          value: byOp[op],
+          itemStyle: { color: OPERATION_COLORS[op] || '#9191A1' },
+        })),
+      }],
+    };
+  });
+
+  /** From Domain Activity: Activity breakdown grouped bar chart */
+  overviewActivityByTldOptions = computed(() => {
+    const d = this.dashService.domainActivity();
+    if (!d || d.activity.length === 0) return null;
+    const tldSet = new Set<string>();
+    const typeSet = new Set<string>();
+    const data = new Map<string, Map<string, number>>();
+    for (const pt of d.activity) {
+      tldSet.add(pt.tld);
+      typeSet.add(pt.type);
+      if (!data.has(pt.tld)) data.set(pt.tld, new Map());
+      data.get(pt.tld)!.set(pt.type, (data.get(pt.tld)!.get(pt.type) ?? 0) + pt.count);
+    }
+    const tlds = [...tldSet].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
+    const types = [...typeSet].sort();
+    return {
+      tooltip: { trigger: 'axis' as const },
+      legend: { data: types },
+      xAxis: { type: 'category' as const, data: tldLabels, axisLabel: { rotate: 30 } },
+      yAxis: { type: 'value' as const },
+      series: types.map(type => ({
+        name: type,
+        type: 'bar' as const,
+        data: tlds.map(tld => data.get(tld)?.get(type) ?? 0),
+        color: ACTIVITY_COLORS[type] || '#9191A1',
+      })),
+    };
+  });
+
+  /** From Forecasting: Domain expirations stacked area chart */
+  overviewExpirationsOptions = computed(() => {
+    const d = this.dashService.forecasting();
+    if (!d || d.expirationCurve.length === 0) return null;
+    const monthSet = new Set<string>();
+    const tldMap = new Map<string, Map<string, number>>();
+    for (const pt of d.expirationCurve) {
+      monthSet.add(pt.month);
+      if (!tldMap.has(pt.tld)) tldMap.set(pt.tld, new Map());
+      tldMap.get(pt.tld)!.set(pt.month, (tldMap.get(pt.tld)!.get(pt.month) ?? 0) + pt.count);
+    }
+    const months = [...monthSet].sort();
+    const tlds = [...tldMap.keys()].sort();
+    const tldLabels = tlds.map(t => `.${t}`);
+    return {
+      tooltip: { trigger: 'axis' as const },
+      legend: { data: tldLabels },
+      xAxis: { type: 'category' as const, data: months },
+      yAxis: { type: 'value' as const },
+      series: tlds.map((tld, i) => ({
+        name: `.${tld}`,
+        type: 'line' as const,
+        stack: 'expirations',
+        areaStyle: { opacity: 0.3 },
+        emphasis: { focus: 'series' as const },
+        data: months.map(m => tldMap.get(tld)!.get(m) ?? 0),
+        color: TLD_COLORS[i % TLD_COLORS.length],
+      })),
+    };
+  });
+
+  /** Overview metric: total revenue */
+  overviewTotalRevenue = computed(() => this.dashService.revenueBilling()?.totals.totalRevenue ?? 0);
+  overviewCurrency = computed(() => this.dashService.revenueBilling()?.totals.currency ?? 'USD');
+
+  /** Overview metric: net growth (creates - deletes) */
+  overviewNetGrowth = computed(() => {
+    const d = this.dashService.domainActivity();
+    if (!d) return 0;
+    const creates = d.activity.filter(pt => pt.type === 'CREATES').reduce((s, pt) => s + pt.count, 0);
+    const deletes = d.activity.filter(pt => pt.type === 'DELETES').reduce((s, pt) => s + pt.count, 0);
+    return creates - deletes;
+  });
+
+  /** Overview metric: avg renewal rate */
+  overviewAvgRenewalRate = computed(() => {
+    const d = this.dashService.forecasting();
+    if (!d || d.renewalRates.length === 0) return 0;
+    return d.renewalRates.reduce((s, r) => s + r.renewalRate, 0) / d.renewalRates.length;
+  });
+
+  costBasisColumns = computed(() => {
+    return FinancialsComponent.ALL_COST_COLUMNS.filter(col => {
+      const key = FinancialsComponent.COST_MONEY_KEYS[col];
+      return !key || this.dashService.isColumnVisible(key);
+    });
+  });
+
+  byTldColumns = computed(() => {
+    const all = ['operation', 'registrarId', 'registrarFee', 'rspCut', 'costAmount', 'notes'];
+    return all.filter(col => {
+      const key = FinancialsComponent.COST_MONEY_KEYS[col];
+      return !key || this.dashService.isColumnVisible(key);
+    });
+  });
 
   constructor(public dashService: RegistryDashService) {
     // Sync filtered entries into dataSource
@@ -204,6 +347,10 @@ export class FinancialsComponent implements OnInit, AfterViewInit {
   ngOnInit() {
     this.dashService.getCostBasis().subscribe();
     this.dashService.getPricing().subscribe();
+    // Pre-load data for the overview charts
+    this.dashService.getRevenueBilling(8760, 'month').subscribe();
+    this.dashService.getDomainActivity(8760, 'month').subscribe();
+    this.dashService.getForecasting(8760, 'month').subscribe();
   }
 
   ngAfterViewInit() {

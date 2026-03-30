@@ -18,8 +18,11 @@ import static google.registry.persistence.transaction.TransactionManagerFactory.
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.model.registrar.Registrar;
+import google.registry.model.registrydash.RoRegistry;
 import google.registry.model.registrydash.RoRegistryTld;
+import google.registry.model.registrydash.RoRegistryUser;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Utility for scoping registry dashboard data access.
@@ -80,5 +83,25 @@ public final class RegistryDashAccessUtil {
   public static ImmutableSet<String> getMappedRegistrarIds(String userEmail) {
     ImmutableSet<String> tlds = getMappedTlds(userEmail);
     return getRegistrarIdsForTlds(tlds);
+  }
+
+  /** Returns the RoRegistry for a user, if any. A non-FTE user belongs to at most one registry. */
+  public static Optional<RoRegistry> getRegistryForUser(String userEmail) {
+    return tm().transact(
+        () -> {
+          List<RoRegistryUser> users =
+              tm().getEntityManager()
+                  .createQuery(
+                      "SELECT ru FROM RoRegistryUser ru WHERE ru.userEmail = :email",
+                      RoRegistryUser.class)
+                  .setParameter("email", userEmail)
+                  .getResultList();
+          if (users.isEmpty()) {
+            return Optional.empty();
+          }
+          RoRegistry registry =
+              tm().getEntityManager().find(RoRegistry.class, users.get(0).getRegistryId());
+          return Optional.ofNullable(registry);
+        });
   }
 }
