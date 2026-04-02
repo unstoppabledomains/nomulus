@@ -222,3 +222,4 @@ V221__registry_dashboard_tables.sql
 V222__registry_dashboard_tld_mapping.sql
 V223__registry_scoping_refactor.sql
 V224__cost_basis_registrar_and_settings.sql
+V225__rsp_fee_refactor.sql
