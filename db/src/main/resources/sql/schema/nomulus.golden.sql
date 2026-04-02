@@ -2007,6 +2007,14 @@ ALTER TABLE ONLY public."RegistryDashboardCostBasis"
 
 
 --
+-- Name: RegistryDashboardCostBasis RegistryDashboardCostBasis_tld_operation_effective_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardCostBasis"
+    ADD CONSTRAINT "RegistryDashboardCostBasis_tld_operation_effective_date_key" UNIQUE (tld, operation, effective_date);
+
+
+--
 -- Name: RegistryDashboardRegistrarPricing RegistryDashboardRegistrarPri_registrar_id_tld_operation_ef_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
