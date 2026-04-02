@@ -377,8 +377,8 @@ public final class ConsoleModule {
           if (obj.has("operation")) {
             cb.setOperation(obj.get("operation").getAsString());
           }
-          if (obj.has("costAmount")) {
-            cb.setCostAmount(obj.get("costAmount").getAsBigDecimal());
+          if (obj.has("rspRetainedFeeAmount")) {
+            cb.setRspRetainedFeeAmount(obj.get("rspRetainedFeeAmount").getAsBigDecimal());
           }
           if (obj.has("costCurrency")) {
             cb.setCostCurrency(obj.get("costCurrency").getAsString());
@@ -390,9 +390,6 @@ public final class ConsoleModule {
           }
           if (obj.has("notes") && !obj.get("notes").isJsonNull()) {
             cb.setNotes(obj.get("notes").getAsString());
-          }
-          if (obj.has("registrarId") && !obj.get("registrarId").isJsonNull()) {
-            cb.setRegistrarId(obj.get("registrarId").getAsString());
           }
           if (obj.has("id") && !obj.get("id").isJsonNull()) {
             try {

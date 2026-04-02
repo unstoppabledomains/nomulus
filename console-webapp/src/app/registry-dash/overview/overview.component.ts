@@ -83,7 +83,7 @@ export class OverviewComponent {
       tooltip: { trigger: 'axis' as const },
       legend: { data: types },
       xAxis: { type: 'category' as const, data: periods },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, name: 'Domains', nameLocation: 'middle' as const, nameGap: 40 },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
       series,
     };

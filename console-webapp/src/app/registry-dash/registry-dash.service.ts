@@ -55,11 +55,14 @@ export interface CostBasisEntry {
   id?: number;
   tld: string;
   operation: string;
-  registrarId?: string;
-  costAmount: number;
+  rspRetainedFeeAmount: number;
   costCurrency: string;
+  currency?: string;
   effectiveDate: string;
   notes?: string;
+  // Enriched fields computed by the backend
+  registrarBilledAmount?: number;
+  netAmountToRegistry?: number;
 }
 
 export interface RoRegistryTld {
@@ -102,13 +105,16 @@ export interface RevenueDataPoint {
   tld: string;
   operation: string;
   amount: number;
+  netAmountToRegistry: number;
   currency: string;
 }
 
 export interface RevenueTotals {
   totalRevenue: number;
+  totalNetAmountToRegistry: number;
   currency: string;
   byOperation: Record<string, number>;
+  byOperationNetAmountToRegistry: Record<string, number>;
 }
 
 export interface RevenueBillingData {
@@ -156,10 +162,11 @@ export class RegistryDashService {
   revenueBilling = signal<RevenueBillingData | undefined>(undefined);
   domainActivity = signal<DomainActivityData | undefined>(undefined);
   forecasting = signal<ForecastingData | undefined>(undefined);
-  /** Default visibility — Registrar Fee and RSP Cut hidden by default. */
+  /** Default visibility — RSP Fee and Net to Registry hidden by default for non-admin users. */
   static readonly DEFAULT_VISIBILITY: Record<string, boolean> = {
-    'financials.registrarFee': false,
-    'financials.rspCut': false,
+    'financials.feesRspPays': false,
+    'financials.feesNetToRegistry': false,
+    'financials.entityBreakdownChart': false,
   };
 
   columnVisibility = signal<Record<string, boolean>>({ ...RegistryDashService.DEFAULT_VISIBILITY });

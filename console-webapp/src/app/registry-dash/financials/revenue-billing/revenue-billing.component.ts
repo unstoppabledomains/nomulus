@@ -17,7 +17,7 @@ import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
-import { RegistryDashService, RevenueDataPoint } from '../../registry-dash.service';
+import { RegistryDashService } from '../../registry-dash.service';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -62,57 +62,51 @@ export class RevenueBillingComponent implements OnInit {
 
   data = computed(() => this.dashService.revenueBilling());
 
-  // Summary metrics
-  totalRevenue = computed(() => {
-    const d = this.data();
-    return d?.totals.totalRevenue ?? 0;
-  });
+  /** Total net amount received by the registry over the selected period. */
+  totalNetAmountToRegistry = computed(() => this.data()?.totals.totalNetAmountToRegistry ?? 0);
 
-  avgMonthlyRevenue = computed(() => {
+  /** Average monthly registry revenue over the selected period. */
+  avgMonthlyRegistryRevenue = computed(() => {
     const d = this.data();
     if (!d || d.periodRevenue.length === 0) return 0;
     const periods = new Set(d.periodRevenue.map(p => p.period));
-    return periods.size > 0 ? d.totals.totalRevenue / periods.size : 0;
+    return periods.size > 0 ? (d.totals.totalNetAmountToRegistry / periods.size) : 0;
   });
 
+  /** Top TLD by Net to Registry over the selected period. */
   topTld = computed(() => {
     const d = this.data();
     if (!d || d.periodRevenue.length === 0) return '—';
     const byTld = new Map<string, number>();
     for (const pt of d.periodRevenue) {
-      byTld.set(pt.tld, (byTld.get(pt.tld) ?? 0) + pt.amount);
+      byTld.set(pt.tld, (byTld.get(pt.tld) ?? 0) + pt.netAmountToRegistry);
     }
     let best = '';
     let bestVal = 0;
     for (const [tld, val] of byTld) {
-      if (val > bestVal) {
-        best = tld;
-        bestVal = val;
-      }
+      if (val > bestVal) { best = tld; bestVal = val; }
     }
     return best || '—';
   });
 
   currency = computed(() => this.data()?.totals.currency ?? 'USD');
 
-  // ECharts: Revenue area chart (one series per TLD)
+  /** Registry Revenue by TLD — one stacked area series per TLD using Net to Registry. */
   revenueLineOptions = computed(() => {
     const d = this.data();
     if (!d || d.periodRevenue.length === 0) return null;
 
-    // Group by TLD
     const tldMap = new Map<string, Map<string, number>>();
     const allPeriods = new Set<string>();
     for (const pt of d.periodRevenue) {
       allPeriods.add(pt.period);
       if (!tldMap.has(pt.tld)) tldMap.set(pt.tld, new Map());
       const periodMap = tldMap.get(pt.tld)!;
-      periodMap.set(pt.period, (periodMap.get(pt.period) ?? 0) + pt.amount);
+      periodMap.set(pt.period, (periodMap.get(pt.period) ?? 0) + pt.netAmountToRegistry);
     }
 
     const periods = [...allPeriods].sort();
     const tlds = [...tldMap.keys()].sort();
-
     const tldLabels = tlds.map(t => `.${t}`);
     const series = tlds.map((tld, i) => {
       const periodMap = tldMap.get(tld)!;
@@ -131,24 +125,24 @@ export class RevenueBillingComponent implements OnInit {
       tooltip: { trigger: 'axis' as const },
       legend: { type: 'scroll' as const, bottom: 0, data: tldLabels },
       xAxis: { type: 'category' as const, data: periods },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
       series,
     };
   });
 
-  // ECharts: Operation breakdown bar chart
+  /** Registry Revenue by Operation — using Net to Registry per operation. */
   operationBarOptions = computed(() => {
     const d = this.data();
     if (!d) return null;
-    const byOp = d.totals.byOperation;
+    const byOp = d.totals.byOperationNetAmountToRegistry;
     const operations = Object.keys(byOp);
     if (operations.length === 0) return null;
 
     return {
       tooltip: { trigger: 'axis' as const },
       xAxis: { type: 'category' as const, data: operations },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
       series: [
         {
           type: 'bar' as const,
@@ -162,7 +156,6 @@ export class RevenueBillingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedRange changes
     effect(() => {
       const range = this.selectedRange();
       const config = RANGE_CONFIG[range];

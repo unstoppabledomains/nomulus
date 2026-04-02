@@ -10,39 +10,25 @@
     {{ dashService.error() }}
   </div>
 
-  <!-- Summary Metric Cards -->
-  <div class="metric-cards" *ngIf="costBasisEntries().length > 0">
-    <mat-card class="metric-card">
-      <mat-card-content>
-        <div class="metric-value">{{ totalTlds() }}</div>
-        <div class="metric-label">TLDs Covered</div>
-      </mat-card-content>
-    </mat-card>
-    <mat-card class="metric-card">
-      <mat-card-content>
-        <div class="metric-value">{{ totalOperations() }}</div>
-        <div class="metric-label">Operation Types</div>
-      </mat-card-content>
-    </mat-card>
-    <mat-card class="metric-card" *ngIf="dashService.isColumnVisible('financials.avgFeeMetric')">
-      <mat-card-content>
-        <div class="metric-value">{{ averageCost() | number:'1.2-2' }}</div>
-        <div class="metric-label">Avg Fee / Operation</div>
-      </mat-card-content>
-    </mat-card>
-  </div>
-
   <mat-tab-group (selectedIndexChange)="onTabChange($event)">
     <!-- Overview Tab -->
     <mat-tab label="Overview">
       <ng-template matTabContent>
         <div class="tab-content overview-tab">
+          <!-- Time Range Toggle -->
+          <div class="time-range">
+            <mat-button-toggle-group [value]="selectedOverviewRange()" (change)="onOverviewRangeChange($event.value)">
+              <mat-button-toggle *ngFor="let key of overviewRangeKeys" [value]="key">{{ key }}</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
           <!-- Overview Metric Cards -->
           <div class="metric-cards" *ngIf="dashService.revenueBilling() || dashService.domainActivity() || dashService.forecasting()">
-            <mat-card class="metric-card" *ngIf="dashService.isColumnVisible('financials.revenueBilling')">
+            <mat-card class="metric-card">
               <mat-card-content>
-                <div class="metric-value">{{ overviewTotalRevenue() | number:'1.2-2' }} {{ overviewCurrency() }}</div>
-                <div class="metric-label">Total Revenue (12m)</div>
+                <div class="metric-value">${{ overviewTotalRevenue() | number:'1.2-2' }} {{ overviewCurrency() }}</div>
+                <div class="metric-label">Registry Revenue ({{ overviewRangeLabel() }})</div>
+                <div class="metric-hint">Net amount received by the registry after RSP fees</div>
               </mat-card-content>
             </mat-card>
             <mat-card class="metric-card">
@@ -50,34 +36,23 @@
                 <div class="metric-value" [class.positive]="overviewNetGrowth() >= 0" [class.negative]="overviewNetGrowth() < 0">
                   {{ overviewNetGrowth() >= 0 ? '+' : '' }}{{ overviewNetGrowth() | number }}
                 </div>
-                <div class="metric-label">Net Domain Growth (12m)</div>
+                <div class="metric-label">Net Domain Growth ({{ overviewRangeLabel() }})</div>
               </mat-card-content>
             </mat-card>
             <mat-card class="metric-card">
               <mat-card-content>
                 <div class="metric-value">{{ overviewAvgRenewalRate() | number:'1.1-1' }}%</div>
-                <div class="metric-label">Avg Renewal Rate</div>
+                <div class="metric-label">Avg Renewal Rate ({{ overviewRangeLabel() }})</div>
               </mat-card-content>
             </mat-card>
           </div>
 
-          <!-- Overview Charts -->
-          <div class="charts-row" *ngIf="overviewRevenueByOpOptions() && dashService.isColumnVisible('financials.revenueBilling')">
+          <!-- Registry Revenue by Operation chart -->
+          <div class="charts-row" *ngIf="overviewRevenueByOpOptions()">
             <div class="chart-container">
-              <h3>Revenue by Operation</h3>
+              <h3>Registry Revenue by Operation</h3>
+              <p class="chart-description">Net registry revenue by operation type — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
               <div echarts [options]="overviewRevenueByOpOptions()!" [theme]="'ud-brand'" class="chart"></div>
-            </div>
-          </div>
-          <div class="charts-row" *ngIf="overviewActivityByTldOptions()">
-            <div class="chart-container">
-              <h3>Domain Activity by TLD</h3>
-              <div echarts [options]="overviewActivityByTldOptions()!" [theme]="'ud-brand'" class="chart"></div>
-            </div>
-          </div>
-          <div class="charts-row" *ngIf="overviewExpirationsOptions()">
-            <div class="chart-container">
-              <h3>Upcoming Domain Expirations</h3>
-              <div echarts [options]="overviewExpirationsOptions()!" [theme]="'ud-brand'" class="chart"></div>
             </div>
           </div>
 
@@ -89,101 +64,18 @@
       </ng-template>
     </mat-tab>
 
-    <!-- Fee Schedule Tab -->
-    <mat-tab label="Fee Schedule">
-      <div class="tab-content">
-        <p class="tab-description">Registrar fees, RSP cut, and net revenue to the registry per TLD and operation. Manage rates on the Admin tab.</p>
-
-        <div class="cost-basis-filters">
-          <mat-form-field>
-            <mat-label>Filter by TLD</mat-label>
-            <mat-select [value]="filterTld()" (selectionChange)="filterTld.set($event.value)">
-              <mat-option value="all">All TLDs</mat-option>
-              <mat-option *ngFor="let tld of uniqueTlds()" [value]="tld">.{{ tld }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Filter by Operation</mat-label>
-            <mat-select [value]="filterOperation()" (selectionChange)="filterOperation.set($event.value)">
-              <mat-option value="all">All Operations</mat-option>
-              <mat-option *ngFor="let op of uniqueOperations()" [value]="op">{{ op }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field *ngIf="uniqueRegistrars().length > 0">
-            <mat-label>Filter by Registrar</mat-label>
-            <mat-select [value]="filterRegistrar()" (selectionChange)="filterRegistrar.set($event.value)">
-              <mat-option value="all">All Registrars</mat-option>
-              <mat-option *ngFor="let reg of uniqueRegistrars()" [value]="reg">{{ reg }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <button mat-button *ngIf="hasActiveFilters()" (click)="clearFilters()">
-            <mat-icon>clear</mat-icon> Clear Filters
-          </button>
-        </div>
-
-        <table mat-table [dataSource]="dataSource" matSort #costBasisSort="matSort" class="financials-table" *ngIf="filteredEntries().length > 0">
-          <ng-container matColumnDef="tld">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>TLD</th>
-            <td mat-cell *matCellDef="let row">.{{ row.tld }}</td>
-          </ng-container>
-          <ng-container matColumnDef="operation">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
-            <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
-          </ng-container>
-          <ng-container matColumnDef="registrarId">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
-            <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
-          </ng-container>
-          <ng-container matColumnDef="registrarFee">
-            <th mat-header-cell *matHeaderCellDef>Avg Registrar Price <mat-icon class="header-help" matTooltip="Average price registrars are actually paying for this TLD/operation, calculated from all custom pricing rules.">help_outline</mat-icon></th>
-            <td mat-cell *matCellDef="let row">
-              <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee | number:'1.2-2' }}</ng-container>
-              <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="rspCut">
-            <th mat-header-cell *matHeaderCellDef>RSP Cut <mat-icon class="header-help" matTooltip="Avg Registrar Price minus Net to Registry. This is the RSP's margin — what the reseller service provider keeps after the registry's wholesale cost.">help_outline</mat-icon></th>
-            <td mat-cell *matCellDef="let row">
-              <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee - row.costAmount | number:'1.2-2' }}</ng-container>
-              <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="costAmount">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Net to Registry <mat-icon class="header-help" matTooltip="The registry's wholesale cost basis for this TLD/operation — the amount the registry receives. Managed on the Admin tab.">help_outline</mat-icon></th>
-            <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="costCurrency">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Currency</th>
-            <td mat-cell *matCellDef="let row">{{ row.costCurrency }}</td>
-          </ng-container>
-          <ng-container matColumnDef="effectiveDate">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Effective</th>
-            <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'short' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="notes">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
-            <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
-          </ng-container>
-          <tr mat-header-row *matHeaderRowDef="costBasisColumns()"></tr>
-          <tr mat-row *matRowDef="let row; columns: costBasisColumns();"></tr>
-        </table>
-
-        <div *ngIf="filteredEntries().length === 0 && !dashService.loading()" class="empty-state">
-          <mat-icon>info</mat-icon>
-          <p *ngIf="hasActiveFilters()">No fee schedule entries match the current filters.</p>
-          <p *ngIf="!hasActiveFilters()">No fee schedule entries configured. Use the Admin tab to add rates.</p>
-        </div>
-      </div>
-    </mat-tab>
-
     <!-- Fees by TLD Tab -->
     <mat-tab label="Fees by TLD">
       <div class="tab-content">
-        <p class="tab-description">Registry fees grouped by TLD.</p>
+        <p class="tab-description">
+          Fee amounts are based on Nomulus TLD default billing values and the configurable RSP Fee per TLD/operation set on the Admin tab.
+          To set what individual registrars are charged, use the Pricing tab.
+        </p>
 
-        <!-- Fees by TLD Stacked Bar Chart -->
-        <div class="bar-chart" *ngIf="chartData().length > 0">
-          <h3 class="chart-title">Fees by TLD</h3>
+        <!-- Chart 1: Default Fees per TLD per operation -->
+        <div class="bar-chart" *ngIf="feesByOperationChartData().length > 0">
+          <h3 class="chart-title">Default Fees per TLD per Operation</h3>
+          <p class="chart-description">Default billing amounts per TLD broken down by operation type, based on the configured fee schedule. Each bar represents total registrar billing across all operations for that TLD.</p>
           <div class="chart-legend">
             <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
               <span class="legend-swatch" [style.background]="getOperationColor(op)"></span>
@@ -191,14 +83,14 @@
             </span>
           </div>
           <div class="chart-rows">
-            <div class="bar-row" *ngFor="let row of chartData()">
+            <div class="bar-row" *ngFor="let row of feesByOperationChartData()">
               <span class="bar-label">.{{ row.tld }}</span>
               <div class="bar-track">
                 <div class="bar-segments" [style.width.%]="row.totalWidthPercent">
                   <div
                     class="bar-segment"
                     *ngFor="let seg of row.segments"
-                    [style.width.%]="(seg.amount / row.total) * 100"
+                    [style.width.%]="row.total > 0 ? (seg.amount / row.total) * 100 : 0"
                     [style.background]="seg.color"
                     [matTooltip]="seg.operation + ': $' + (seg.amount | number:'1.2-2')"
                   ></div>
@@ -209,107 +101,108 @@
           </div>
         </div>
 
-        <div *ngFor="let group of costBasisByTld()" class="tld-group">
-          <h3>.{{ group.tld }}</h3>
-          <table mat-table [dataSource]="group.entries" matSort class="financials-table compact">
-            <ng-container matColumnDef="operation">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
-              <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
-            </ng-container>
-            <ng-container matColumnDef="registrarId">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar</th>
-              <td mat-cell *matCellDef="let row">{{ getRegistrarLabel(row.registrarId) }}</td>
-            </ng-container>
-            <ng-container matColumnDef="registrarFee">
-              <th mat-header-cell *matHeaderCellDef>Avg Registrar Price <mat-icon class="header-help" matTooltip="Average price registrars are actually paying for this TLD/operation, calculated from all custom pricing rules.">help_outline</mat-icon></th>
-              <td mat-cell *matCellDef="let row">
-                <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee | number:'1.2-2' }}</ng-container>
-                <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
-              </td>
-            </ng-container>
-            <ng-container matColumnDef="rspCut">
-              <th mat-header-cell *matHeaderCellDef>RSP Cut <mat-icon class="header-help" matTooltip="Avg Registrar Price minus Net to Registry. This is the RSP's margin — what the reseller service provider keeps after the registry's wholesale cost.">help_outline</mat-icon></th>
-              <td mat-cell *matCellDef="let row">
-                <ng-container *ngIf="getRegistrarFee(row.tld, row.operation) as fee">{{ fee - row.costAmount | number:'1.2-2' }}</ng-container>
-                <span *ngIf="!getRegistrarFee(row.tld, row.operation)" class="muted">—</span>
-              </td>
-            </ng-container>
-            <ng-container matColumnDef="costAmount">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Net to Registry <mat-icon class="header-help" matTooltip="The registry's wholesale cost basis for this TLD/operation — the amount the registry receives. Managed on the Admin tab.">help_outline</mat-icon></th>
-              <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }} {{ row.costCurrency }}</td>
-            </ng-container>
-            <ng-container matColumnDef="notes">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Notes</th>
-              <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="byTldColumns()"></tr>
-            <tr mat-row *matRowDef="let row; columns: byTldColumns();"></tr>
-          </table>
-        </div>
-
-        <div *ngIf="costBasisByTld().length === 0 && !dashService.loading()" class="empty-state">
-          <mat-icon>info</mat-icon>
-          <p>No fee schedule data available.</p>
-        </div>
-      </div>
-    </mat-tab>
-
-    <!-- Registrar Markup Tab -->
-    <mat-tab label="Registrar Markup" *ngIf="dashService.isColumnVisible('financials.registrarMarkup')">
-      <div class="tab-content">
-        <p class="tab-description">How each registrar's custom price compares to the registry's wholesale cost basis (Net to Registry). Green = registrar price is above the registry cost (positive margin). Red = registrar price is below the registry cost (the registry is subsidizing sales).</p>
-
-        <div class="spread-chart" *ngIf="pricingSpreadData().length > 0">
-          <div class="spread-header">
-            <span class="spread-col-label">← Below Fee</span>
-            <span class="spread-col-center">0</span>
-            <span class="spread-col-label">Above Fee →</span>
-          </div>
-          <div class="spread-row" *ngFor="let row of pricingSpreadData()">
-            <span class="spread-label">{{ row.registrarId }} · .{{ row.tld }} · {{ row.operation }}</span>
-            <div class="spread-bar-container">
-              <div class="spread-bar-left">
-                <div class="spread-bar-fill spread-discount"
-                  *ngIf="!row.isPositive"
-                  [style.width.%]="row.barWidthPct"
-                ></div>
-              </div>
-              <div class="spread-center-line"></div>
-              <div class="spread-bar-right">
-                <div class="spread-bar-fill spread-margin"
-                  *ngIf="row.isPositive"
-                  [style.width.%]="row.barWidthPct"
-                ></div>
-              </div>
-            </div>
-            <span class="spread-value" [class.spread-positive]="row.isPositive" [class.spread-negative]="!row.isPositive">
-              {{ row.spread >= 0 ? '+' : '' }}{{ row.spread | number:'1.2-2' }} {{ row.currency }}
+        <!-- Chart 2: Entity breakdown (gated) -->
+        <div class="bar-chart" *ngIf="feesEntityBreakdownData().length > 0">
+          <h3 class="chart-title">Fee Split per TLD</h3>
+          <p class="chart-description">How the default registrar billing amount is split between the RSP and the registry, per TLD. The RSP Fee portion is what the RSP retains; Net to Registry is the remainder.</p>
+          <div class="chart-legend">
+            <span class="legend-item">
+              <span class="legend-swatch" style="background:#192B55"></span> Net to Registry
+            </span>
+            <span class="legend-item">
+              <span class="legend-swatch" style="background:#4A9B30"></span> RSP Fee
             </span>
           </div>
+          <div class="chart-rows">
+            <div class="bar-row" *ngFor="let row of feesEntityBreakdownData()">
+              <span class="bar-label">.{{ row.tld }}</span>
+              <div class="bar-track">
+                <div class="bar-segments" [style.width.%]="row.totalWidthPercent">
+                  <div
+                    class="bar-segment"
+                    *ngFor="let seg of row.segments"
+                    [style.width.%]="seg.widthPct"
+                    [style.background]="seg.color"
+                    [matTooltip]="seg.label + ': $' + (seg.amount | number:'1.2-2')"
+                  ></div>
+                </div>
+              </div>
+              <span class="bar-total">${{ row.total | number:'1.2-2' }}</span>
+            </div>
+          </div>
         </div>
 
-        <div *ngIf="pricingSpreadData().length === 0 && !dashService.loading()" class="empty-state">
+        <!-- Fees table -->
+        <table mat-table [dataSource]="costBasisEntries()" class="financials-table" *ngIf="costBasisEntries().length > 0">
+          <ng-container matColumnDef="tld">
+            <th mat-header-cell *matHeaderCellDef>TLD</th>
+            <td mat-cell *matCellDef="let row">.{{ row.tld }}</td>
+          </ng-container>
+          <ng-container matColumnDef="operation">
+            <th mat-header-cell *matHeaderCellDef>Operation</th>
+            <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+          </ng-container>
+          <ng-container matColumnDef="registrarPays">
+            <th mat-header-cell *matHeaderCellDef>
+              Registrar Pays
+              <mat-icon class="header-help" matTooltip="The default amount the registrar is billed per operation for this TLD, sourced from the Nomulus TLD configuration. Read-only — change this in the TLD config.">help_outline</mat-icon>
+            </th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="row.registrarBilledAmount != null">{{ row.registrarBilledAmount | number:'1.2-2' }}</ng-container>
+              <span *ngIf="row.registrarBilledAmount == null" class="muted">—</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="rspFee">
+            <th mat-header-cell *matHeaderCellDef>
+              RSP Fee
+              <mat-icon class="header-help" matTooltip="The service fee the RSP charges per operation. The registry receives the remainder: Registrar Pays minus RSP Fee. Configurable per TLD and operation on the Admin tab. Hidden by default for non-admin users.">help_outline</mat-icon>
+            </th>
+            <td mat-cell *matCellDef="let row">{{ row.rspRetainedFeeAmount | number:'1.2-2' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="netToRegistry">
+            <th mat-header-cell *matHeaderCellDef>
+              Net to Registry
+              <mat-icon class="header-help" matTooltip="The amount the registry receives per operation — calculated as Registrar Pays minus RSP Fee. Not stored; updates automatically when RSP Fee changes. Hidden by default for non-admin users.">help_outline</mat-icon>
+            </th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="row.netAmountToRegistry != null">{{ row.netAmountToRegistry | number:'1.2-2' }}</ng-container>
+              <span *ngIf="row.netAmountToRegistry == null" class="muted">—</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="currency">
+            <th mat-header-cell *matHeaderCellDef>Currency</th>
+            <td mat-cell *matCellDef="let row">{{ row.currency || row.costCurrency }}</td>
+          </ng-container>
+          <ng-container matColumnDef="effectiveDate">
+            <th mat-header-cell *matHeaderCellDef>Effective</th>
+            <td mat-cell *matCellDef="let row">{{ row.effectiveDate | date:'shortDate' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="feesTableColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: feesTableColumns();"></tr>
+        </table>
+
+        <div *ngIf="costBasisEntries().length === 0 && !dashService.loading()" class="empty-state">
           <mat-icon>info</mat-icon>
-          <p>No markup data available. Configure pricing rules and fee schedule first.</p>
+          <p>No fee data available. Configure RSP fees on the Admin tab.</p>
         </div>
       </div>
     </mat-tab>
 
-    <!-- Revenue & Billing Tab (ECharts) -->
-    <mat-tab label="Revenue & Billing" *ngIf="dashService.isColumnVisible('financials.revenueBilling')">
+    <!-- Registry Revenue Tab -->
+    <mat-tab label="Registry Revenue">
       <ng-template matTabContent>
         <app-revenue-billing></app-revenue-billing>
       </ng-template>
     </mat-tab>
 
-    <!-- Domain Activity Tab (ECharts) -->
+    <!-- Domain Activity Tab -->
     <mat-tab label="Domain Activity">
       <ng-template matTabContent>
         <app-domain-activity></app-domain-activity>
       </ng-template>
     </mat-tab>
 
-    <!-- Forecasting Tab (ECharts) -->
+    <!-- Forecasting Tab -->
     <mat-tab label="Forecasting">
       <ng-template matTabContent>
         <app-forecasting></app-forecasting>

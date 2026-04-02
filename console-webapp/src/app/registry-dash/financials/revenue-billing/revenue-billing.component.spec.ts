@@ -17,7 +17,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing.component';
-import { RegistryDashService, RevenueBillingData, RevenueDataPoint } from '../../registry-dash.service';
+import { RegistryDashService, RevenueBillingData } from '../../registry-dash.service';
 import { NgxEchartsDirective } from 'ngx-echarts';
 
 describe('RevenueBillingComponent', () => {
@@ -27,14 +27,16 @@ describe('RevenueBillingComponent', () => {
 
   const mockData: RevenueBillingData = {
     periodRevenue: [
-      { period: '2024-05', tld: 'tld', operation: 'CREATE', amount: 100, currency: 'USD' },
-      { period: '2024-05', tld: 'tld2', operation: 'CREATE', amount: 200, currency: 'USD' },
-      { period: '2024-06', tld: 'tld', operation: 'RENEW', amount: 50, currency: 'USD' },
+      { period: '2024-05', tld: 'tld', operation: 'CREATE', amount: 100, netAmountToRegistry: 60, currency: 'USD' },
+      { period: '2024-05', tld: 'tld2', operation: 'CREATE', amount: 200, netAmountToRegistry: 140, currency: 'USD' },
+      { period: '2024-06', tld: 'tld', operation: 'RENEW', amount: 50, netAmountToRegistry: 30, currency: 'USD' },
     ],
     totals: {
       totalRevenue: 350,
+      totalNetAmountToRegistry: 230,
       currency: 'USD',
       byOperation: { CREATE: 300, RENEW: 50 },
+      byOperationNetAmountToRegistry: { CREATE: 200, RENEW: 30 },
     },
   };
 
@@ -109,19 +111,19 @@ describe('RevenueBillingComponent', () => {
 
   // --- Chart data tests ---
 
-  it('should compute total revenue from data', () => {
+  it('should compute total net registry revenue from data', () => {
     fixture.detectChanges();
-    expect(component.totalRevenue()).toBe(350);
+    expect(component.totalNetAmountToRegistry()).toBe(230);
   });
 
-  it('should compute top TLD from period revenue', () => {
+  it('should compute top TLD by net registry revenue', () => {
     fixture.detectChanges();
     expect(component.topTld()).toBe('tld2');
   });
 
   // --- Operation bar chart ---
 
-  it('should generate operation bar chart options', () => {
+  it('should generate operation bar chart options using net registry revenue', () => {
     fixture.detectChanges();
     const options = component.operationBarOptions();
     expect(options).toBeTruthy();

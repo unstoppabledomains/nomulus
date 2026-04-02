@@ -1142,13 +1142,12 @@ CREATE TABLE public."RegistryDashboardCostBasis" (
     id bigint NOT NULL,
     tld text NOT NULL,
     operation text NOT NULL,
-    cost_amount numeric(19,2) NOT NULL,
+    rsp_retained_fee_amount numeric(19,2) NOT NULL,
     cost_currency text NOT NULL,
     effective_date timestamp with time zone DEFAULT now() NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    registrar_id text
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2587,7 +2586,7 @@ CREATE INDEX idx_console_update_history_type ON public."ConsoleUpdateHistory" US
 -- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_cost_basis_tld_op_reg_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, COALESCE(registrar_id, ''::text), effective_date);
+CREATE UNIQUE INDEX idx_cost_basis_tld_op_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, effective_date);
 
 
 --

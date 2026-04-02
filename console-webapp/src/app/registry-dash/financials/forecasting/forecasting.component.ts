@@ -93,7 +93,7 @@ export class ForecastingComponent implements OnInit {
       tooltip: { trigger: 'axis' as const },
       legend: { data: tldLabels },
       xAxis: { type: 'category' as const, data: months },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, name: 'Domains', nameLocation: 'middle' as const, nameGap: 40 },
       dataZoom: [{ type: 'inside' as const, start: 0, end: 100 }],
       series,
     };
@@ -122,7 +122,7 @@ export class ForecastingComponent implements OnInit {
     return {
       tooltip: { trigger: 'axis' as const },
       xAxis: { type: 'category' as const, data: periods },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, name: 'Domains', nameLocation: 'middle' as const, nameGap: 40 },
       series: [
         {
           name: 'Net Growth',

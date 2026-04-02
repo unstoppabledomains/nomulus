@@ -138,20 +138,20 @@
     </mat-card-content>
   </mat-card>
 
-  <!-- Fee Schedule Management -->
+  <!-- Fees per TLD Management -->
   <mat-card class="admin-card">
     <mat-card-header>
-      <mat-card-title>Fee Schedule (Defaults)</mat-card-title>
-      <mat-card-subtitle>Default registry fees charged to all registrars per TLD and operation. These are the baseline rates applied when no registrar-specific pricing rule exists. To set custom pricing for individual registrars, use the Pricing tab.</mat-card-subtitle>
+      <mat-card-title>Fees per TLD (Defaults)</mat-card-title>
+      <mat-card-subtitle>Per-operation RSP fees per TLD — the amount the RSP retains per operation. The registry receives the remainder (Registrar Pays minus RSP Fee). Configure one entry per TLD/operation combination. To set what individual registrars are charged, use the Pricing tab.</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
       <button mat-raised-button color="primary" (click)="onAddCostBasis()" *ngIf="!showCostBasisForm()">
-        <mat-icon>add</mat-icon> Add Rate
+        <mat-icon>add</mat-icon> Add Entry
       </button>
 
       <!-- Add/Edit Form -->
       <div *ngIf="showCostBasisForm()" class="cost-basis-form">
-        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Fee Schedule Entry</h3>
+        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Fees per TLD Entry</h3>
         <form [formGroup]="costBasisForm" (ngSubmit)="onSaveCostBasis()" class="add-form cost-basis-fields">
           <mat-form-field>
             <mat-label>TLD</mat-label>
@@ -166,15 +166,9 @@
             </mat-select>
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Registrar (blank = all)</mat-label>
-            <mat-select formControlName="registrarId">
-              <mat-option value="">All (default)</mat-option>
-              <mat-option *ngFor="let reg of systemInfo()?.registrars || []" [value]="reg.registrarId">{{ reg.registrarId }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Fee Amount</mat-label>
-            <input matInput formControlName="costAmount" type="number" step="0.01">
+            <mat-label>RSP Fee</mat-label>
+            <input matInput formControlName="rspRetainedFeeAmount" type="number" step="0.01">
+            <mat-hint>Amount RSP retains per operation. Net to Registry = Registrar Pays − RSP Fee.</mat-hint>
           </mat-form-field>
           <mat-form-field>
             <mat-label>Currency</mat-label>
@@ -193,7 +187,7 @@
         </form>
       </div>
 
-      <!-- Fee Schedule Table -->
+      <!-- Fees per TLD Table -->
       <table mat-table [dataSource]="costBasisEntries()" class="cost-basis-table" *ngIf="costBasisEntries().length > 0">
         <ng-container matColumnDef="tld">
           <th mat-header-cell *matHeaderCellDef>TLD</th>
@@ -203,17 +197,36 @@
           <th mat-header-cell *matHeaderCellDef>Operation</th>
           <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
         </ng-container>
-        <ng-container matColumnDef="registrarId">
-          <th mat-header-cell *matHeaderCellDef>Registrar</th>
-          <td mat-cell *matCellDef="let row">{{ row.registrarId || 'All (default)' }}</td>
+        <ng-container matColumnDef="registrarPays">
+          <th mat-header-cell *matHeaderCellDef>
+            Registrar Pays
+            <mat-icon class="header-help" matTooltip="The default amount the registrar is billed per operation for this TLD, sourced from the Nomulus TLD configuration. Read-only — change this in the TLD config.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="row.registrarBilledAmount != null">{{ row.registrarBilledAmount | number:'1.2-2' }}</ng-container>
+            <span *ngIf="row.registrarBilledAmount == null" class="muted">—</span>
+          </td>
         </ng-container>
-        <ng-container matColumnDef="costAmount">
-          <th mat-header-cell *matHeaderCellDef>Fee</th>
-          <td mat-cell *matCellDef="let row">{{ row.costAmount | number:'1.2-2' }}</td>
+        <ng-container matColumnDef="rspFee">
+          <th mat-header-cell *matHeaderCellDef>
+            RSP Fee
+            <mat-icon class="header-help" matTooltip="The service fee the RSP charges per operation. The registry receives the remainder: Registrar Pays minus RSP Fee. Configurable per TLD and operation.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">{{ row.rspRetainedFeeAmount | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="netToRegistry">
+          <th mat-header-cell *matHeaderCellDef>
+            Net to Registry
+            <mat-icon class="header-help" matTooltip="The amount the registry receives per operation — calculated as Registrar Pays minus RSP Fee. Not stored; updates automatically when RSP Fee changes.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="row.netAmountToRegistry != null">{{ row.netAmountToRegistry | number:'1.2-2' }}</ng-container>
+            <span *ngIf="row.netAmountToRegistry == null" class="muted">—</span>
+          </td>
         </ng-container>
         <ng-container matColumnDef="costCurrency">
           <th mat-header-cell *matHeaderCellDef>Currency</th>
-          <td mat-cell *matCellDef="let row">{{ row.costCurrency }}</td>
+          <td mat-cell *matCellDef="let row">{{ row.currency || row.costCurrency }}</td>
         </ng-container>
         <ng-container matColumnDef="notes">
           <th mat-header-cell *matHeaderCellDef>Notes</th>
@@ -232,7 +245,7 @@
       </table>
 
       <p *ngIf="costBasisEntries().length === 0 && !dashService.loading()" class="empty-state">
-        No fee schedule entries configured yet.
+        No fee entries configured yet.
       </p>
     </mat-card-content>
   </mat-card>

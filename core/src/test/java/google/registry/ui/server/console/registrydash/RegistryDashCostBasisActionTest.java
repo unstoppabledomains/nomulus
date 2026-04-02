@@ -96,7 +96,7 @@ class RegistryDashCostBasisActionTest {
     RegistryDashboardCostBasis cb1 = new RegistryDashboardCostBasis();
     cb1.setTld("tld");
     cb1.setOperation("CREATE");
-    cb1.setCostAmount(new BigDecimal("5.00"));
+    cb1.setRspRetainedFeeAmount(new BigDecimal("5.00"));
     cb1.setCostCurrency("USD");
     cb1.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
     tm().transact(() -> tm().getEntityManager().persist(cb1));
@@ -104,7 +104,7 @@ class RegistryDashCostBasisActionTest {
     RegistryDashboardCostBasis cb2 = new RegistryDashboardCostBasis();
     cb2.setTld("tld");
     cb2.setOperation("RENEW");
-    cb2.setCostAmount(new BigDecimal("4.00"));
+    cb2.setRspRetainedFeeAmount(new BigDecimal("4.00"));
     cb2.setCostCurrency("USD");
     cb2.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
     tm().transact(() -> tm().getEntityManager().persist(cb2));
@@ -133,7 +133,7 @@ class RegistryDashCostBasisActionTest {
     RegistryDashboardCostBasis costBasis = new RegistryDashboardCostBasis();
     costBasis.setTld("tld");
     costBasis.setOperation("CREATE");
-    costBasis.setCostAmount(new BigDecimal("5.00"));
+    costBasis.setRspRetainedFeeAmount(new BigDecimal("5.00"));
     costBasis.setCostCurrency("USD");
     costBasis.setNotes("Test cost basis");
 
