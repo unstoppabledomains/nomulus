@@ -178,7 +178,7 @@ public class RegistryDashboardEntitiesTest {
     RegistryDashboardCostBasis costBasis = new RegistryDashboardCostBasis();
     costBasis.setTld("tld");
     costBasis.setOperation("CREATE");
-    costBasis.setCostAmount(new BigDecimal("5.00"));
+    costBasis.setRspRetainedFeeAmount(new BigDecimal("5.00"));
     costBasis.setCostCurrency("USD");
     costBasis.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
     costBasis.setNotes("Base cost for TLD");
@@ -193,7 +193,7 @@ public class RegistryDashboardEntitiesTest {
           assertThat(loaded).isNotNull();
           assertThat(loaded.getTld()).isEqualTo("tld");
           assertThat(loaded.getOperation()).isEqualTo("CREATE");
-          assertThat(loaded.getCostAmount()).isEqualTo(new BigDecimal("5.00"));
+          assertThat(loaded.getRspRetainedFeeAmount()).isEqualTo(new BigDecimal("5.00"));
           assertThat(loaded.getCostCurrency()).isEqualTo("USD");
           assertThat(loaded.getNotes()).isEqualTo("Base cost for TLD");
         });
@@ -204,7 +204,7 @@ public class RegistryDashboardEntitiesTest {
     RegistryDashboardCostBasis costBasis = new RegistryDashboardCostBasis();
     costBasis.setTld("tld");
     costBasis.setOperation("RESTORE");
-    costBasis.setCostAmount(new BigDecimal("40.00"));
+    costBasis.setRspRetainedFeeAmount(new BigDecimal("40.00"));
     costBasis.setCostCurrency("USD");
     costBasis.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
 
@@ -346,7 +346,7 @@ public class RegistryDashboardEntitiesTest {
     RegistryDashboardCostBasis c1 = new RegistryDashboardCostBasis();
     c1.setTld("tld");
     c1.setOperation("CREATE");
-    c1.setCostAmount(new BigDecimal("5.00"));
+    c1.setRspRetainedFeeAmount(new BigDecimal("5.00"));
     c1.setCostCurrency("USD");
     c1.setEffectiveDate(date);
     tm().transact(() -> tm().getEntityManager().persist(c1));
@@ -354,7 +354,7 @@ public class RegistryDashboardEntitiesTest {
     RegistryDashboardCostBasis c2 = new RegistryDashboardCostBasis();
     c2.setTld("tld");
     c2.setOperation("CREATE");
-    c2.setCostAmount(new BigDecimal("6.00"));
+    c2.setRspRetainedFeeAmount(new BigDecimal("6.00"));
     c2.setCostCurrency("USD");
     c2.setEffectiveDate(date); // same → unique violation
     assertThrows(
@@ -440,46 +440,6 @@ public class RegistryDashboardEntitiesTest {
   }
 
   @Test
-  void testCostBasis_withRegistrarId() {
-    RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
-    cb.setTld("tld");
-    cb.setOperation("CREATE");
-    cb.setCostAmount(new BigDecimal("5.00"));
-    cb.setCostCurrency("USD");
-    cb.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
-    cb.setRegistrarId("arsenic");
-    tm().transact(() -> tm().getEntityManager().persist(cb));
-
-    tm().transact(
-        () -> {
-          RegistryDashboardCostBasis loaded =
-              tm().getEntityManager()
-                  .find(RegistryDashboardCostBasis.class, cb.getId());
-          assertThat(loaded.getRegistrarId()).isEqualTo("arsenic");
-        });
-  }
-
-  @Test
-  void testCostBasis_nullRegistrarId_isDefault() {
-    RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
-    cb.setTld("tld");
-    cb.setOperation("RENEW");
-    cb.setCostAmount(new BigDecimal("7.00"));
-    cb.setCostCurrency("USD");
-    cb.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
-    // registrarId left null - this is the "default" rate
-    tm().transact(() -> tm().getEntityManager().persist(cb));
-
-    tm().transact(
-        () -> {
-          RegistryDashboardCostBasis loaded =
-              tm().getEntityManager()
-                  .find(RegistryDashboardCostBasis.class, cb.getId());
-          assertThat(loaded.getRegistrarId()).isNull();
-        });
-  }
-
-  @Test
   void testRoRegistry_settings() {
     RoRegistry reg = new RoRegistry("SettingsTest");
     tm().transact(() -> tm().getEntityManager().persist(reg));
@@ -512,7 +472,7 @@ public class RegistryDashboardEntitiesTest {
     RegistryDashboardCostBasis cost = new RegistryDashboardCostBasis();
     cost.setTld("tld");
     cost.setOperation("RENEW");
-    cost.setCostAmount(new BigDecimal("4.00"));
+    cost.setRspRetainedFeeAmount(new BigDecimal("4.00"));
     cost.setCostCurrency("USD");
     cost.setEffectiveDate(ZonedDateTime.now(ZoneOffset.UTC));
 

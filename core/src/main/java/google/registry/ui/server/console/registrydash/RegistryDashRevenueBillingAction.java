@@ -66,9 +66,20 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      LEFT JOIN LATERAL (
+        SELECT rsp_retained_fee_amount
+        FROM "RegistryDashboardCostBasis"
+        WHERE tld = d.tld
+          AND operation = b.reason
+          AND effective_date <= b.event_time
+        ORDER BY effective_date DESC
+        LIMIT 1
+      ) cb ON true
       WHERE b.event_time >= :startDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
@@ -80,9 +91,20 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      LEFT JOIN LATERAL (
+        SELECT rsp_retained_fee_amount
+        FROM "RegistryDashboardCostBasis"
+        WHERE tld = d.tld
+          AND operation = b.reason
+          AND effective_date <= b.event_time
+        ORDER BY effective_date DESC
+        LIMIT 1
+      ) cb ON true
       WHERE b.event_time >= :startDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
@@ -98,9 +120,20 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      LEFT JOIN LATERAL (
+        SELECT rsp_retained_fee_amount
+        FROM "RegistryDashboardCostBasis"
+        WHERE tld = d.tld
+          AND operation = b.reason
+          AND effective_date <= b.event_time
+        ORDER BY effective_date DESC
+        LIMIT 1
+      ) cb ON true
       WHERE b.event_time >= :startDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
@@ -113,9 +146,20 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      LEFT JOIN LATERAL (
+        SELECT rsp_retained_fee_amount
+        FROM "RegistryDashboardCostBasis"
+        WHERE tld = d.tld
+          AND operation = b.reason
+          AND effective_date <= b.event_time
+        ORDER BY effective_date DESC
+        LIMIT 1
+      ) cb ON true
       WHERE b.event_time >= :startDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
@@ -165,7 +209,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("periodRevenue", List.of());
-      empty.put("totals", Map.of("totalRevenue", 0, "currency", "USD", "byOperation", Map.of()));
+      Map<String, Object> emptyTotals = new HashMap<>();
+      emptyTotals.put("totalRevenue", 0);
+      emptyTotals.put("totalNetAmountToRegistry", 0);
+      emptyTotals.put("currency", "USD");
+      emptyTotals.put("byOperation", Map.of());
+      emptyTotals.put("byOperationNetAmountToRegistry", Map.of());
+      empty.put("totals", emptyTotals);
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(empty));
       consoleApiParams.response().setStatus(SC_OK);
       return;
@@ -212,7 +262,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
 
           List<Map<String, Object>> periodRevenue = new ArrayList<>();
           BigDecimal totalRevenue = BigDecimal.ZERO;
+          BigDecimal totalNetAmountToRegistry = BigDecimal.ZERO;
           Map<String, BigDecimal> byOperation = new HashMap<>();
+          Map<String, BigDecimal> byOperationNetAmountToRegistry = new HashMap<>();
           String currency = "USD";
 
           for (Object[] row : results) {
@@ -231,25 +283,31 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             String tld = (String) row[1];
             String operation = (String) row[2];
             BigDecimal amount = (BigDecimal) row[3];
-            String cur = (String) row[4];
+            BigDecimal netAmountToRegistry = row[4] != null ? (BigDecimal) row[4] : BigDecimal.ZERO;
+            String cur = (String) row[5];
 
             Map<String, Object> entry = new HashMap<>();
             entry.put("period", formatPeriod(periodInstant, resolvedGran));
             entry.put("tld", tld);
             entry.put("operation", operation);
             entry.put("amount", amount);
+            entry.put("netAmountToRegistry", netAmountToRegistry);
             entry.put("currency", cur);
             periodRevenue.add(entry);
 
             totalRevenue = totalRevenue.add(amount);
+            totalNetAmountToRegistry = totalNetAmountToRegistry.add(netAmountToRegistry);
             byOperation.merge(operation, amount, BigDecimal::add);
+            byOperationNetAmountToRegistry.merge(operation, netAmountToRegistry, BigDecimal::add);
             currency = cur;
           }
 
           Map<String, Object> totals = new HashMap<>();
           totals.put("totalRevenue", totalRevenue);
+          totals.put("totalNetAmountToRegistry", totalNetAmountToRegistry);
           totals.put("currency", currency);
           totals.put("byOperation", byOperation);
+          totals.put("byOperationNetAmountToRegistry", byOperationNetAmountToRegistry);
 
           Map<String, Object> response = new HashMap<>();
           response.put("periodRevenue", periodRevenue);

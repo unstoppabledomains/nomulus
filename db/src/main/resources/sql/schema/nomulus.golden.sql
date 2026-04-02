@@ -1142,13 +1142,12 @@ CREATE TABLE public."RegistryDashboardCostBasis" (
     id bigint NOT NULL,
     tld text NOT NULL,
     operation text NOT NULL,
-    cost_amount numeric(19,2) NOT NULL,
+    rsp_retained_fee_amount numeric(19,2) NOT NULL,
     cost_currency text NOT NULL,
     effective_date timestamp with time zone DEFAULT now() NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    registrar_id text
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2008,6 +2007,14 @@ ALTER TABLE ONLY public."RegistryDashboardCostBasis"
 
 
 --
+-- Name: RegistryDashboardCostBasis RegistryDashboardCostBasis_tld_operation_effective_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardCostBasis"
+    ADD CONSTRAINT "RegistryDashboardCostBasis_tld_operation_effective_date_key" UNIQUE (tld, operation, effective_date);
+
+
+--
 -- Name: RegistryDashboardRegistrarPricing RegistryDashboardRegistrarPri_registrar_id_tld_operation_ef_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2581,13 +2588,6 @@ CREATE INDEX idx_console_update_history_modification_time ON public."ConsoleUpda
 --
 
 CREATE INDEX idx_console_update_history_type ON public."ConsoleUpdateHistory" USING btree (type);
-
-
---
--- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_cost_basis_tld_op_reg_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, COALESCE(registrar_id, ''::text), effective_date);
 
 
 --

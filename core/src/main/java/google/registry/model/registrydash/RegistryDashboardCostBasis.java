@@ -24,7 +24,12 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import javax.annotation.Nullable;
 
-/** RO cost basis — what the RSP pays upstream to the RO per TLD (dashboard-only). */
+/**
+ * Per-TLD fee schedule entry — stores the RSP's retained fee per operation.
+ *
+ * <p>The RSP retains {@code rspRetainedFeeAmount} per operation. The registry receives the
+ * remainder: registrar billed amount (from Nomulus TLD config) minus rspRetainedFeeAmount.
+ */
 @Entity
 @Table(name = "RegistryDashboardCostBasis")
 public class RegistryDashboardCostBasis {
@@ -39,12 +44,8 @@ public class RegistryDashboardCostBasis {
   @Column(nullable = false)
   String operation;
 
-  @Nullable
-  @Column(name = "registrar_id")
-  String registrarId;
-
-  @Column(name = "cost_amount", nullable = false, precision = 19, scale = 2)
-  BigDecimal costAmount;
+  @Column(name = "rsp_retained_fee_amount", nullable = false, precision = 19, scale = 2)
+  BigDecimal rspRetainedFeeAmount;
 
   @Column(name = "cost_currency", nullable = false)
   String costCurrency;
@@ -89,21 +90,12 @@ public class RegistryDashboardCostBasis {
     this.operation = operation;
   }
 
-  @Nullable
-  public String getRegistrarId() {
-    return registrarId;
+  public BigDecimal getRspRetainedFeeAmount() {
+    return rspRetainedFeeAmount;
   }
 
-  public void setRegistrarId(@Nullable String registrarId) {
-    this.registrarId = registrarId;
-  }
-
-  public BigDecimal getCostAmount() {
-    return costAmount;
-  }
-
-  public void setCostAmount(BigDecimal costAmount) {
-    this.costAmount = costAmount;
+  public void setRspRetainedFeeAmount(BigDecimal rspRetainedFeeAmount) {
+    this.rspRetainedFeeAmount = rspRetainedFeeAmount;
   }
 
   public String getCostCurrency() {

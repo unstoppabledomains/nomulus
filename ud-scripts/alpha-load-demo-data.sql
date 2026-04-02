@@ -126,47 +126,52 @@ WHERE r.name IN ('RetroTech Registry', 'Vintage Digital', 'NeonWave Networks')
 ON CONFLICT (registry_id, user_email) DO NOTHING;
 
 -- ==========================================================================
--- Step 5: Fee Schedules (Cost Basis) — global rates per TLD/Operation
+-- Step 5: RSP Fee Schedule per TLD/Operation
 -- ==========================================================================
--- These represent what the registry operator pays upstream per operation.
--- registrar_id is NULL = global rate (applies to all registrars).
+-- rsp_retained_fee_amount: the service fee the RSP charges per operation.
+-- Net to Registry = Registrar Pays (from TLD config) minus RSP Fee.
+-- One entry per TLD/operation — no registrar-specific rows.
 -- Operations: CREATE, RENEW, RESTORE, TRANSFER
 --
--- Pricing strategy: cost basis is roughly 55-65% of TLD retail price,
--- leaving room for per-registrar markup.
+-- Registrar Pays (from TLD config):
+--   modem:    Create $15, Renew $12, Restore $25, Transfer $0
+--   floppy:   Create $10, Renew  $8, Restore $18, Transfer $0
+--   pixel:    Create $20, Renew $16, Restore $35, Transfer $0
+--   dialup:   Create $12, Renew $10, Restore $20, Transfer $0
+--   cassette: Create $18, Renew $14, Restore $30, Transfer $0
 
 INSERT INTO "RegistryDashboardCostBasis"
-  (tld, operation, cost_amount, cost_currency, effective_date, registrar_id, notes, created_at, updated_at)
+  (tld, operation, rsp_retained_fee_amount, cost_currency, effective_date, notes, created_at, updated_at)
 VALUES
-  -- modem: Retail Create $15, Renew $12, Restore $25
-  ('modem',    'CREATE',   9.00,  'USD', '2026-01-01', NULL, 'Wholesale create — modem',   NOW(), NOW()),
-  ('modem',    'RENEW',    7.50,  'USD', '2026-01-01', NULL, 'Wholesale renew — modem',    NOW(), NOW()),
-  ('modem',    'RESTORE', 15.00,  'USD', '2026-01-01', NULL, 'Wholesale restore — modem',  NOW(), NOW()),
-  ('modem',    'TRANSFER', 7.50,  'USD', '2026-01-01', NULL, 'Same as renew — modem',      NOW(), NOW()),
+  -- modem: RSP Fee = Registrar Pays - Net to Registry ($15-$9, $12-$7.50, $25-$15)
+  ('modem',    'CREATE',   6.00,  'USD', '2026-01-01', 'RSP service fee — modem CREATE',   NOW(), NOW()),
+  ('modem',    'RENEW',    4.50,  'USD', '2026-01-01', 'RSP service fee — modem RENEW',    NOW(), NOW()),
+  ('modem',    'RESTORE', 10.00,  'USD', '2026-01-01', 'RSP service fee — modem RESTORE',  NOW(), NOW()),
+  ('modem',    'TRANSFER', 0.00,  'USD', '2026-01-01', 'Transfer is free — modem',         NOW(), NOW()),
 
-  -- floppy: Retail Create $10, Renew $8, Restore $18
-  ('floppy',   'CREATE',   6.00,  'USD', '2026-01-01', NULL, 'Wholesale create — floppy',  NOW(), NOW()),
-  ('floppy',   'RENEW',    5.00,  'USD', '2026-01-01', NULL, 'Wholesale renew — floppy',   NOW(), NOW()),
-  ('floppy',   'RESTORE', 10.00,  'USD', '2026-01-01', NULL, 'Wholesale restore — floppy', NOW(), NOW()),
-  ('floppy',   'TRANSFER', 5.00,  'USD', '2026-01-01', NULL, 'Same as renew — floppy',     NOW(), NOW()),
+  -- floppy: RSP Fee = Registrar Pays - Net to Registry ($10-$6, $8-$5, $18-$10)
+  ('floppy',   'CREATE',   4.00,  'USD', '2026-01-01', 'RSP service fee — floppy CREATE',  NOW(), NOW()),
+  ('floppy',   'RENEW',    3.00,  'USD', '2026-01-01', 'RSP service fee — floppy RENEW',   NOW(), NOW()),
+  ('floppy',   'RESTORE',  8.00,  'USD', '2026-01-01', 'RSP service fee — floppy RESTORE', NOW(), NOW()),
+  ('floppy',   'TRANSFER', 0.00,  'USD', '2026-01-01', 'Transfer is free — floppy',        NOW(), NOW()),
 
-  -- pixel: Retail Create $20, Renew $16, Restore $35
-  ('pixel',    'CREATE',  12.00,  'USD', '2026-01-01', NULL, 'Wholesale create — pixel',   NOW(), NOW()),
-  ('pixel',    'RENEW',   10.00,  'USD', '2026-01-01', NULL, 'Wholesale renew — pixel',    NOW(), NOW()),
-  ('pixel',    'RESTORE', 20.00,  'USD', '2026-01-01', NULL, 'Wholesale restore — pixel',  NOW(), NOW()),
-  ('pixel',    'TRANSFER',10.00,  'USD', '2026-01-01', NULL, 'Same as renew — pixel',      NOW(), NOW()),
+  -- pixel: RSP Fee = Registrar Pays - Net to Registry ($20-$12, $16-$10, $35-$20)
+  ('pixel',    'CREATE',   8.00,  'USD', '2026-01-01', 'RSP service fee — pixel CREATE',   NOW(), NOW()),
+  ('pixel',    'RENEW',    6.00,  'USD', '2026-01-01', 'RSP service fee — pixel RENEW',    NOW(), NOW()),
+  ('pixel',    'RESTORE', 15.00,  'USD', '2026-01-01', 'RSP service fee — pixel RESTORE',  NOW(), NOW()),
+  ('pixel',    'TRANSFER', 0.00,  'USD', '2026-01-01', 'Transfer is free — pixel',         NOW(), NOW()),
 
-  -- dialup: Retail Create $12, Renew $10, Restore $20
-  ('dialup',   'CREATE',   7.00,  'USD', '2026-01-01', NULL, 'Wholesale create — dialup',  NOW(), NOW()),
-  ('dialup',   'RENEW',    6.00,  'USD', '2026-01-01', NULL, 'Wholesale renew — dialup',   NOW(), NOW()),
-  ('dialup',   'RESTORE', 12.00,  'USD', '2026-01-01', NULL, 'Wholesale restore — dialup', NOW(), NOW()),
-  ('dialup',   'TRANSFER', 6.00,  'USD', '2026-01-01', NULL, 'Same as renew — dialup',     NOW(), NOW()),
+  -- dialup: RSP Fee = Registrar Pays - Net to Registry ($12-$7, $10-$6, $20-$12)
+  ('dialup',   'CREATE',   5.00,  'USD', '2026-01-01', 'RSP service fee — dialup CREATE',  NOW(), NOW()),
+  ('dialup',   'RENEW',    4.00,  'USD', '2026-01-01', 'RSP service fee — dialup RENEW',   NOW(), NOW()),
+  ('dialup',   'RESTORE',  8.00,  'USD', '2026-01-01', 'RSP service fee — dialup RESTORE', NOW(), NOW()),
+  ('dialup',   'TRANSFER', 0.00,  'USD', '2026-01-01', 'Transfer is free — dialup',        NOW(), NOW()),
 
-  -- cassette: Retail Create $18, Renew $14, Restore $30
-  ('cassette', 'CREATE',  11.00,  'USD', '2026-01-01', NULL, 'Wholesale create — cassette',  NOW(), NOW()),
-  ('cassette', 'RENEW',    9.00,  'USD', '2026-01-01', NULL, 'Wholesale renew — cassette',   NOW(), NOW()),
-  ('cassette', 'RESTORE', 18.00,  'USD', '2026-01-01', NULL, 'Wholesale restore — cassette', NOW(), NOW()),
-  ('cassette', 'TRANSFER', 9.00,  'USD', '2026-01-01', NULL, 'Same as renew — cassette',     NOW(), NOW())
+  -- cassette: RSP Fee = Registrar Pays - Net to Registry ($18-$11, $14-$9, $30-$18)
+  ('cassette', 'CREATE',   7.00,  'USD', '2026-01-01', 'RSP service fee — cassette CREATE',  NOW(), NOW()),
+  ('cassette', 'RENEW',    5.00,  'USD', '2026-01-01', 'RSP service fee — cassette RENEW',   NOW(), NOW()),
+  ('cassette', 'RESTORE', 12.00,  'USD', '2026-01-01', 'RSP service fee — cassette RESTORE', NOW(), NOW()),
+  ('cassette', 'TRANSFER', 0.00,  'USD', '2026-01-01', 'Transfer is free — cassette',        NOW(), NOW())
 
 ON CONFLICT DO NOTHING;
 
@@ -279,10 +284,9 @@ LEFT JOIN "RoRegistryUser" ru ON ru.registry_id = r.id
 GROUP BY r.id, r.name, r.settings
 ORDER BY r.name;
 
-SELECT '=== Cost Basis (global fee schedules) ===' AS section;
-SELECT tld, operation, cost_amount, cost_currency, registrar_id
+SELECT '=== RSP Fee Schedule ===' AS section;
+SELECT tld, operation, rsp_retained_fee_amount, cost_currency
 FROM "RegistryDashboardCostBasis"
-WHERE registrar_id IS NULL
 ORDER BY tld, operation;
 
 SELECT '=== Per-Registrar Pricing Rules ===' AS section;

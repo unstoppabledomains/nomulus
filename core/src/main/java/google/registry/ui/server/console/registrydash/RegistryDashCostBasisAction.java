@@ -26,6 +26,7 @@ import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrydash.RegistryDashboardCostBasis;
+import google.registry.model.tld.Tld;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
@@ -33,13 +34,17 @@ import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.joda.time.DateTime;
 
-/** Handles cost basis CRUD for the registry dashboard. */
+/** Handles fees-per-TLD CRUD for the registry dashboard. */
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashCostBasisAction.PATH,
@@ -81,10 +86,23 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
               tm().getEntityManager()
                   .createQuery(ALL_COST_BASIS, RegistryDashboardCostBasis.class)
                   .getResultList();
-          List<Map<String, Object>> payload =
-              new java.util.ArrayList<>();
+
+          // Build a TLD cache for registrar billed amount lookups
+          Map<String, Tld> tldCache = new HashMap<>();
+          results.stream()
+              .map(RegistryDashboardCostBasis::getTld)
+              .distinct()
+              .forEach(tldStr -> {
+                try {
+                  tldCache.put(tldStr, Tld.get(tldStr));
+                } catch (Exception e) {
+                  // TLD not found — skip; tldCache.get() will return null for this TLD
+                }
+              });
+
+          List<Map<String, Object>> payload = new ArrayList<>();
           for (RegistryDashboardCostBasis c : results) {
-            payload.add(costBasisToMap(c));
+            payload.add(costBasisToMap(c, tldCache.get(c.getTld())));
           }
           consoleApiParams.response().setPayload(
               consoleApiParams.gson().toJson(payload));
@@ -96,25 +114,29 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
   protected void postHandler(User user) {
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
     if (!isAdmin
-        && !user.getUserRoles().hasGlobalPermission(
-            ConsolePermission.MANAGE_COST_BASIS)) {
+        && !user.getUserRoles().hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)) {
       consoleApiParams.response().setStatus(SC_FORBIDDEN);
       return;
     }
 
     RegistryDashboardCostBasis costBasis =
         costBasisPayload.orElseThrow(
-            () -> new IllegalArgumentException(
-                "Cost basis data is required"));
+            () -> new IllegalArgumentException("Cost basis data is required"));
 
     ZonedDateTime now = ZonedDateTime.now(java.time.ZoneOffset.UTC);
     costBasis.setEffectiveDate(
-        costBasis.getEffectiveDate() != null
-            ? costBasis.getEffectiveDate() : now);
+        costBasis.getEffectiveDate() != null ? costBasis.getEffectiveDate() : now);
 
     tm().transact(() -> tm().getEntityManager().persist(costBasis));
+
+    Tld tld = null;
+    try {
+      tld = Tld.get(costBasis.getTld());
+    } catch (Exception e) {
+      // TLD not found — netAmountToRegistry will be null in response
+    }
     consoleApiParams.response().setPayload(
-        consoleApiParams.gson().toJson(costBasisToMap(costBasis)));
+        consoleApiParams.gson().toJson(costBasisToMap(costBasis, tld)));
     consoleApiParams.response().setStatus(SC_OK);
   }
 
@@ -144,29 +166,61 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
             setFailedResponse("Cost basis entry not found", SC_BAD_REQUEST);
             return;
           }
-          existing.setCostAmount(costBasis.getCostAmount());
+          existing.setRspRetainedFeeAmount(costBasis.getRspRetainedFeeAmount());
           existing.setCostCurrency(costBasis.getCostCurrency());
           existing.setNotes(costBasis.getNotes());
-          existing.setRegistrarId(costBasis.getRegistrarId());
           existing.setUpdatedAt(ZonedDateTime.now(java.time.ZoneOffset.UTC));
           tm().getEntityManager().merge(existing);
+
+          Tld tld = null;
+          try {
+            tld = Tld.get(existing.getTld());
+          } catch (Exception e) {
+            // TLD not found
+          }
           consoleApiParams.response().setPayload(
-              consoleApiParams.gson().toJson(costBasisToMap(existing)));
+              consoleApiParams.gson().toJson(costBasisToMap(existing, tld)));
           consoleApiParams.response().setStatus(SC_OK);
         });
   }
 
-  private static Map<String, Object> costBasisToMap(
-      RegistryDashboardCostBasis c) {
+  private static Map<String, Object> costBasisToMap(RegistryDashboardCostBasis c, Tld tld) {
     Map<String, Object> map = new HashMap<>();
     map.put("id", c.getId());
     map.put("tld", c.getTld());
     map.put("operation", c.getOperation());
-    map.put("registrarId", c.getRegistrarId());
-    map.put("costAmount", c.getCostAmount());
+    map.put("rspRetainedFeeAmount", c.getRspRetainedFeeAmount());
     map.put("costCurrency", c.getCostCurrency());
-    map.put("effectiveDate", c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : null);
+    map.put("effectiveDate",
+        c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : null);
     map.put("notes", c.getNotes());
+
+    // Enrich with registrar billed amount (from TLD config) and calculated net to registry
+    if (tld != null) {
+      BigDecimal registrarBilledAmount = getRegistrarBilledAmount(tld, c.getOperation());
+      map.put("registrarBilledAmount", registrarBilledAmount);
+      if (registrarBilledAmount != null && c.getRspRetainedFeeAmount() != null) {
+        map.put("netAmountToRegistry",
+            registrarBilledAmount.subtract(c.getRspRetainedFeeAmount()));
+      }
+      map.put("currency", tld.getCurrency().getCode());
+    }
     return map;
+  }
+
+  /**
+   * Returns the default amount the registrar is billed for a given TLD and operation.
+   * For TRANSFER, uses renew pricing — the gaining registrar is charged a one-year renewal
+   * as part of the transfer (see DomainPricingLogic.getTransferPrice).
+   */
+  static BigDecimal getRegistrarBilledAmount(Tld tld, String operation) {
+    DateTime now = DateTime.now(org.joda.time.DateTimeZone.UTC);
+    return switch (operation.toUpperCase(Locale.US)) {
+      case "CREATE" -> tld.getCreateBillingCost(now).getAmount();
+      case "RENEW" -> tld.getStandardRenewCost(now).getAmount();
+      case "TRANSFER" -> tld.getStandardRenewCost(now).getAmount();
+      case "RESTORE" -> tld.getRestoreBillingCost().getAmount();
+      default -> null;
+    };
   }
 }

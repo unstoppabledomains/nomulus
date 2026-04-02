@@ -32,20 +32,23 @@
   <div class="metric-cards" *ngIf="data()">
     <mat-card class="metric-card">
       <mat-card-content>
-        <div class="metric-value">{{ totalRevenue() | number:'1.2-2' }} {{ currency() }}</div>
-        <div class="metric-label">Total Revenue</div>
+        <div class="metric-value">${{ totalNetAmountToRegistry() | number:'1.2-2' }} {{ currency() }}</div>
+        <div class="metric-label">Registry Revenue</div>
+        <div class="metric-hint">Total net amount received by the registry over this period — what registrars paid minus RSP fees</div>
       </mat-card-content>
     </mat-card>
     <mat-card class="metric-card">
       <mat-card-content>
-        <div class="metric-value">{{ avgMonthlyRevenue() | number:'1.2-2' }} {{ currency() }}</div>
-        <div class="metric-label">Avg Monthly</div>
+        <div class="metric-value">${{ avgPerBucketRegistryRevenue() | number:'1.2-2' }} {{ currency() }}</div>
+        <div class="metric-label">Avg Per Bucket Registry Revenue</div>
+        <div class="metric-hint">Average net-to-registry per time bucket over the selected period</div>
       </mat-card-content>
     </mat-card>
     <mat-card class="metric-card">
       <mat-card-content>
         <div class="metric-value">.{{ topTld() }}</div>
         <div class="metric-label">Top TLD</div>
+        <div class="metric-hint">TLD contributing most to registry revenue</div>
       </mat-card-content>
     </mat-card>
   </div>
@@ -53,11 +56,13 @@
   <!-- Charts -->
   <div class="charts-row" *ngIf="data()">
     <div class="chart-container" *ngIf="revenueLineOptions()">
-      <h3>Revenue by TLD</h3>
+      <h3>Registry Revenue by TLD</h3>
+      <p class="chart-description">Net registry revenue per TLD over the selected period — what the registry received after RSP fees.</p>
       <div echarts [options]="revenueLineOptions()!" [theme]="'ud-brand'" class="chart"></div>
     </div>
     <div class="chart-container" *ngIf="operationBarOptions()">
-      <h3>Revenue by Operation</h3>
+      <h3>Registry Revenue by Operation</h3>
+      <p class="chart-description">Net registry revenue by operation type over the selected period — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
       <div echarts [options]="operationBarOptions()!" [theme]="'ud-brand'" class="chart"></div>
     </div>
   </div>

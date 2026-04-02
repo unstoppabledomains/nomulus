@@ -17,6 +17,10 @@
   }
 }
 
+.time-range {
+  margin-bottom: 16px;
+}
+
 // Summary metric cards
 .metric-cards {
   display: flex;
@@ -45,6 +49,13 @@
     color: var(--ud-text-secondary);
     margin-top: 2px;
   }
+
+  .metric-hint {
+    font-size: 11px;
+    color: var(--ud-text-secondary);
+    opacity: 0.7;
+    margin-top: 2px;
+  }
 }
 
 // Bar chart
@@ -55,10 +66,17 @@
   padding: 20px 24px;
 
   .chart-title {
-    margin: 0 0 12px;
+    margin: 0 0 4px;
     font-size: 15px;
     font-weight: 500;
   }
+}
+
+.chart-description {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ud-text-secondary);
+  font-style: italic;
 }
 
 .chart-legend {

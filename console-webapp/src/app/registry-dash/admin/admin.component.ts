@@ -47,7 +47,7 @@ export class AdminComponent implements OnInit {
 
   // Cost Basis management
   costBasisEntries = computed(() => this.dashService.costBasis());
-  costBasisColumns = ['tld', 'operation', 'registrarId', 'costAmount', 'costCurrency', 'notes', 'actions'];
+  costBasisColumns = ['tld', 'operation', 'registrarPays', 'rspFee', 'netToRegistry', 'costCurrency', 'notes', 'actions'];
 
   showCostBasisForm = signal(false);
   editingCostBasis = signal<CostBasisEntry | undefined>(undefined);
@@ -55,8 +55,7 @@ export class AdminComponent implements OnInit {
   costBasisForm = new FormGroup({
     tld: new FormControl('', [Validators.required]),
     operation: new FormControl('', [Validators.required]),
-    registrarId: new FormControl(''),
-    costAmount: new FormControl<number | null>(null, [Validators.required, Validators.min(0)]),
+    rspRetainedFeeAmount: new FormControl<number | null>(null, [Validators.required, Validators.min(0)]),
     costCurrency: new FormControl('USD', [Validators.required]),
     notes: new FormControl(''),
   });
@@ -68,12 +67,9 @@ export class AdminComponent implements OnInit {
     { key: 'pricing.priceAmount', label: 'Pricing: Price' },
     { key: 'pricing.defaultPrice', label: 'Pricing: Default Price' },
     { key: 'pricing.difference', label: 'Pricing: Difference' },
-    { key: 'financials.registrarFee', label: 'Financials: Registrar Fee' },
-    { key: 'financials.rspCut', label: 'Financials: RSP Cut' },
-    { key: 'financials.costAmount', label: 'Financials: Net to Registry' },
-    { key: 'financials.registrarMarkup', label: 'Financials: Registrar Markup tab' },
-    { key: 'financials.revenueBilling', label: 'Financials: Revenue & Billing tab' },
-    { key: 'financials.avgFeeMetric', label: 'Financials: Avg Fee metric card' },
+    { key: 'financials.feesRspPays', label: 'Financials: RSP Fee column' },
+    { key: 'financials.feesNetToRegistry', label: 'Financials: Net to Registry column' },
+    { key: 'financials.entityBreakdownChart', label: 'Financials: Entity Breakdown Chart' },
   ];
   visibilityKeys = AdminComponent.VISIBILITY_KEYS;
 
@@ -216,8 +212,7 @@ export class AdminComponent implements OnInit {
     this.costBasisForm.patchValue({
       tld: entry.tld,
       operation: entry.operation,
-      registrarId: entry.registrarId || '',
-      costAmount: entry.costAmount,
+      rspRetainedFeeAmount: entry.rspRetainedFeeAmount,
       costCurrency: entry.costCurrency,
       notes: entry.notes || '',
     });
@@ -230,8 +225,7 @@ export class AdminComponent implements OnInit {
     const entry: CostBasisEntry = {
       tld: val.tld!,
       operation: val.operation!,
-      registrarId: val.registrarId || undefined,
-      costAmount: val.costAmount!,
+      rspRetainedFeeAmount: val.rspRetainedFeeAmount!,
       costCurrency: val.costCurrency!,
       notes: val.notes || undefined,
       effectiveDate: new Date().toISOString(),

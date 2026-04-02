@@ -116,7 +116,7 @@ export class DomainActivityComponent implements OnInit {
       tooltip: { trigger: 'axis' as const },
       legend: { data: types },
       xAxis: { type: 'category' as const, data: tldLabels, axisLabel: { rotate: 30 } },
-      yAxis: { type: 'value' as const },
+      yAxis: { type: 'value' as const, name: 'Domains', nameLocation: 'middle' as const, nameGap: 40 },
       series,
     };
   });
@@ -135,7 +135,7 @@ export class DomainActivityComponent implements OnInit {
 
     return {
       tooltip: { trigger: 'axis' as const },
-      xAxis: { type: 'value' as const },
+      xAxis: { type: 'value' as const, name: 'Domains', nameLocation: 'middle' as const, nameGap: 25 },
       yAxis: {
         type: 'category' as const,
         data: tlds,
