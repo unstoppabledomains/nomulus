@@ -2591,13 +2591,6 @@ CREATE INDEX idx_console_update_history_type ON public."ConsoleUpdateHistory" US
 
 
 --
--- Name: idx_cost_basis_tld_op_reg_date; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_cost_basis_tld_op_date ON public."RegistryDashboardCostBasis" USING btree (tld, operation, effective_date);
-
-
---
 -- Name: idx_pricing_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
