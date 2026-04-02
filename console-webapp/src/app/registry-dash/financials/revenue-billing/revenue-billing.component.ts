@@ -65,8 +65,8 @@ export class RevenueBillingComponent implements OnInit {
   /** Total net amount received by the registry over the selected period. */
   totalNetAmountToRegistry = computed(() => this.data()?.totals.totalNetAmountToRegistry ?? 0);
 
-  /** Average monthly registry revenue over the selected period. */
-  avgMonthlyRegistryRevenue = computed(() => {
+  /** Average net-to-registry per time bucket over the selected period. */
+  avgPerBucketRegistryRevenue = computed(() => {
     const d = this.data();
     if (!d || d.periodRevenue.length === 0) return 0;
     const periods = new Set(d.periodRevenue.map(p => p.period));

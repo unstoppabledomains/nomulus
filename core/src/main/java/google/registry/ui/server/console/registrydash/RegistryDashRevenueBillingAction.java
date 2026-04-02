@@ -66,7 +66,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
                AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
@@ -91,7 +91,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
                AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
@@ -120,7 +120,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
                AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
@@ -146,7 +146,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+             SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
                AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
@@ -209,7 +209,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("periodRevenue", List.of());
-      empty.put("totals", Map.of("totalRevenue", 0, "currency", "USD", "byOperation", Map.of()));
+      Map<String, Object> emptyTotals = new HashMap<>();
+      emptyTotals.put("totalRevenue", 0);
+      emptyTotals.put("totalNetAmountToRegistry", 0);
+      emptyTotals.put("currency", "USD");
+      emptyTotals.put("byOperation", Map.of());
+      emptyTotals.put("byOperationNetAmountToRegistry", Map.of());
+      empty.put("totals", emptyTotals);
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(empty));
       consoleApiParams.response().setStatus(SC_OK);
       return;

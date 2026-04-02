@@ -42,7 +42,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.joda.time.DateTime;
 
 /** Handles fees-per-TLD CRUD for the registry dashboard. */
@@ -89,19 +88,17 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
                   .getResultList();
 
           // Build a TLD cache for registrar billed amount lookups
-          Map<String, Tld> tldCache = results.stream()
+          Map<String, Tld> tldCache = new HashMap<>();
+          results.stream()
               .map(RegistryDashboardCostBasis::getTld)
               .distinct()
-              .collect(Collectors.toMap(
-                  tldStr -> tldStr,
-                  tldStr -> {
-                    try {
-                      return Tld.get(tldStr);
-                    } catch (Exception e) {
-                      return null;
-                    }
-                  },
-                  (a, b) -> a));
+              .forEach(tldStr -> {
+                try {
+                  tldCache.put(tldStr, Tld.get(tldStr));
+                } catch (Exception e) {
+                  // TLD not found — skip; tldCache.get() will return null for this TLD
+                }
+              });
 
           List<Map<String, Object>> payload = new ArrayList<>();
           for (RegistryDashboardCostBasis c : results) {
@@ -213,14 +210,15 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
 
   /**
    * Returns the default amount the registrar is billed for a given TLD and operation.
-   * For TRANSFER, returns $0 per spec (transfers are not billed to registrars by default).
+   * For TRANSFER, uses renew pricing — the gaining registrar is charged a one-year renewal
+   * as part of the transfer (see DomainPricingLogic.getTransferPrice).
    */
   static BigDecimal getRegistrarBilledAmount(Tld tld, String operation) {
     DateTime now = DateTime.now(org.joda.time.DateTimeZone.UTC);
     return switch (operation.toUpperCase(Locale.US)) {
       case "CREATE" -> tld.getCreateBillingCost(now).getAmount();
       case "RENEW" -> tld.getStandardRenewCost(now).getAmount();
-      case "TRANSFER" -> BigDecimal.ZERO;
+      case "TRANSFER" -> tld.getStandardRenewCost(now).getAmount();
       case "RESTORE" -> tld.getRestoreBillingCost().getAmount();
       default -> null;
     };

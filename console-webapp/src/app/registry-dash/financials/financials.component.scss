@@ -49,6 +49,13 @@
     color: var(--ud-text-secondary);
     margin-top: 2px;
   }
+
+  .metric-hint {
+    font-size: 11px;
+    color: var(--ud-text-secondary);
+    opacity: 0.7;
+    margin-top: 2px;
+  }
 }
 
 // Bar chart
