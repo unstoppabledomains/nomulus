@@ -66,7 +66,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0)) AS total_net_amount_to_registry,
+             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
@@ -90,7 +91,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       SELECT date_trunc('%s', b.event_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0)) AS total_net_amount_to_registry,
+             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
@@ -118,7 +120,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0)) AS total_net_amount_to_registry,
+             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
@@ -143,7 +146,8 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
                + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
-             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0)) AS total_net_amount_to_registry,
+             SUM(COALESCE(b.cost_amount - cb.rsp_retained_fee_amount, 0))
+               AS total_net_amount_to_registry,
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
