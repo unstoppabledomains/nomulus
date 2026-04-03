@@ -74,10 +74,11 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
-        WHERE tld = d.tld
+        WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
           AND effective_date <= b.event_time
-        ORDER BY effective_date DESC
+        ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
+                 effective_date DESC
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
@@ -99,10 +100,11 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
-        WHERE tld = d.tld
+        WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
           AND effective_date <= b.event_time
-        ORDER BY effective_date DESC
+        ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
+                 effective_date DESC
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
@@ -128,10 +130,11 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
-        WHERE tld = d.tld
+        WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
           AND effective_date <= b.event_time
-        ORDER BY effective_date DESC
+        ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
+                 effective_date DESC
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
@@ -154,10 +157,11 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
-        WHERE tld = d.tld
+        WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
           AND effective_date <= b.event_time
-        ORDER BY effective_date DESC
+        ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
+                 effective_date DESC
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate

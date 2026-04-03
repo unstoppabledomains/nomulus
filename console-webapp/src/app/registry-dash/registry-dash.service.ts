@@ -51,6 +51,8 @@ export interface PricingRule {
   defaultPriceCurrency?: string;
 }
 
+export const DEFAULT_TLD = '*';
+
 export interface CostBasisEntry {
   id?: number;
   tld: string;
@@ -60,6 +62,8 @@ export interface CostBasisEntry {
   currency?: string;
   effectiveDate: string;
   notes?: string;
+  isDefault?: boolean;
+  inheritedFromDefault?: boolean;
   // Enriched fields computed by the backend
   registrarBilledAmount?: number;
   netAmountToRegistry?: number;

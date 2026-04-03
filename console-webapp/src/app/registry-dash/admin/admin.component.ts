@@ -45,8 +45,8 @@ export class AdminComponent implements OnInit {
     userEmail: new FormControl('', [Validators.required, Validators.email]),
   });
 
-  // Cost Basis management
-  costBasisEntries = computed(() => this.dashService.costBasis());
+  // Cost Basis management — admin shows only stored entries (not virtual inherited rows)
+  costBasisEntries = computed(() => this.dashService.costBasis().filter(e => !e.inheritedFromDefault));
   costBasisColumns = ['tld', 'operation', 'registrarPays', 'rspFee', 'netToRegistry', 'costCurrency', 'notes', 'actions'];
 
   showCostBasisForm = signal(false);
