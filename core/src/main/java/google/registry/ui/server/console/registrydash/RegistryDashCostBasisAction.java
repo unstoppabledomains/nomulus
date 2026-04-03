@@ -91,6 +91,7 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
           Map<String, Tld> tldCache = new HashMap<>();
           results.stream()
               .map(RegistryDashboardCostBasis::getTld)
+              .filter(tldStr -> !RegistryDashboardCostBasis.DEFAULT_TLD.equals(tldStr))
               .distinct()
               .forEach(tldStr -> {
                 try {
@@ -194,6 +195,7 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
     map.put("effectiveDate",
         c.getEffectiveDate() != null ? c.getEffectiveDate().toString() : null);
     map.put("notes", c.getNotes());
+    map.put("isDefault", c.isDefault());
 
     // Enrich with registrar billed amount (from TLD config) and calculated net to registry
     if (tld != null) {

@@ -29,10 +29,16 @@ import javax.annotation.Nullable;
  *
  * <p>The RSP retains {@code rspRetainedFeeAmount} per operation. The registry receives the
  * remainder: registrar billed amount (from Nomulus TLD config) minus rspRetainedFeeAmount.
+ *
+ * <p>An entry with {@code tld = "*"} acts as the default for any TLD that has no specific entry.
+ * Specific per-TLD entries always take precedence over the default.
  */
 @Entity
 @Table(name = "RegistryDashboardCostBasis")
 public class RegistryDashboardCostBasis {
+
+  /** Sentinel value for a default entry that applies to all TLDs without a specific override. */
+  public static final String DEFAULT_TLD = "*";
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -80,6 +86,11 @@ public class RegistryDashboardCostBasis {
 
   public void setTld(String tld) {
     this.tld = tld;
+  }
+
+  /** Returns true if this is a default entry (applies to all TLDs without a specific override). */
+  public boolean isDefault() {
+    return DEFAULT_TLD.equals(tld);
   }
 
   public String getOperation() {

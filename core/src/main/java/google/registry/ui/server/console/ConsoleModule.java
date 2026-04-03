@@ -371,8 +371,12 @@ public final class ConsoleModule {
         e -> {
           JsonObject obj = e.getAsJsonObject();
           RegistryDashboardCostBasis cb = new RegistryDashboardCostBasis();
-          if (obj.has("tld")) {
-            cb.setTld(obj.get("tld").getAsString());
+          if (obj.has("tld") && !obj.get("tld").isJsonNull()) {
+            String tldVal = obj.get("tld").getAsString();
+            cb.setTld(tldVal.isEmpty()
+                ? RegistryDashboardCostBasis.DEFAULT_TLD : tldVal);
+          } else {
+            cb.setTld(RegistryDashboardCostBasis.DEFAULT_TLD);
           }
           if (obj.has("operation")) {
             cb.setOperation(obj.get("operation").getAsString());
