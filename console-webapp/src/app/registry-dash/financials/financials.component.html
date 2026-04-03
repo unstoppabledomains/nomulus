@@ -137,8 +137,8 @@
           <ng-container matColumnDef="tld">
             <th mat-header-cell *matHeaderCellDef>TLD</th>
             <td mat-cell *matCellDef="let row">
-              <ng-container *ngIf="row.tld !== '*'">.{{ row.tld }}</ng-container>
-              <span *ngIf="row.tld === '*'" class="default-badge">Default (all TLDs)</span>
+              <ng-container *ngIf="row.tld === '*'"><span class="default-badge">Default (all TLDs)</span></ng-container>
+              <ng-container *ngIf="row.tld !== '*'">.{{ row.tld }}<span *ngIf="row.inheritedFromDefault" class="default-badge"> (default)</span></ng-container>
             </td>
           </ng-container>
           <ng-container matColumnDef="operation">

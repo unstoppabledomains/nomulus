@@ -27,6 +27,7 @@ import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.registrydash.RegistryDashboardCostBasis;
 import google.registry.model.tld.Tld;
+import google.registry.model.tld.Tlds;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
 import google.registry.request.Parameter;
@@ -87,23 +88,59 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
                   .createQuery(ALL_COST_BASIS, RegistryDashboardCostBasis.class)
                   .getResultList();
 
+          // Separate default entries from TLD-specific entries
+          Map<String, RegistryDashboardCostBasis> defaultByOp = new HashMap<>();
+          List<RegistryDashboardCostBasis> specificEntries = new ArrayList<>();
+          // Track which TLD+operation combos have specific entries (use most recent only)
+          java.util.Set<String> coveredKeys = new java.util.HashSet<>();
+
+          for (RegistryDashboardCostBasis c : results) {
+            if (c.isDefault()) {
+              // Keep the most recent default per operation (results ordered by effectiveDate DESC)
+              defaultByOp.putIfAbsent(c.getOperation(), c);
+            } else {
+              specificEntries.add(c);
+              coveredKeys.add(c.getTld() + ":" + c.getOperation());
+            }
+          }
+
           // Build a TLD cache for registrar billed amount lookups
           Map<String, Tld> tldCache = new HashMap<>();
-          results.stream()
-              .map(RegistryDashboardCostBasis::getTld)
-              .filter(tldStr -> !RegistryDashboardCostBasis.DEFAULT_TLD.equals(tldStr))
-              .distinct()
-              .forEach(tldStr -> {
-                try {
-                  tldCache.put(tldStr, Tld.get(tldStr));
-                } catch (Exception e) {
-                  // TLD not found — skip; tldCache.get() will return null for this TLD
-                }
-              });
+          for (String tldStr : Tlds.getTlds()) {
+            try {
+              tldCache.put(tldStr, Tld.get(tldStr));
+            } catch (Exception e) {
+              // skip
+            }
+          }
 
           List<Map<String, Object>> payload = new ArrayList<>();
+
+          // Add the raw default entries (shown with isDefault=true in the UI)
           for (RegistryDashboardCostBasis c : results) {
+            if (c.isDefault()) {
+              payload.add(costBasisToMap(c, null));
+            }
+          }
+
+          // Add specific TLD entries
+          for (RegistryDashboardCostBasis c : specificEntries) {
             payload.add(costBasisToMap(c, tldCache.get(c.getTld())));
+          }
+
+          // Synthesize virtual entries for TLDs that inherit the default
+          for (String tldStr : tldCache.keySet()) {
+            for (var defaultEntry : defaultByOp.entrySet()) {
+              String key = tldStr + ":" + defaultEntry.getKey();
+              if (!coveredKeys.contains(key)) {
+                RegistryDashboardCostBasis def = defaultEntry.getValue();
+                Map<String, Object> virtual = costBasisToMap(def, tldCache.get(tldStr));
+                virtual.put("tld", tldStr);
+                virtual.put("isDefault", true);
+                virtual.put("inheritedFromDefault", true);
+                payload.add(virtual);
+              }
+            }
           }
           consoleApiParams.response().setPayload(
               consoleApiParams.gson().toJson(payload));

@@ -63,6 +63,7 @@ export interface CostBasisEntry {
   effectiveDate: string;
   notes?: string;
   isDefault?: boolean;
+  inheritedFromDefault?: boolean;
   // Enriched fields computed by the backend
   registrarBilledAmount?: number;
   netAmountToRegistry?: number;
