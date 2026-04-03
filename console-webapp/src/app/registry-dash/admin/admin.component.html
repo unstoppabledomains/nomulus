@@ -193,8 +193,8 @@
         <ng-container matColumnDef="tld">
           <th mat-header-cell *matHeaderCellDef>TLD</th>
           <td mat-cell *matCellDef="let row">
-            <ng-container *ngIf="row.tld !== '*'">.{{ row.tld }}</ng-container>
-            <span *ngIf="row.tld === '*'" class="default-badge">Default (all TLDs)</span>
+            <ng-container *ngIf="!row.isDefault">.{{ row.tld }}</ng-container>
+            <span *ngIf="row.isDefault" class="default-badge">Default (all TLDs)</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="operation">

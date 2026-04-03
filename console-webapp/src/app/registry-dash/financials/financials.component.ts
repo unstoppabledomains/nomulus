@@ -78,7 +78,7 @@ export class FinancialsComponent implements OnInit {
 
   /** Chart 1: Default fees per TLD per operation. Segments = operations, bar = sum of registrarBilledAmount. */
   feesByOperationChartData = computed(() => {
-    const entries = this.costBasisEntries().filter(e => e.tld !== '*');
+    const entries = this.costBasisEntries().filter(e => !e.isDefault);
     if (entries.length === 0) return [];
     const grouped = new Map<string, Map<string, number>>();
     for (const e of entries) {
@@ -104,7 +104,7 @@ export class FinancialsComponent implements OnInit {
 
   /** Chart 2 (gated): Fee split per TLD — RSP Fee and Net to Registry stacked within Registrar Pays. */
   feesEntityBreakdownData = computed(() => {
-    const entries = this.costBasisEntries().filter(e => e.tld !== '*');
+    const entries = this.costBasisEntries().filter(e => !e.isDefault);
     if (entries.length === 0 || !this.dashService.isColumnVisible('financials.entityBreakdownChart')) return [];
     const grouped = new Map<string, { registrarPays: number; rspFee: number; netToRegistry: number }>();
     for (const e of entries) {
