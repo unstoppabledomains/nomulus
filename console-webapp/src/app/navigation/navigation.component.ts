@@ -90,6 +90,9 @@ export class NavigationComponent {
       return RESTRICTED_ELEMENTS.USERS;
     } else if (node.path === PATHS.RegistryDash) {
       return RESTRICTED_ELEMENTS.REGISTRY_DASH;
+    // UD: Registry Dashboard — admin tab is FTE-only
+    } else if (node.path === 'admin' && (node as NavMenuNode).parentRoute?.path === PATHS.RegistryDash) {
+      return RESTRICTED_ELEMENTS.REGISTRY_DASH_ADMIN;
     // UD: Registry Dashboard — hide registrar-specific pages for REGISTRY_OPERATOR role
     } else if (
       node.path === 'home' ||

@@ -1,11 +1,12 @@
-// UD: Registry Dashboard — tests for navigation auto-expand behavior
+// UD: Registry Dashboard — tests for navigation auto-expand and admin visibility
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterTestingModule } from '@angular/router/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { NavigationComponent } from './navigation.component';
 import { UserData, UserDataService } from '../shared/services/userData.service';
-import { PATHS } from '../app-routing.module';
+import { PATHS, RouteWithIcon } from '../app-routing.module';
+import { RESTRICTED_ELEMENTS } from '../shared/directives/userLevelVisiblity.directive';
 import { AppModule } from '../app.module';
 
 describe('NavigationComponent', () => {
@@ -61,5 +62,21 @@ describe('NavigationComponent', () => {
     );
     expect(registryDashNode).toBeTruthy();
     expect(component.treeControl.isExpanded(registryDashNode!)).toBe(false);
+  });
+
+  // UD: Registry Dashboard — admin tab should map to REGISTRY_DASH_ADMIN restriction
+  it('should map admin child of registry-dash to REGISTRY_DASH_ADMIN', () => {
+    setup('NONE');
+    const registryDashNode = component.dataSource.data.find(
+      (node) => node.path === PATHS.RegistryDash
+    );
+    expect(registryDashNode?.children).toBeTruthy();
+    const adminChild = registryDashNode!.children!.find(
+      (c) => c.path === 'admin'
+    );
+    expect(adminChild).toBeTruthy();
+    expect(component.getElementId(adminChild as RouteWithIcon)).toBe(
+      RESTRICTED_ELEMENTS.REGISTRY_DASH_ADMIN
+    );
   });
 });
