@@ -144,10 +144,12 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<HistoryRecord[]>(err)));
   }
 
+  // UD: Registry Dashboard — return empty array for users without registrar access
+  // (e.g. REGISTRY_OPERATOR) so the app doesn't hang on startup
   getRegistrars(): Observable<Registrar[]> {
     return this.http
       .get<Registrar[]>('/console-api/registrars')
-      .pipe(catchError((err) => this.errorCatcher<Registrar[]>(err)));
+      .pipe(catchError((err) => this.errorCatcher<Registrar[]>(err, [])));
   }
 
   createRegistrar(registrar: Registrar): Observable<Registrar> {

@@ -32,14 +32,26 @@ class RegistryOperatorRoleTest {
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.MANAGE_COST_BASIS)).isTrue();
   }
 
+  // UD: Registry Dashboard — REGISTRY_OPERATOR should NOT have registrar-facing permissions
   @Test
-  void testRegistryOperator_hasReadOnlyRegistrarPermissions() {
+  void testRegistryOperator_doesNotHaveRegistrarPermissions() {
     UserRoles userRoles =
         new UserRoles.Builder().setGlobalRole(GlobalRole.REGISTRY_OPERATOR).build();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_REGISTRARS)).isFalse();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_REGISTRAR_DETAILS)).isFalse();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.DOWNLOAD_DOMAINS)).isFalse();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_TLD_PORTFOLIO)).isTrue();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.ACCESS_BILLING_DETAILS)).isFalse();
+    assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_OPERATIONAL_DATA)).isFalse();
+  }
+
+  // UD: Verify FTE still has perms after REGISTRY_OPERATOR tightening
+  @Test
+  void testFte_stillHasRegistrarPermissions() {
+    UserRoles userRoles = new UserRoles.Builder().setGlobalRole(GlobalRole.FTE).build();
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_REGISTRARS)).isTrue();
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_REGISTRAR_DETAILS)).isTrue();
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.DOWNLOAD_DOMAINS)).isTrue();
-    assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_TLD_PORTFOLIO)).isTrue();
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.ACCESS_BILLING_DETAILS)).isTrue();
     assertThat(userRoles.hasGlobalPermission(ConsolePermission.VIEW_OPERATIONAL_DATA)).isTrue();
   }

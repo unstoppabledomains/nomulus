@@ -22,6 +22,7 @@ import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
 import static google.registry.testing.SqlHelper.saveRegistrar;
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
+import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
@@ -87,6 +88,21 @@ class RegistrarsActionTest extends ConsoleActionBaseTestCase {
           "localizedAddress",
           "{ \"street\": [\"test street\"], \"city\": \"test city\", \"state\": \"test state\","
               + " \"zip\": \"00700\", \"countryCode\": \"US\" }");
+
+  // UD: Registry Dashboard — verify REGISTRY_OPERATOR cannot list registrars
+  @Test
+  void testForbidden_registryOperatorCannotListRegistrars() {
+    RegistrarsAction action =
+        createAction(
+            Action.Method.GET,
+            AuthResult.createUser(
+                createUser(
+                    new UserRoles.Builder()
+                        .setGlobalRole(GlobalRole.REGISTRY_OPERATOR)
+                        .build())));
+    action.run();
+    assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
+  }
 
   @Test
   void testSuccess_onlyRealAndOteRegistrars() {

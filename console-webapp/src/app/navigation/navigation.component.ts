@@ -20,6 +20,12 @@ import { Subscription } from 'rxjs';
 import { RouteWithIcon, routes, PATHS } from '../app-routing.module';
 import { RESTRICTED_ELEMENTS } from '../shared/directives/userLevelVisiblity.directive';
 import { RegistrarComponent } from '../registrar/registrarsTable.component';
+// UD: Registry Dashboard — imports for registrar-specific page path constants
+import { DomainListComponent } from '../domains/domainList.component';
+import { SettingsComponent } from '../settings/settings.component';
+import { BillingInfoComponent } from '../billingInfo/billingInfo.component';
+import { ResourcesComponent } from '../resources/resources.component';
+import { SupportComponent } from '../support/support.component';
 
 interface NavMenuNode extends RouteWithIcon {
   parentRoute?: RouteWithIcon;
@@ -67,6 +73,16 @@ export class NavigationComponent {
       return RESTRICTED_ELEMENTS.USERS;
     } else if (node.path === PATHS.RegistryDash) {
       return RESTRICTED_ELEMENTS.REGISTRY_DASH;
+    // UD: Registry Dashboard — hide registrar-specific pages for REGISTRY_OPERATOR role
+    } else if (
+      node.path === 'home' ||
+      node.path === DomainListComponent.PATH ||
+      node.path === SettingsComponent.PATH ||
+      node.path === BillingInfoComponent.PATH ||
+      node.path === ResourcesComponent.PATH ||
+      node.path === SupportComponent.PATH
+    ) {
+      return RESTRICTED_ELEMENTS.REGISTRAR_PAGES;
     }
     return null;
   }
