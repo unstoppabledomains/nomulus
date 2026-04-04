@@ -64,15 +64,13 @@ public class ConsoleRoleDefinitions {
               ConsolePermission.MANAGE_DOCUMENTATION)
           .build();
 
+  // UD: Removed registrar-facing permissions (VIEW_REGISTRARS, VIEW_REGISTRAR_DETAILS,
+  // DOWNLOAD_DOMAINS, ACCESS_BILLING_DETAILS, VIEW_OPERATIONAL_DATA) —
+  // REGISTRY_OPERATOR should only access Registry Dashboard, not registrar-scoped data.
   /** Permissions for a registry operator (dashboard user). */
   static final ImmutableSet<ConsolePermission> REGISTRY_OPERATOR_PERMISSIONS =
       ImmutableSet.of(
-          ConsolePermission.VIEW_REGISTRARS,
-          ConsolePermission.VIEW_REGISTRAR_DETAILS,
-          ConsolePermission.DOWNLOAD_DOMAINS,
           ConsolePermission.VIEW_TLD_PORTFOLIO,
-          ConsolePermission.ACCESS_BILLING_DETAILS,
-          ConsolePermission.VIEW_OPERATIONAL_DATA,
           ConsolePermission.VIEW_DASHBOARD_OVERVIEW,
           ConsolePermission.VIEW_REGISTRAR_PORTFOLIO,
           ConsolePermission.VIEW_PRICING,

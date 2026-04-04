@@ -23,6 +23,7 @@ export enum RESTRICTED_ELEMENTS {
   BULK_DELETE,
   SUSPEND,
   REGISTRY_DASH,
+  REGISTRAR_PAGES, // UD: Registry Dashboard — hide registrar-specific pages for REGISTRY_OPERATOR
 }
 
 export const DISABLED_ELEMENTS_PER_ROLE: Record<string, RESTRICTED_ELEMENTS[]> = {
@@ -44,6 +45,7 @@ export const DISABLED_ELEMENTS_PER_ROLE: Record<string, RESTRICTED_ELEMENTS[]> =
     RESTRICTED_ELEMENTS.ACTIVITY_PER_USER,
     RESTRICTED_ELEMENTS.REGISTRAR_ELEMENT,
     RESTRICTED_ELEMENTS.USERS,
+    RESTRICTED_ELEMENTS.REGISTRAR_PAGES, // UD: Registry Dashboard — hide all registrar pages
   ],
 };
 
