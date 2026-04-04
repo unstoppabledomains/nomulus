@@ -28,6 +28,8 @@ import { SupportComponent } from './support/support.component';
 import RdapComponent from './settings/rdap/rdap.component';
 import { HistoryComponent } from './history/history.component';
 import { PasswordResetVerifyComponent } from './shared/components/passwordReset/passwordResetVerify.component';
+// UD: Registry Dashboard — guard to redirect REGISTRY_OPERATOR away from registrar pages
+import { udRegistrarPageGuard } from './shared/guards/ud-registrarPageGuard';
 
 export interface RouteWithIcon extends Route {
   iconName?: string;
@@ -65,6 +67,7 @@ export const routes: RouteWithIcon[] = [
     component: HomeComponent,
     title: 'Dashboard',
     iconName: 'view_comfy_alt',
+    canActivate: [udRegistrarPageGuard], // UD: Registry Dashboard — redirect REGISTRY_OPERATOR
   },
   {
     path: DomainListComponent.PATH,

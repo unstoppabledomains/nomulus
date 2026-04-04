@@ -14,6 +14,8 @@
 
 import { Component, EventEmitter, Output } from '@angular/core';
 import { BreakPointObserverService } from '../shared/services/breakPoint.service';
+// UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR
+import { RESTRICTED_ELEMENTS } from '../shared/directives/userLevelVisiblity.directive';
 
 @Component({
   selector: 'app-header',
@@ -22,6 +24,8 @@ import { BreakPointObserverService } from '../shared/services/breakPoint.service
   standalone: false,
 })
 export class HeaderComponent {
+  // UD: Registry Dashboard — used by [elementId] directive in template
+  registrarPagesRestriction = RESTRICTED_ELEMENTS.REGISTRAR_PAGES;
   private isNavOpen = false;
 
   constructor(protected breakpointObserver: BreakPointObserverService) {}

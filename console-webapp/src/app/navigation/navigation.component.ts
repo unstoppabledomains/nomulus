@@ -13,13 +13,15 @@
 // limitations under the License.
 
 import { NestedTreeControl } from '@angular/cdk/tree';
-import { Component } from '@angular/core';
+import { Component, effect } from '@angular/core';
 import { MatTreeNestedDataSource } from '@angular/material/tree';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { RouteWithIcon, routes, PATHS } from '../app-routing.module';
 import { RESTRICTED_ELEMENTS } from '../shared/directives/userLevelVisiblity.directive';
 import { RegistrarComponent } from '../registrar/registrarsTable.component';
+// UD: Registry Dashboard — auto-expand for REGISTRY_OPERATOR
+import { UserDataService } from '../shared/services/userData.service';
 // UD: Registry Dashboard — imports for registrar-specific page path constants
 import { DomainListComponent } from '../domains/domainList.component';
 import { SettingsComponent } from '../settings/settings.component';
@@ -50,8 +52,23 @@ export class NavigationComponent {
   hasChild = (_: number, node: RouteWithIcon) =>
     !!node.children && node.children.length > 0;
 
-  constructor(protected router: Router) {
+  constructor(
+    protected router: Router,
+    private userDataService: UserDataService // UD: Registry Dashboard
+  ) {
     this.dataSource.data = this.ngRoutesToNavMenuNodes(routes);
+    // UD: Registry Dashboard — auto-expand for REGISTRY_OPERATOR users
+    effect(() => {
+      const globalRole = this.userDataService.userData()?.globalRole;
+      if (globalRole === 'REGISTRY_OPERATOR') {
+        const registryDashNode = this.dataSource.data.find(
+          (node) => node.path === PATHS.RegistryDash
+        );
+        if (registryDashNode) {
+          this.treeControl.expand(registryDashNode);
+        }
+      }
+    });
   }
 
   ngOnInit() {
