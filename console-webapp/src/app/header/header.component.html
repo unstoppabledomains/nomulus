@@ -66,8 +66,9 @@
       </svg>
     </a>
     <span class="spacer"></span>
+    <!-- UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR -->
     @if (!breakpointObserver.isMobileView()) {
-    <app-registrar-selector />
+    <app-registrar-selector [elementId]="registrarPagesRestriction" />
     }
     <button
       class="console-app__header-user-icon"
@@ -82,7 +83,8 @@
       <button mat-menu-item (click)="logOut()">Log out</button>
     </mat-menu>
   </mat-toolbar>
+  <!-- UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR -->
   @if (breakpointObserver.isMobileView()) {
-  <app-registrar-selector />
+  <app-registrar-selector [elementId]="registrarPagesRestriction" />
   }
 </p>

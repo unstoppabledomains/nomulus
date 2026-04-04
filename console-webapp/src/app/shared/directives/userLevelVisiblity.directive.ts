@@ -24,6 +24,7 @@ export enum RESTRICTED_ELEMENTS {
   SUSPEND,
   REGISTRY_DASH,
   REGISTRAR_PAGES, // UD: Registry Dashboard — hide registrar-specific pages for REGISTRY_OPERATOR
+  REGISTRY_DASH_ADMIN, // UD: Registry Dashboard — admin tab is FTE-only
 }
 
 export const DISABLED_ELEMENTS_PER_ROLE: Record<string, RESTRICTED_ELEMENTS[]> = {
@@ -46,6 +47,7 @@ export const DISABLED_ELEMENTS_PER_ROLE: Record<string, RESTRICTED_ELEMENTS[]> =
     RESTRICTED_ELEMENTS.REGISTRAR_ELEMENT,
     RESTRICTED_ELEMENTS.USERS,
     RESTRICTED_ELEMENTS.REGISTRAR_PAGES, // UD: Registry Dashboard — hide all registrar pages
+    RESTRICTED_ELEMENTS.REGISTRY_DASH_ADMIN, // UD: Registry Dashboard — admin is FTE-only
   ],
 };
 

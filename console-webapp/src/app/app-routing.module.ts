@@ -28,6 +28,10 @@ import { SupportComponent } from './support/support.component';
 import RdapComponent from './settings/rdap/rdap.component';
 import { HistoryComponent } from './history/history.component';
 import { PasswordResetVerifyComponent } from './shared/components/passwordReset/passwordResetVerify.component';
+// UD: Registry Dashboard — guard to redirect REGISTRY_OPERATOR away from registrar pages
+import { udRegistrarPageGuard } from './shared/guards/ud-registrarPageGuard';
+// UD: Registry Dashboard — restrict admin tab to FTE only
+import { udFteOnlyGuard } from './shared/guards/ud-fteOnlyGuard';
 
 export interface RouteWithIcon extends Route {
   iconName?: string;
@@ -65,6 +69,7 @@ export const routes: RouteWithIcon[] = [
     component: HomeComponent,
     title: 'Dashboard',
     iconName: 'view_comfy_alt',
+    canActivate: [udRegistrarPageGuard], // UD: Registry Dashboard — redirect REGISTRY_OPERATOR
   },
   {
     path: DomainListComponent.PATH,
@@ -192,6 +197,7 @@ export const routes: RouteWithIcon[] = [
       {
         path: 'admin',
         title: 'Admin',
+        canActivate: [udFteOnlyGuard], // UD: Registry Dashboard — admin is FTE-only
         loadComponent: () =>
           import('./registry-dash/admin/admin.component').then(
             (mod) => mod.AdminComponent
