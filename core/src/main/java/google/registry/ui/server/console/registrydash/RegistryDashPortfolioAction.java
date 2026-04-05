@@ -50,11 +50,12 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
       WHERE r.registrarId IN :registrarIds
       """;
 
-  private static final String DOMAIN_COUNTS_QUERY =
+  private static final String DOMAIN_COUNTS_SCOPED_QUERY =
       """
       SELECT d.currentSponsorRegistrarId, COUNT(d)
       FROM Domain d
       WHERE d.currentSponsorRegistrarId IN :registrarIds
+        AND d.tld IN :tlds
         AND d.deletionTime > CURRENT_TIMESTAMP
       GROUP BY d.currentSponsorRegistrarId
       """;
@@ -72,9 +73,12 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    ImmutableSet<String> tlds =
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> registrarIds =
         isAdmin ? ImmutableSet.of()
-            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+            : RegistryDashAccessUtil.getRegistrarIdsForTlds(tlds);
     if (!isAdmin && registrarIds.isEmpty()) {
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
       consoleApiParams.response().setStatus(SC_OK);
@@ -105,8 +109,9 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
                               + " GROUP BY d.currentSponsorRegistrarId")
                       .getResultList()
                   : tm().getEntityManager()
-                      .createQuery(DOMAIN_COUNTS_QUERY)
+                      .createQuery(DOMAIN_COUNTS_SCOPED_QUERY)
                       .setParameter("registrarIds", registrarIds)
+                      .setParameter("tlds", tlds)
                       .getResultList();
 
           Map<String, Long> countMap = new HashMap<>();
@@ -116,12 +121,18 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
 
           List<Map<String, Object>> portfolio = new java.util.ArrayList<>();
           for (Registrar r : registrars) {
+            // Filter allowedTlds to only show TLDs the user's registry owns
+            ImmutableSet<String> visibleTlds = isAdmin
+                ? r.getAllowedTlds()
+                : r.getAllowedTlds().stream()
+                    .filter(tlds::contains)
+                    .collect(ImmutableSet.toImmutableSet());
             Map<String, Object> entry = new HashMap<>();
             entry.put("registrarId", r.getRegistrarId());
             entry.put("registrarName", r.getRegistrarName());
             entry.put("state", r.getState() != null ? r.getState().toString() : "ACTIVE");
             entry.put("domainCount", countMap.getOrDefault(r.getRegistrarId(), 0L));
-            entry.put("allowedTlds", r.getAllowedTlds());
+            entry.put("allowedTlds", visibleTlds);
             portfolio.add(entry);
           }
 

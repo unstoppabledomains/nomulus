@@ -14,11 +14,11 @@
 
 import { Component, OnInit, computed, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MaterialModule } from '../../../material.module';
+import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
-import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
-import { RegistryDashService, ActivityDataPoint } from '../../registry-dash.service';
-import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
+import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
+import { RegistryDashService, ActivityDataPoint } from '../registry-dash.service';
+import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.component';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',

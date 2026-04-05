@@ -43,11 +43,12 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/overview";
 
-  private static final String DOMAIN_COUNT_BY_REGISTRAR =
+  private static final String DOMAIN_COUNT_BY_REGISTRAR_SCOPED =
       """
       SELECT d.currentSponsorRegistrarId, COUNT(d)
       FROM Domain d
       WHERE d.currentSponsorRegistrarId IN :registrarIds
+        AND d.tld IN :tlds
         AND d.deletionTime > CURRENT_TIMESTAMP
       GROUP BY d.currentSponsorRegistrarId
       """;
@@ -65,9 +66,12 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    ImmutableSet<String> tlds =
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> registrarIds =
         isAdmin ? ImmutableSet.of()
-            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+            : RegistryDashAccessUtil.getRegistrarIdsForTlds(tlds);
     if (!isAdmin && registrarIds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("totalDomains", 0L);
@@ -91,8 +95,9 @@ public class RegistryDashOverviewAction extends ConsoleApiAction {
                               + " GROUP BY d.currentSponsorRegistrarId")
                       .getResultList()
                   : tm().getEntityManager()
-                      .createQuery(DOMAIN_COUNT_BY_REGISTRAR)
+                      .createQuery(DOMAIN_COUNT_BY_REGISTRAR_SCOPED)
                       .setParameter("registrarIds", registrarIds)
+                      .setParameter("tlds", tlds)
                       .getResultList();
 
           long totalDomains = 0;

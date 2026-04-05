@@ -55,10 +55,11 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
 
   static final String PATH = "/console-api/registry-dash/pricing";
 
-  private static final String PRICING_BY_REGISTRARS =
+  private static final String PRICING_BY_REGISTRARS_AND_TLDS =
       """
       SELECT p FROM RegistryDashboardRegistrarPricing p
       WHERE p.registrarId IN :registrarIds
+        AND p.tld IN :tlds
       ORDER BY p.registrarId, p.tld, p.operation, p.effectiveDate DESC
       """;
 
@@ -81,9 +82,12 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+    ImmutableSet<String> tlds =
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> registrarIds =
         isAdmin ? ImmutableSet.of()
-            : RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+            : RegistryDashAccessUtil.getRegistrarIdsForTlds(tlds);
     if (!isAdmin && registrarIds.isEmpty()) {
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
       consoleApiParams.response().setStatus(SC_OK);
@@ -103,9 +107,10 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
                           RegistryDashboardRegistrarPricing.class)
                       .getResultList()
                   : tm().getEntityManager()
-                      .createQuery(PRICING_BY_REGISTRARS,
+                      .createQuery(PRICING_BY_REGISTRARS_AND_TLDS,
                           RegistryDashboardRegistrarPricing.class)
                       .setParameter("registrarIds", registrarIds)
+                      .setParameter("tlds", tlds)
                       .getResultList();
           // ===== start registry-dash-default-prices =====
           // Build a TLD cache for default price lookups
@@ -146,8 +151,14 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
     if (!isAdmin) {
+      ImmutableSet<String> mappedTlds =
+          RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+      if (!mappedTlds.contains(pricing.getTld())) {
+        consoleApiParams.response().setStatus(SC_FORBIDDEN);
+        return;
+      }
       ImmutableSet<String> registrarIds =
-          RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+          RegistryDashAccessUtil.getRegistrarIdsForTlds(mappedTlds);
       if (!registrarIds.contains(pricing.getRegistrarId())) {
         consoleApiParams.response().setStatus(SC_FORBIDDEN);
         return;
@@ -191,8 +202,14 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
             return;
           }
           if (!isAdmin) {
+            ImmutableSet<String> mappedTlds =
+                RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+            if (!mappedTlds.contains(existing.getTld())) {
+              consoleApiParams.response().setStatus(SC_FORBIDDEN);
+              return;
+            }
             ImmutableSet<String> registrarIds =
-                RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
+                RegistryDashAccessUtil.getRegistrarIdsForTlds(mappedTlds);
             if (!registrarIds.contains(existing.getRegistrarId())) {
               consoleApiParams.response().setStatus(SC_FORBIDDEN);
               return;

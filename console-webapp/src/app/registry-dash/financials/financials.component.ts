@@ -19,7 +19,6 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
 import { RegistryDashService } from '../registry-dash.service';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing/revenue-billing.component';
-import { DomainActivityComponent } from './domain-activity/domain-activity.component';
 import { ForecastingComponent } from './forecasting/forecasting.component';
 
 const OPERATION_COLORS: Record<string, string> = {
@@ -37,7 +36,7 @@ const ENTITY_COLORS = {
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, DomainActivityComponent, ForecastingComponent],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],

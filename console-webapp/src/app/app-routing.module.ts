@@ -187,6 +187,14 @@ export const routes: RouteWithIcon[] = [
           ),
       },
       {
+        path: 'domain-activity',
+        title: 'Domain Activity',
+        loadComponent: () =>
+          import('./registry-dash/domain-activity/domain-activity.component').then(
+            (mod) => mod.DomainActivityComponent
+          ),
+      },
+      {
         path: 'financials',
         title: 'Financials',
         loadComponent: () =>
