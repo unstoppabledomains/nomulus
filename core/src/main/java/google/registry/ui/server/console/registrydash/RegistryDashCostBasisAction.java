@@ -22,6 +22,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
+import com.google.common.collect.ImmutableSet;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
@@ -61,6 +62,13 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
       ORDER BY c.tld, c.operation, c.effectiveDate DESC
       """;
 
+  private static final String SCOPED_COST_BASIS =
+      """
+      SELECT c FROM RegistryDashboardCostBasis c
+      WHERE c.tld IN :tlds OR c.tld = '*'
+      ORDER BY c.tld, c.operation, c.effectiveDate DESC
+      """;
+
   private final Optional<RegistryDashboardCostBasis> costBasisPayload;
 
   @Inject
@@ -80,13 +88,27 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
       return;
     }
 
+    ImmutableSet<String> tlds =
+        isAdmin ? ImmutableSet.of()
+            : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+    if (!isAdmin && tlds.isEmpty()) {
+      consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
+      consoleApiParams.response().setStatus(SC_OK);
+      return;
+    }
+
     tm().transact(
         () -> {
           @SuppressWarnings("unchecked")
           List<RegistryDashboardCostBasis> results =
-              tm().getEntityManager()
-                  .createQuery(ALL_COST_BASIS, RegistryDashboardCostBasis.class)
-                  .getResultList();
+              isAdmin
+                  ? tm().getEntityManager()
+                      .createQuery(ALL_COST_BASIS, RegistryDashboardCostBasis.class)
+                      .getResultList()
+                  : tm().getEntityManager()
+                      .createQuery(SCOPED_COST_BASIS, RegistryDashboardCostBasis.class)
+                      .setParameter("tlds", tlds)
+                      .getResultList();
 
           // Separate default entries from TLD-specific entries
           Map<String, RegistryDashboardCostBasis> defaultByOp = new HashMap<>();
@@ -104,9 +126,10 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
             }
           }
 
-          // Build a TLD cache for registrar billed amount lookups
+          // Build a TLD cache for registrar billed amount lookups — scoped to user's TLDs
+          java.util.Set<String> tldStrings = isAdmin ? Tlds.getTlds() : tlds;
           Map<String, Tld> tldCache = new HashMap<>();
-          for (String tldStr : Tlds.getTlds()) {
+          for (String tldStr : tldStrings) {
             try {
               tldCache.put(tldStr, Tld.get(tldStr));
             } catch (Exception e) {
@@ -161,6 +184,20 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
         costBasisPayload.orElseThrow(
             () -> new IllegalArgumentException("Cost basis data is required"));
 
+    // Non-admin users can only create entries for their own TLDs (not defaults)
+    if (!isAdmin) {
+      if (costBasis.isDefault()) {
+        consoleApiParams.response().setStatus(SC_FORBIDDEN);
+        return;
+      }
+      ImmutableSet<String> tlds =
+          RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+      if (!tlds.contains(costBasis.getTld())) {
+        consoleApiParams.response().setStatus(SC_FORBIDDEN);
+        return;
+      }
+    }
+
     ZonedDateTime now = ZonedDateTime.now(java.time.ZoneOffset.UTC);
     costBasis.setEffectiveDate(
         costBasis.getEffectiveDate() != null ? costBasis.getEffectiveDate() : now);
@@ -203,6 +240,18 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
           if (existing == null) {
             setFailedResponse("Cost basis entry not found", SC_BAD_REQUEST);
             return;
+          }
+          if (!isAdmin) {
+            if (existing.isDefault()) {
+              consoleApiParams.response().setStatus(SC_FORBIDDEN);
+              return;
+            }
+            ImmutableSet<String> tlds =
+                RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+            if (!tlds.contains(existing.getTld())) {
+              consoleApiParams.response().setStatus(SC_FORBIDDEN);
+              return;
+            }
           }
           existing.setRspRetainedFeeAmount(costBasis.getRspRetainedFeeAmount());
           existing.setCostCurrency(costBasis.getCostCurrency());

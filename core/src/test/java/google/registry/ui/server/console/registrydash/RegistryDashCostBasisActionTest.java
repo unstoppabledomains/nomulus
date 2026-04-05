@@ -28,6 +28,9 @@ import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.model.registrydash.RegistryDashboardCostBasis;
+import google.registry.model.registrydash.RoRegistry;
+import google.registry.model.registrydash.RoRegistryTld;
+import google.registry.model.registrydash.RoRegistryUser;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.ConsoleApiParamsUtils;
@@ -72,6 +75,17 @@ class RegistryDashCostBasisActionTest {
             .build());
   }
 
+  /** Creates registry group mappings so the user's TLDs are visible via getMappedTlds(). */
+  private void createRegistryMapping(String email, String tld) {
+    RoRegistry registry = new RoRegistry("registry-for-" + email);
+    tm().transact(
+        () -> {
+          tm().getEntityManager().persist(registry);
+          tm().getEntityManager().persist(new RoRegistryTld(registry.getId(), tld));
+          tm().getEntityManager().persist(new RoRegistryUser(registry.getId(), email));
+        });
+  }
+
   @Test
   void testGetCostBasis_forbiddenForNonRoUser() {
     User user =
@@ -110,6 +124,7 @@ class RegistryDashCostBasisActionTest {
     tm().transact(() -> tm().getEntityManager().persist(cb2));
 
     User user = createRoUser("ro2@example.com");
+    createRegistryMapping("ro2@example.com", "tld");
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashCostBasisAction action =
@@ -129,6 +144,7 @@ class RegistryDashCostBasisActionTest {
   @Test
   void testPostCostBasis_createsEntry() {
     User user = createRoUser("ro@example.com");
+    createRegistryMapping("ro@example.com", "tld");
 
     RegistryDashboardCostBasis costBasis = new RegistryDashboardCostBasis();
     costBasis.setTld("tld");
