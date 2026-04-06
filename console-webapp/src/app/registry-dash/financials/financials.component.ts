@@ -22,6 +22,7 @@ import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
 import { RegistryDashService } from '../registry-dash.service';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing/revenue-billing.component';
 import { ForecastingComponent } from './forecasting/forecasting.component';
+import { EffectiveFeesComponent } from './effective-fees/effective-fees.component';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -30,15 +31,10 @@ const OPERATION_COLORS: Record<string, string> = {
   RESTORE: '#192B55',
 };
 
-const ENTITY_COLORS = {
-  rspFee: '#4A9B30',
-  netToRegistry: '#192B55',
-};
-
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
@@ -61,31 +57,18 @@ export class FinancialsComponent implements OnInit {
 
   // --- Fees by TLD tab ---
 
-  costBasisEntries = computed(() => this.dashService.costBasis());
+  tldFeeEntries = computed(() => this.dashService.tldFees());
 
-  private static readonly FEES_TABLE_BASE_COLUMNS = ['tld', 'operation', 'registrarPays'];
-  private static readonly FEES_TABLE_GATED: Record<string, string> = {
-    rspFee: 'financials.feesRspPays',
-    netToRegistry: 'financials.feesNetToRegistry',
-  };
-  private static readonly FEES_TABLE_TAIL_COLUMNS = ['currency', 'effectiveDate'];
+  feesTableColumns = ['tld', 'operation', 'defaultPrice', 'currency'];
 
-  feesTableColumns = computed(() => {
-    const cols = [...FinancialsComponent.FEES_TABLE_BASE_COLUMNS];
-    for (const [col, key] of Object.entries(FinancialsComponent.FEES_TABLE_GATED)) {
-      if (this.dashService.isColumnVisible(key)) cols.push(col);
-    }
-    return [...cols, ...FinancialsComponent.FEES_TABLE_TAIL_COLUMNS];
-  });
-
-  /** Chart 1: Default fees per TLD per operation. Segments = operations, bar = sum of registrarBilledAmount. */
+  /** Chart: Default fees per TLD per operation. Segments = operations, bar = sum of defaultPrice. */
   feesByOperationChartData = computed(() => {
-    const entries = this.costBasisEntries().filter(e => !e.isDefault);
+    const entries = this.tldFeeEntries();
     if (entries.length === 0) return [];
     const grouped = new Map<string, Map<string, number>>();
     for (const e of entries) {
       if (!grouped.has(e.tld)) grouped.set(e.tld, new Map());
-      grouped.get(e.tld)!.set(e.operation, e.registrarBilledAmount ?? 0);
+      grouped.get(e.tld)!.set(e.operation, e.defaultPrice ?? 0);
     }
     const tlds = [...grouped.keys()].sort();
     const totals = tlds.map(tld => [...(grouped.get(tld)?.values() ?? [])].reduce((s, v) => s + v, 0));
@@ -100,35 +83,6 @@ export class FinancialsComponent implements OnInit {
         tld, total: totals[i],
         totalWidthPercent: (totals[i] / maxTotal) * 100,
         segments,
-      };
-    });
-  });
-
-  /** Chart 2 (gated): Fee split per TLD — RSP Fee and Net to Registry stacked within Registrar Pays. */
-  feesEntityBreakdownData = computed(() => {
-    const entries = this.costBasisEntries().filter(e => !e.isDefault);
-    if (entries.length === 0 || !this.dashService.isColumnVisible('financials.entityBreakdownChart')) return [];
-    const grouped = new Map<string, { registrarPays: number; rspFee: number; netToRegistry: number }>();
-    for (const e of entries) {
-      if (!grouped.has(e.tld)) grouped.set(e.tld, { registrarPays: 0, rspFee: 0, netToRegistry: 0 });
-      const g = grouped.get(e.tld)!;
-      g.registrarPays += (e.registrarBilledAmount ?? 0);
-      g.rspFee += (e.rspRetainedFeeAmount ?? 0);
-      g.netToRegistry += (e.netAmountToRegistry ?? 0);
-    }
-    const tlds = [...grouped.keys()].sort();
-    const maxTotal = Math.max(...tlds.map(tld => grouped.get(tld)!.registrarPays), 1);
-    return tlds.map(tld => {
-      const g = grouped.get(tld)!;
-      const total = g.registrarPays;
-      const pct = (v: number) => total > 0 ? (v / total) * 100 : 0;
-      return {
-        tld, total,
-        totalWidthPercent: (total / maxTotal) * 100,
-        segments: [
-          { label: 'Net to Registry', amount: g.netToRegistry, widthPct: pct(g.netToRegistry), color: ENTITY_COLORS.netToRegistry },
-          { label: 'RSP Fee', amount: g.rspFee, widthPct: pct(g.rspFee), color: ENTITY_COLORS.rspFee },
-        ],
       };
     });
   });
@@ -197,7 +151,7 @@ export class FinancialsComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.dashService.getCostBasis().subscribe();
+    this.dashService.getTldFees().subscribe();
   }
 
   onOverviewRangeChange(range: string) {

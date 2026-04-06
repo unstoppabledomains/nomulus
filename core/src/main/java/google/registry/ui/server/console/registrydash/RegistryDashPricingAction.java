@@ -39,11 +39,9 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.joda.time.DateTime;
 
 /** Handles per-registrar pricing CRUD for the registry dashboard. */
 @Action(
@@ -259,13 +257,7 @@ public class RegistryDashPricingAction extends ConsoleApiAction {
   // ===== start registry-dash-default-prices =====
   /** Looks up the default TLD price for a given operation type. */
   private static BigDecimal getDefaultPrice(Tld tld, String operation) {
-    DateTime now = DateTime.now(org.joda.time.DateTimeZone.UTC);
-    return switch (operation.toUpperCase(Locale.US)) {
-      case "CREATE" -> tld.getCreateBillingCost(now).getAmount();
-      case "RENEW", "TRANSFER" -> tld.getStandardRenewCost(now).getAmount();
-      case "RESTORE" -> tld.getRestoreBillingCost().getAmount();
-      default -> null;
-    };
+    return RegistryDashPriceUtil.getDefaultPrice(tld, operation);
   }
   // ===== end registry-dash-default-prices =====
 }

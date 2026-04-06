@@ -41,10 +41,8 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import org.joda.time.DateTime;
 
 /** Handles fees-per-TLD CRUD for the registry dashboard. */
 @Action(
@@ -298,17 +296,9 @@ public class RegistryDashCostBasisAction extends ConsoleApiAction {
 
   /**
    * Returns the default amount the registrar is billed for a given TLD and operation.
-   * For TRANSFER, uses renew pricing — the gaining registrar is charged a one-year renewal
-   * as part of the transfer (see DomainPricingLogic.getTransferPrice).
+   * Delegates to {@link RegistryDashPriceUtil#getDefaultPrice}.
    */
   static BigDecimal getRegistrarBilledAmount(Tld tld, String operation) {
-    DateTime now = DateTime.now(org.joda.time.DateTimeZone.UTC);
-    return switch (operation.toUpperCase(Locale.US)) {
-      case "CREATE" -> tld.getCreateBillingCost(now).getAmount();
-      case "RENEW" -> tld.getStandardRenewCost(now).getAmount();
-      case "TRANSFER" -> tld.getStandardRenewCost(now).getAmount();
-      case "RESTORE" -> tld.getRestoreBillingCost().getAmount();
-      default -> null;
-    };
+    return RegistryDashPriceUtil.getDefaultPrice(tld, operation);
   }
 }
