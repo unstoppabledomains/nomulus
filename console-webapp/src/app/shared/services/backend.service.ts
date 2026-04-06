@@ -30,6 +30,8 @@ import {
   RevenueBillingData,
   DomainActivityData,
   ForecastingData,
+  TldFeeEntry,
+  EffectiveFeeEntry,
 } from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
@@ -454,5 +456,17 @@ export class BackendService {
     return this.http
       .get<ForecastingData>(`/console-api/registry-dash/forecasting${params}`)
       .pipe(catchError((err) => this.errorCatcher<ForecastingData>(err)));
+  }
+
+  getRegistryDashTldFees(): Observable<TldFeeEntry[]> {
+    return this.http
+      .get<TldFeeEntry[]>('/console-api/registry-dash/tld-fees')
+      .pipe(catchError((err) => this.errorCatcher<TldFeeEntry[]>(err)));
+  }
+
+  getRegistryDashEffectiveFees(): Observable<EffectiveFeeEntry[]> {
+    return this.http
+      .get<EffectiveFeeEntry[]>('/console-api/registry-dash/effective-fees')
+      .pipe(catchError((err) => this.errorCatcher<EffectiveFeeEntry[]>(err)));
   }
 }

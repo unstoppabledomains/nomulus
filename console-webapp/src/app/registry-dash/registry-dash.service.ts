@@ -156,6 +156,23 @@ export interface ForecastingData {
   renewalRates: RenewalRateEntry[];
 }
 
+export interface TldFeeEntry {
+  tld: string;
+  operation: string;
+  defaultPrice: number;
+  currency: string;
+}
+
+export interface EffectiveFeeEntry {
+  registrarId: string;
+  registrarName: string;
+  tld: string;
+  operation: string;
+  price: number;
+  currency: string;
+  source: 'Default' | 'Custom';
+}
+
 @Injectable({ providedIn: 'root' })
 export class RegistryDashService {
   overview = signal<OverviewData | undefined>(undefined);
@@ -166,6 +183,8 @@ export class RegistryDashService {
   revenueBilling = signal<RevenueBillingData | undefined>(undefined);
   domainActivity = signal<DomainActivityData | undefined>(undefined);
   forecasting = signal<ForecastingData | undefined>(undefined);
+  tldFees = signal<TldFeeEntry[]>([]);
+  effectiveFees = signal<EffectiveFeeEntry[]>([]);
   /** Default visibility — RSP Fee and Net to Registry hidden by default for non-admin users. */
   static readonly DEFAULT_VISIBILITY: Record<string, boolean> = {
     'financials.feesRspPays': false,
@@ -395,6 +414,34 @@ export class RegistryDashService {
           this.loading.set(false);
         }),
         catchError((err) => this.handleError<ForecastingData>(err))
+      );
+  }
+
+  getTldFees(): Observable<TldFeeEntry[]> {
+    this.loading.set(true);
+    this.error.set(undefined);
+    return this.backend
+      .getRegistryDashTldFees()
+      .pipe(
+        tap((data) => {
+          this.tldFees.set(data);
+          this.loading.set(false);
+        }),
+        catchError((err) => this.handleError<TldFeeEntry[]>(err))
+      );
+  }
+
+  getEffectiveFees(): Observable<EffectiveFeeEntry[]> {
+    this.loading.set(true);
+    this.error.set(undefined);
+    return this.backend
+      .getRegistryDashEffectiveFees()
+      .pipe(
+        tap((data) => {
+          this.effectiveFees.set(data);
+          this.loading.set(false);
+        }),
+        catchError((err) => this.handleError<EffectiveFeeEntry[]>(err))
       );
   }
 }
