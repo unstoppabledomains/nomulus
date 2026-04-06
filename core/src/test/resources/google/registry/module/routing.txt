@@ -1,4 +1,3 @@
-Apr 06, 2026 9:41:00 AM org.jline.utils.Log logr
 SERVICE  PATH                                               CLASS                                          METHODS             OK MIN  USER_POLICY
 FRONTEND /_dr/epp                                           EppTlsAction                                   POST                n  APP  ADMIN
 FRONTEND /ready/frontend                                    ReadinessProbeActionFrontend                   GET                 n  NONE PUBLIC
