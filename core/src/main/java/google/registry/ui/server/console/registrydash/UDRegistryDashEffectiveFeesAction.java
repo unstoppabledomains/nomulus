@@ -167,7 +167,9 @@ public class UDRegistryDashEffectiveFeesAction extends ConsoleApiAction {
 
             for (String tldStr : tlds) {
               Tld tld = tldCache.get(tldStr);
-              if (tld == null) continue;
+              if (tld == null) {
+                continue;
+              }
 
               String currency = tld.getCurrency().getCode();
               for (String op : operations) {
