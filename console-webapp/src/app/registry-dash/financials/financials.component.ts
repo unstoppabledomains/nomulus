@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, computed, effect, signal } from '@angular/core';
+import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { combineLatest, switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
@@ -42,6 +44,7 @@ const ENTITY_COLORS = {
   styleUrls: ['./financials.component.scss'],
 })
 export class FinancialsComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   selectedTab = signal(0);
   selectedOverviewRange = signal('12m');
   overviewRangeKeys = Object.keys(RANGE_CONFIG);
@@ -174,16 +177,23 @@ export class FinancialsComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    effect(() => {
-      // Re-run whenever range changes OR when returning to Overview tab (index 0)
-      const tab = this.selectedTab();
-      const config = RANGE_CONFIG[this.selectedOverviewRange()];
-      if (tab === 0) {
-        this.dashService.getRevenueBilling(config.lookbackHours, config.granularity).subscribe();
-        this.dashService.getDomainActivity(config.lookbackHours, config.granularity).subscribe();
-        this.dashService.getForecasting(config.lookbackHours, config.granularity).subscribe();
-      }
-    });
+    // Re-fetch all overview data when range or tab changes
+    combineLatest([
+      toObservable(this.selectedTab),
+      toObservable(this.selectedOverviewRange),
+    ]).pipe(
+      switchMap(([tab, range]) => {
+        const config = RANGE_CONFIG[range];
+        if (tab === 0) {
+          // Fetch all three in parallel for overview tab
+          this.dashService.getDomainActivity(config.lookbackHours, config.granularity).subscribe();
+          this.dashService.getForecasting(config.lookbackHours, config.granularity).subscribe();
+          return this.dashService.getRevenueBilling(config.lookbackHours, config.granularity);
+        }
+        return [];
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
   }
 
   ngOnInit() {

@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, computed, effect, signal } from '@angular/core';
+import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { switchMap } from 'rxjs';
 import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
@@ -57,6 +59,7 @@ export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
   styleUrls: ['./revenue-billing.component.scss'],
 })
 export class RevenueBillingComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   selectedRange = signal('12m');
   rangeKeys = Object.keys(RANGE_CONFIG);
 
@@ -141,8 +144,8 @@ export class RevenueBillingComponent implements OnInit {
 
     return {
       tooltip: { trigger: 'axis' as const },
-      xAxis: { type: 'category' as const, data: operations },
-      yAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
+      xAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
+      yAxis: { type: 'category' as const, data: operations, inverse: true },
       series: [
         {
           type: 'bar' as const,
@@ -156,17 +159,19 @@ export class RevenueBillingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    effect(() => {
-      const range = this.selectedRange();
-      const config = RANGE_CONFIG[range];
-      if (config) {
-        this.dashService.getRevenueBilling(config.lookbackHours, config.granularity).subscribe();
-      }
-    });
+    toObservable(this.selectedRange)
+      .pipe(
+        switchMap(range => {
+          const config = RANGE_CONFIG[range];
+          return this.dashService.getRevenueBilling(config.lookbackHours, config.granularity);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
   }
 
   ngOnInit() {
-    // Initial fetch is handled by the effect above
+    // Initial fetch is handled by the observable above
   }
 
   onRangeChange(range: string) {

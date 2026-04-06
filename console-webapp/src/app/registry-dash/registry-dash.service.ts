@@ -220,7 +220,10 @@ export class RegistryDashService {
       tap(() => {
         try {
           const parsed = JSON.parse(settings);
-          this.columnVisibility.set(parsed?.['columnVisibility'] ?? {});
+          this.columnVisibility.set({
+            ...RegistryDashService.DEFAULT_VISIBILITY,
+            ...(parsed?.['columnVisibility'] ?? {}),
+          });
         } catch { /* ignore parse errors */ }
       }),
       catchError((err) => this.handleError<unknown>(err))

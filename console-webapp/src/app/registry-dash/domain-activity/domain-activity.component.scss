@@ -16,6 +16,18 @@
 
 .domain-activity-container {
   padding: 24px;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .subtitle {
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--ud-text-secondary);
+  }
 }
 
 .time-range {
@@ -67,9 +79,16 @@
   padding: 20px 24px;
 
   h3 {
-    margin: 0 0 12px;
+    margin: 0 0 4px;
     font-size: 15px;
     font-weight: 500;
+  }
+
+  .chart-description {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--ud-text-secondary);
+    font-style: italic;
   }
 }
 
