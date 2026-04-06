@@ -30,23 +30,38 @@
     @include ud.error-banner;
   }
 
+  .time-indicator {
+    font-size: 12px;
+    color: var(--ud-text-secondary);
+    font-style: italic;
+    margin: 0 0 1rem;
+  }
+
   // Charts row
   .charts-row {
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     margin-bottom: 1.5rem;
   }
 
   .chart-card {
     flex: 1;
     min-width: 0;
+    margin-bottom: 1.5rem;
   }
 
   .chart-title {
-    margin: 0 0 1rem;
+    margin: 0 0 4px;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--ud-text-primary);
+  }
+
+  .chart-description {
+    margin: 0 0 1rem;
+    font-size: 0.75rem;
+    color: var(--ud-text-secondary);
+    font-style: italic;
   }
 
   // Horizontal bar chart

@@ -180,7 +180,7 @@ export const routes: RouteWithIcon[] = [
       },
       {
         path: 'pricing',
-        title: 'Pricing',
+        title: 'Custom Pricing',
         loadComponent: () =>
           import('./registry-dash/pricing/pricing.component').then(
             (mod) => mod.PricingComponent

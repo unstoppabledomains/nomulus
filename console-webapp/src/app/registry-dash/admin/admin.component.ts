@@ -277,7 +277,7 @@ export class AdminComponent implements OnInit {
     const toggles = this.visibilityToggles();
     const columnVisibility: Record<string, boolean> = {};
     for (const [key, value] of Object.entries(toggles)) {
-      if (!value) columnVisibility[key] = false;
+      columnVisibility[key] = value;
     }
     const settings = JSON.stringify({ columnVisibility });
     this.dashService.updateSettings(registry.id, settings).subscribe(() => {

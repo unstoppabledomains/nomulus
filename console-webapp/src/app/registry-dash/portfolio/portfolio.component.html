@@ -8,6 +8,7 @@
   }
 
   <h2 class="mat-headline-6">Registrar Portfolio</h2>
+  <p class="subtitle">All registrars accredited to operate under this registry, their status, domain counts, and authorized TLDs.</p>
 
   @if (dashService.portfolio().length > 0) {
     <table mat-table [dataSource]="dashService.portfolio()" class="mat-elevation-z1">

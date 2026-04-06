@@ -53,18 +53,11 @@
   }
 }
 
-.charts-row {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
 .chart-container {
-  flex: 1;
-  min-width: 0;
   background: var(--ud-surface-muted);
   border-radius: var(--ud-radius-md);
   padding: 20px 24px;
+  margin-bottom: 24px;
 
   h3 {
     margin: 0 0 4px;

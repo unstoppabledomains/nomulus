@@ -68,14 +68,14 @@
     <mat-tab label="Fees by TLD">
       <div class="tab-content">
         <p class="tab-description">
-          Fee amounts are based on Nomulus TLD default billing values and the configurable RSP Fee per TLD/operation set on the Admin tab.
-          To set what individual registrars are charged, use the Pricing tab.
+          These are the effective billing amounts per TLD per operation. Each row shows what a registrar is charged by default.
+          Rows marked '(default)' inherit from the global default fee. To set registrar-specific pricing, use the Custom Pricing tab.
         </p>
 
         <!-- Chart 1: Default Fees per TLD per operation -->
         <div class="bar-chart" *ngIf="feesByOperationChartData().length > 0">
           <h3 class="chart-title">Default Fees per TLD per Operation</h3>
-          <p class="chart-description">Default billing amounts per TLD broken down by operation type, based on the configured fee schedule. Each bar represents total registrar billing across all operations for that TLD.</p>
+          <p class="chart-description">Effective fee amounts per TLD per operation — the amount registrars are billed based on the Nomulus TLD configuration. If a TLD has no explicit fee, it inherits the global default.</p>
           <div class="chart-legend">
             <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
               <span class="legend-swatch" [style.background]="getOperationColor(op)"></span>

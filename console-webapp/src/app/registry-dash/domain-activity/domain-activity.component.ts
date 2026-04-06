@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, computed, effect, signal } from '@angular/core';
+import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
-import { RegistryDashService, ActivityDataPoint } from '../registry-dash.service';
+import { RegistryDashService } from '../registry-dash.service';
 import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.component';
 
 const ACTIVITY_COLORS: Record<string, string> = {
@@ -42,6 +44,7 @@ const TLD_COLORS = [
   styleUrls: ['./domain-activity.component.scss'],
 })
 export class DomainActivityComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   selectedRange = signal('12m');
   rangeKeys = Object.keys(RANGE_CONFIG);
 
@@ -154,18 +157,20 @@ export class DomainActivityComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedRange changes
-    effect(() => {
-      const range = this.selectedRange();
-      const config = RANGE_CONFIG[range];
-      if (config) {
-        this.dashService.getDomainActivity(config.lookbackHours, config.granularity).subscribe();
-      }
-    });
+    // Refetch when selectedRange changes, cancel previous request on new selection
+    toObservable(this.selectedRange)
+      .pipe(
+        switchMap(range => {
+          const config = RANGE_CONFIG[range];
+          return this.dashService.getDomainActivity(config.lookbackHours, config.granularity);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
   }
 
   ngOnInit() {
-    // Initial fetch is handled by the effect above
+    // Initial fetch is handled by the observable above
   }
 
   onRangeChange(range: string) {

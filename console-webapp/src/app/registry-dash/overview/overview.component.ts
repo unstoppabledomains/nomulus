@@ -95,6 +95,8 @@ export class OverviewComponent {
     const sorted = [...d.renewalRates].sort((a, b) => b.renewalRate - a.renewalRate);
     const tlds = sorted.map(r => `.${r.tld}`);
     const rates = sorted.map(r => r.renewalRate);
+    const maxRate = Math.max(...rates, 0);
+    const dynamicMax = Math.min(100, Math.ceil((maxRate + 10) / 10) * 10);
     return {
       tooltip: {
         trigger: 'axis' as const,
@@ -106,7 +108,7 @@ export class OverviewComponent {
       xAxis: {
         type: 'value' as const,
         min: 0,
-        max: 100,
+        max: dynamicMax,
         axisLabel: { formatter: '{value}%' },
       },
       yAxis: {
@@ -127,7 +129,7 @@ export class OverviewComponent {
             silent: true,
             symbol: 'none',
             lineStyle: { type: 'dashed' as const, color: '#9191A1' },
-            label: { formatter: '85% avg', position: 'insideEndTop' as const },
+            label: { formatter: '85% benchmark', position: 'insideEndTop' as const },
             data: [{ xAxis: 85 }],
           },
         },

@@ -13,6 +13,9 @@
      limitations under the License. -->
 
 <div class="domain-activity-container">
+  <h2>Domain Activity</h2>
+  <p class="subtitle">Domain registration activity across all TLDs — creates, renews, transfers, deletes, and restores.</p>
+
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>
   </div>
@@ -56,10 +59,12 @@
   <div class="charts-row" *ngIf="data()">
     <div class="chart-container" *ngIf="activityByTldOptions()">
       <h3>Activity Breakdown by TLD</h3>
+      <p class="chart-description">Total domain transactions grouped by TLD and operation type for the selected time period.</p>
       <div echarts [options]="activityByTldOptions()!" [theme]="'ud-brand'" class="chart"></div>
     </div>
     <div class="chart-container" *ngIf="domainCountsBarOptions()">
       <h3>Current Domain Counts by TLD</h3>
+      <p class="chart-description">Current number of active (non-deleted) domains per TLD. This count is independent of the selected time period.</p>
       <div echarts [options]="domainCountsBarOptions()!" [theme]="'ud-brand'" class="chart"></div>
     </div>
   </div>
