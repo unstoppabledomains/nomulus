@@ -35,6 +35,7 @@ export class EffectiveFeesComponent implements AfterViewInit {
 
   filterRegistrar = signal<string>('all');
   filterTld = signal<string>('all');
+  filterSource = signal<string>('all');
 
   uniqueRegistrars = computed(() => {
     const fees = this.dashService.effectiveFees();
@@ -50,8 +51,10 @@ export class EffectiveFeesComponent implements AfterViewInit {
     let fees = this.dashService.effectiveFees();
     const reg = this.filterRegistrar();
     const tld = this.filterTld();
+    const source = this.filterSource();
     if (reg !== 'all') fees = fees.filter(f => f.registrarId === reg);
     if (tld !== 'all') fees = fees.filter(f => f.tld === tld);
+    if (source !== 'all') fees = fees.filter(f => f.source === source);
     return fees;
   });
 
@@ -75,5 +78,9 @@ export class EffectiveFeesComponent implements AfterViewInit {
 
   onTldFilterChange(value: string) {
     this.filterTld.set(value);
+  }
+
+  onSourceFilterChange(value: string) {
+    this.filterSource.set(value);
   }
 }
