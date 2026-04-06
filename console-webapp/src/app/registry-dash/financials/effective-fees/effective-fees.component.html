@@ -31,6 +31,15 @@
         <mat-option *ngFor="let tld of uniqueTlds()" [value]="tld">.{{ tld }}</mat-option>
       </mat-select>
     </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Source</mat-label>
+      <mat-select [value]="filterSource()" (selectionChange)="onSourceFilterChange($event.value)">
+        <mat-option value="all">All Sources</mat-option>
+        <mat-option value="Default">Default</mat-option>
+        <mat-option value="Custom">Custom</mat-option>
+      </mat-select>
+    </mat-form-field>
   </div>
 
   <!-- Table -->
