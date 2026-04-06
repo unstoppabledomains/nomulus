@@ -2,7 +2,7 @@
   <div class="effective-fees-header">
     <h3>Effective Fees by Registrar</h3>
     <p class="effective-fees-description">
-      What each registrar is actually paying per TLD per operation. Default TLD prices are shown unless overridden by an active custom pricing rule.
+      What each registrar is actually paying per TLD per operation. Default TLD prices are shown unless overridden by an active custom pricing rule.<span *ngIf="fetchedAt()"> Data active as of {{ fetchedAt() }}.</span>
     </p>
   </div>
 

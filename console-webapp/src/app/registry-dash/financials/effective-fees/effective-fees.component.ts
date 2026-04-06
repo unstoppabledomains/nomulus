@@ -33,6 +33,7 @@ export class EffectiveFeesComponent implements AfterViewInit {
     'registrarId', 'registrarName', 'tld', 'operation', 'price', 'currency', 'source',
   ];
 
+  fetchedAt = signal<string>('');
   filterRegistrar = signal<string>('all');
   filterTld = signal<string>('all');
   filterSource = signal<string>('all');
@@ -61,7 +62,14 @@ export class EffectiveFeesComponent implements AfterViewInit {
   dataSource = new MatTableDataSource<EffectiveFeeEntry>([]);
 
   constructor(public dashService: RegistryDashService) {
-    this.dashService.getEffectiveFees().subscribe();
+    this.dashService.getEffectiveFees().subscribe(() => {
+      this.fetchedAt.set(
+        new Date().toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short',
+        })
+      );
+    });
 
     effect(() => {
       this.dataSource.data = this.filteredFees();
