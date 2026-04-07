@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Output, computed } from '@angular/core';
 import { BreakPointObserverService } from '../shared/services/breakPoint.service';
 // UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR
 import { RESTRICTED_ELEMENTS } from '../shared/directives/userLevelVisiblity.directive';
+import { UserDataService } from '../shared/services/userData.service';
 
 @Component({
   selector: 'app-header',
@@ -28,7 +29,13 @@ export class HeaderComponent {
   registrarPagesRestriction = RESTRICTED_ELEMENTS.REGISTRAR_PAGES;
   private isNavOpen = false;
 
-  constructor(protected breakpointObserver: BreakPointObserverService) {}
+  // UD: display logged-in user email in header
+  userEmail = computed(() => this.userDataService.userData()?.userEmail || '');
+
+  constructor(
+    protected breakpointObserver: BreakPointObserverService,
+    private userDataService: UserDataService,
+  ) {}
 
   @Output() toggleNavOpen = new EventEmitter<boolean>();
 
