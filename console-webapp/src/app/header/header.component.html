@@ -17,11 +17,15 @@
       class="console-app__logo"
     >
       <span class="console-app__logo-text">DNEX <span class="logo-registry">Registry</span></span>
+      <span class="console-app__logo-subtitle">and Service Provider</span>
     </a>
     <span class="spacer"></span>
     <!-- UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR -->
     @if (!breakpointObserver.isMobileView()) {
     <app-registrar-selector [elementId]="registrarPagesRestriction" />
+    }
+    @if (userEmail()) {
+    <span class="console-app__header-user-email">{{ userEmail() }}</span>
     }
     <button
       class="console-app__header-user-icon"
