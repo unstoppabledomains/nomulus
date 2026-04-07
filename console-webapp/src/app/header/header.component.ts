@@ -27,6 +27,7 @@ import { UserDataService } from '../shared/services/userData.service';
 export class HeaderComponent {
   // UD: Registry Dashboard — used by [elementId] directive in template
   registrarPagesRestriction = RESTRICTED_ELEMENTS.REGISTRAR_PAGES;
+  isUserLoaded = computed(() => !!this.userDataService.userData());
   private isNavOpen = false;
 
   // UD: display logged-in user email in header

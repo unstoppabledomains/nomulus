@@ -21,7 +21,7 @@
     </a>
     <span class="spacer"></span>
     <!-- UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR -->
-    @if (!breakpointObserver.isMobileView()) {
+    @if (!breakpointObserver.isMobileView() && isUserLoaded()) {
     <app-registrar-selector [elementId]="registrarPagesRestriction" />
     }
     @if (userEmail()) {
@@ -41,7 +41,7 @@
     </mat-menu>
   </mat-toolbar>
   <!-- UD: Registry Dashboard — hide registrar selector for REGISTRY_OPERATOR -->
-  @if (breakpointObserver.isMobileView()) {
+  @if (breakpointObserver.isMobileView() && isUserLoaded()) {
   <app-registrar-selector [elementId]="registrarPagesRestriction" />
   }
 </p>
