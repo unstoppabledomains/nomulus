@@ -68,7 +68,15 @@ export class UserLevelVisibility {
   }
 
   processElement() {
-    const globalRole = this.userDataService?.userData()?.globalRole || 'NONE';
+    const userData = this.userDataService?.userData();
+    // UD: Hide role-restricted elements until user data loads to prevent flash
+    if (!userData) {
+      if (this.elementId !== null) {
+        this.el.nativeElement.style.display = 'none';
+      }
+      return;
+    }
+    const globalRole = userData.globalRole || 'NONE';
     if (this.elementId === null) {
       return;
     }
