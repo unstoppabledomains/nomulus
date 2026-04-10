@@ -74,7 +74,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
       WHERE dh.history_modification_time >= :startDate
-        AND dh.history_modification_time <= CURRENT_TIMESTAMP
+        AND dh.history_modification_time <= :endDate
         AND dh.history_type IN (
           'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
           'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
@@ -98,7 +98,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
       WHERE dh.history_modification_time >= :startDate
-        AND dh.history_modification_time <= CURRENT_TIMESTAMP
+        AND dh.history_modification_time <= :endDate
         AND d.tld IN :tlds
         AND dh.history_type IN (
           'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
@@ -127,7 +127,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
       WHERE dh.history_modification_time >= :startDate
-        AND dh.history_modification_time <= CURRENT_TIMESTAMP
+        AND dh.history_modification_time <= :endDate
         AND dh.history_type IN (
           'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
           'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
@@ -153,7 +153,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       FROM "DomainHistory" dh
       JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
       WHERE dh.history_modification_time >= :startDate
-        AND dh.history_modification_time <= CURRENT_TIMESTAMP
+        AND dh.history_modification_time <= :endDate
         AND d.tld IN :tlds
         AND dh.history_type IN (
           'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
@@ -228,8 +228,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       gran = "month";
     }
 
-    Instant startDate = ZonedDateTime.now(ZoneOffset.UTC)
-        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+    Instant startDate = now.minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    Instant endDate = now.toInstant();
 
     String resolvedGran = gran;
     tm().transact(
@@ -243,11 +244,13 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
             activityResults = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .getResultList();
           } else {
             activityResults = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .setParameter("tlds", tlds)
                 .getResultList();
           }
