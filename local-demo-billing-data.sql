@@ -21,7 +21,8 @@
 --
 -- What this populates:
 --   - BillingEvent            → Registry Revenue tab (Overview + Revenue & Billing)
---   - DomainTransactionRecord → Domain Activity tab
+--   - DomainTransactionRecord → ICANN reporting (no longer used by Domain Activity tab)
+--   Note: Domain Activity tab now queries DomainHistory directly (actual event time)
 --   - DomainHistory (renew/delete) → Forecasting renewal rates
 --   - Domain expiration spread → Forecasting expiration curve
 

@@ -94,6 +94,9 @@ class RegistryDashRevenueBillingActionTest {
 
   private Domain createDomainWithBilling(
       String label, String tld, Reason reason, String cost, DateTime eventTime) {
+    // Set clock to eventTime so the DomainHistory gets the correct modification timestamp.
+    // The revenue SQL now groups by DomainHistory.history_modification_time, not event_time.
+    clock.setTo(eventTime);
     Domain domain =
         persistDomainWithDependentResources(
             label, tld, clock.nowUtc(), clock.nowUtc(), clock.nowUtc().plusYears(2));
