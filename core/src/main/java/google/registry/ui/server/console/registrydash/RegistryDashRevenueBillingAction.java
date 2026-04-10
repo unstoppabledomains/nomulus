@@ -82,6 +82,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
+        AND b.event_time <= CURRENT_TIMESTAMP
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
@@ -108,6 +109,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
+        AND b.event_time <= CURRENT_TIMESTAMP
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
@@ -138,6 +140,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
+        AND b.event_time <= CURRENT_TIMESTAMP
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
@@ -165,6 +168,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE b.event_time >= :startDate
+        AND b.event_time <= CURRENT_TIMESTAMP
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
