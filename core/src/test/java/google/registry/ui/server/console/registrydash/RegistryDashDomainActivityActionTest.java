@@ -33,7 +33,6 @@ import google.registry.model.reporting.HistoryEntry.Type;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.auth.AuthResult;
 import google.registry.testing.ConsoleApiParamsUtils;
-import google.registry.testing.DatabaseHelper;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
 import google.registry.tools.GsonUtils;
