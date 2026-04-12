@@ -107,7 +107,9 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  env:
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c
@@ -144,7 +146,9 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  env:
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c
@@ -212,6 +216,8 @@ steps:
 # nomulus.jar built earlier.
 - id: Build-And-Push-Prober-Cert-Updater-Image
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  env:
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c
