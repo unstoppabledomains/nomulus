@@ -180,6 +180,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private final Optional<Integer> months;
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
+  private final java.time.Clock clock;
 
   @Inject
   public RegistryDashDomainActivityAction(
@@ -187,10 +188,21 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
       @Parameter("granularity") Optional<String> granularity) {
+    this(consoleApiParams, months, lookbackHours, granularity, java.time.Clock.systemUTC());
+  }
+
+  /** Constructor that accepts a clock for testing. */
+  RegistryDashDomainActivityAction(
+      ConsoleApiParams consoleApiParams,
+      Optional<Integer> months,
+      Optional<Integer> lookbackHours,
+      Optional<String> granularity,
+      java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
+    this.clock = clock;
   }
 
   @Override
@@ -228,7 +240,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       gran = "month";
     }
 
-    ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+    ZonedDateTime now = ZonedDateTime.now(clock);
     Instant startDate = now.minus(hoursBack, ChronoUnit.HOURS).toInstant();
     Instant endDate = now.toInstant();
 

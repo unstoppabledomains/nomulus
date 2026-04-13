@@ -88,6 +88,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY date_trunc('%s', dh.history_modification_time), d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
@@ -149,6 +150,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
@@ -254,9 +256,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       gran = "month";
     }
 
-    Instant startInstant = ZonedDateTime.now(clock)
-        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
-    Instant startDate = startInstant;
+    ZonedDateTime now = ZonedDateTime.now(clock);
+    Instant startDate = now.minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    Instant endDate = now.toInstant();
 
     String resolvedGran = gran;
     tm().transact(
@@ -269,11 +271,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             results = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .getResultList();
           } else {
             results = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .setParameter("tlds", tlds)
                 .getResultList();
           }
