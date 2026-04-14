@@ -15,7 +15,7 @@
 import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { switchMap } from 'rxjs';
+import { EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
@@ -162,7 +162,9 @@ export class DomainActivityComponent implements OnInit {
       .pipe(
         switchMap(range => {
           const config = RANGE_CONFIG[range];
-          return this.dashService.getDomainActivity(config.lookbackHours, config.granularity);
+          return this.dashService.getDomainActivity(config.lookbackHours, config.granularity).pipe(
+            catchError(() => EMPTY) // Prevent subscription death on HTTP errors
+          );
         }),
         takeUntilDestroyed(this.destroyRef),
       )
