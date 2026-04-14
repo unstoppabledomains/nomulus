@@ -60,10 +60,14 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
   private static final Set<String> VALID_GRANULARITIES = Set.of("15min", "hour", "day", "month");
 
   // --- Standard granularity SQL (hour, day, month) ---
+  // Uses DomainHistory.history_modification_time for the period timestamp instead of
+  // BillingEvent.event_time. For most operations these are identical, but for transfers
+  // the BillingEvent.event_time is set to the speculative auto-approval date (days/weeks
+  // in the future), while DomainHistory records when the action was actually taken.
 
   private static final String REVENUE_ALL_TEMPLATE =
       """
-      SELECT date_trunc('%s', b.event_time) AS period,
+      SELECT date_trunc('%s', dh.history_modification_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
@@ -71,25 +75,28 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      JOIN "DomainHistory" dh ON dh.history_revision_id = b.domain_history_revision_id
+        AND dh.domain_repo_id = b.domain_repo_id
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
         WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
-          AND effective_date <= b.event_time
+          AND effective_date <= dh.history_modification_time
         ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
                  effective_date DESC
         LIMIT 1
       ) cb ON true
-      WHERE b.event_time >= :startDate
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
-      GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
+      GROUP BY date_trunc('%s', dh.history_modification_time), d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
       """;
 
   private static final String REVENUE_SCOPED_TEMPLATE =
       """
-      SELECT date_trunc('%s', b.event_time) AS period,
+      SELECT date_trunc('%s', dh.history_modification_time) AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
@@ -97,20 +104,22 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      JOIN "DomainHistory" dh ON dh.history_revision_id = b.domain_history_revision_id
+        AND dh.domain_repo_id = b.domain_repo_id
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
         WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
-          AND effective_date <= b.event_time
+          AND effective_date <= dh.history_modification_time
         ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
                  effective_date DESC
         LIMIT 1
       ) cb ON true
-      WHERE b.event_time >= :startDate
+      WHERE dh.history_modification_time >= :startDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
-      GROUP BY date_trunc('%s', b.event_time), d.tld, b.reason, b.cost_currency
+      GROUP BY date_trunc('%s', dh.history_modification_time), d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
       """;
 
@@ -118,8 +127,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
 
   private static final String REVENUE_15MIN_ALL =
       """
-      SELECT date_trunc('hour', b.event_time)
-               + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
+      SELECT date_trunc('hour', dh.history_modification_time)
+               + floor(extract(minute from dh.history_modification_time) / 15)
+                 * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
@@ -127,17 +137,20 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      JOIN "DomainHistory" dh ON dh.history_revision_id = b.domain_history_revision_id
+        AND dh.domain_repo_id = b.domain_repo_id
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
         WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
-          AND effective_date <= b.event_time
+          AND effective_date <= dh.history_modification_time
         ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
                  effective_date DESC
         LIMIT 1
       ) cb ON true
-      WHERE b.event_time >= :startDate
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
       ORDER BY period, d.tld
@@ -145,8 +158,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
 
   private static final String REVENUE_15MIN_SCOPED =
       """
-      SELECT date_trunc('hour', b.event_time)
-               + floor(extract(minute from b.event_time) / 15) * interval '15 minutes' AS period,
+      SELECT date_trunc('hour', dh.history_modification_time)
+               + floor(extract(minute from dh.history_modification_time) / 15)
+                 * interval '15 minutes' AS period,
              d.tld, b.reason,
              SUM(b.cost_amount) AS total_amount,
              SUM(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0))
@@ -154,17 +168,19 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
              b.cost_currency
       FROM "BillingEvent" b
       JOIN "Domain" d ON d.repo_id = b.domain_repo_id
+      JOIN "DomainHistory" dh ON dh.history_revision_id = b.domain_history_revision_id
+        AND dh.domain_repo_id = b.domain_repo_id
       LEFT JOIN LATERAL (
         SELECT rsp_retained_fee_amount
         FROM "RegistryDashboardCostBasis"
         WHERE (tld = d.tld OR tld = '*')
           AND operation = b.reason
-          AND effective_date <= b.event_time
+          AND effective_date <= dh.history_modification_time
         ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END,
                  effective_date DESC
         LIMIT 1
       ) cb ON true
-      WHERE b.event_time >= :startDate
+      WHERE dh.history_modification_time >= :startDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency
@@ -240,9 +256,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       gran = "month";
     }
 
-    Instant startInstant = ZonedDateTime.now(clock)
-        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
-    Instant startDate = startInstant;
+    ZonedDateTime now = ZonedDateTime.now(clock);
+    Instant startDate = now.minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    Instant endDate = now.toInstant();
 
     String resolvedGran = gran;
     tm().transact(
@@ -255,11 +271,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             results = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .getResultList();
           } else {
             results = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .setParameter("tlds", tlds)
                 .getResultList();
           }

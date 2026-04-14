@@ -21,6 +21,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { SnackBarModule } from '../../snackbar.module';
 import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-dash.service';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({
   selector: 'app-registry-dash-pricing',
@@ -76,10 +77,41 @@ export class PricingComponent implements AfterViewInit {
   editingRule = signal<PricingRule | undefined>(undefined);
   selectedRegistrarId = signal<string>('');
 
-  registrars = computed<SystemRegistrar[]>(
-    () => this.dashService.systemInfo()?.registrars || []
-  );
+  /** TLDs owned by the current user's registry (empty for admins = no filtering). */
+  private registryTlds = computed<Set<string>>(() => {
+    const admin = this.dashService.adminData();
+    const user = this.userDataService.userData();
+    if (!admin || !user) return new Set();
+    // Admins see everything
+    if (user.isAdmin) return new Set();
+    const email = user.userEmail?.toLowerCase();
+    if (!email) return new Set();
+    for (const reg of admin.registries) {
+      const isMember = reg.users?.some(
+        (u) => u.userEmail?.toLowerCase() === email
+      );
+      if (isMember) {
+        return new Set(reg.tlds?.map((t) => t.tld) ?? []);
+      }
+    }
+    return new Set();
+  });
 
+  /** Registrars filtered to those with at least one TLD in the user's registry. */
+  registrars = computed<SystemRegistrar[]>(() => {
+    const all = this.dashService.systemInfo()?.registrars || [];
+    const scope = this.registryTlds();
+    // Empty scope set means admin — show all
+    if (scope.size === 0) return all;
+    return all
+      .filter((r) => r.allowedTlds.some((tld) => scope.has(tld)))
+      .map((r) => ({
+        ...r,
+        allowedTlds: r.allowedTlds.filter((tld) => scope.has(tld)),
+      }));
+  });
+
+  /** TLDs available for the selected registrar, scoped to the user's registry. */
   availableTlds = computed<string[]>(() => {
     const regId = this.selectedRegistrarId();
     if (!regId) return [];
@@ -103,6 +135,7 @@ export class PricingComponent implements AfterViewInit {
 
   constructor(
     protected dashService: RegistryDashService,
+    private userDataService: UserDataService,
     private snackBar: MatSnackBar
   ) {
     this.dashService.getPricing().subscribe();
