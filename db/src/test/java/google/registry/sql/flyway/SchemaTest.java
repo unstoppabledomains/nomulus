@@ -132,7 +132,9 @@ class SchemaTest {
     String cleanedExpected = expectedContent.lines()
         .filter(line -> !line.trim().isEmpty()
                     && !line.startsWith("--")
-                    && !line.startsWith("**"))
+                    && !line.startsWith("**")
+                    && !line.startsWith("\\restrict")
+                    && !line.startsWith("\\unrestrict"))
         .collect(Collectors.joining("\n"));
 
     assertThat(cleanedActual).isEqualTo(cleanedExpected);

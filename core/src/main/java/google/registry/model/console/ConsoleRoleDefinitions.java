@@ -64,10 +64,27 @@ public class ConsoleRoleDefinitions {
               ConsolePermission.MANAGE_DOCUMENTATION)
           .build();
 
+  // UD: Removed registrar-facing permissions (VIEW_REGISTRARS, VIEW_REGISTRAR_DETAILS,
+  // DOWNLOAD_DOMAINS, ACCESS_BILLING_DETAILS, VIEW_OPERATIONAL_DATA) —
+  // REGISTRY_OPERATOR should only access Registry Dashboard, not registrar-scoped data.
+  /** Permissions for a registry operator (dashboard user). */
+  static final ImmutableSet<ConsolePermission> REGISTRY_OPERATOR_PERMISSIONS =
+      ImmutableSet.of(
+          ConsolePermission.VIEW_TLD_PORTFOLIO,
+          ConsolePermission.VIEW_DASHBOARD_OVERVIEW,
+          ConsolePermission.VIEW_REGISTRAR_PORTFOLIO,
+          ConsolePermission.VIEW_PRICING,
+          ConsolePermission.MANAGE_PRICING,
+          ConsolePermission.MANAGE_COST_BASIS,
+          ConsolePermission.VIEW_REVENUE_BILLING,
+          ConsolePermission.VIEW_DOMAIN_ACTIVITY,
+          ConsolePermission.VIEW_FORECASTING);
+
   /** Permissions for a registry full-time employee. */
   static final ImmutableSet<ConsolePermission> FTE_PERMISSIONS =
       new ImmutableSet.Builder<ConsolePermission>()
           .addAll(SUPPORT_LEAD_PERMISSIONS)
+          .addAll(REGISTRY_OPERATOR_PERMISSIONS)
           .add(ConsolePermission.CHANGE_NOMULUS_PASSWORD)
           .build();
 

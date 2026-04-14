@@ -28,6 +28,10 @@ import { SupportComponent } from './support/support.component';
 import RdapComponent from './settings/rdap/rdap.component';
 import { HistoryComponent } from './history/history.component';
 import { PasswordResetVerifyComponent } from './shared/components/passwordReset/passwordResetVerify.component';
+// UD: Registry Dashboard — guard to redirect REGISTRY_OPERATOR away from registrar pages
+import { udRegistrarPageGuard } from './shared/guards/ud-registrarPageGuard';
+// UD: Registry Dashboard — restrict admin tab to FTE only
+import { udFteOnlyGuard } from './shared/guards/ud-fteOnlyGuard';
 
 export interface RouteWithIcon extends Route {
   iconName?: string;
@@ -37,6 +41,7 @@ export const PATHS = {
   NewOteComponent: 'new-ote',
   OteStatusComponent: 'ote-status/:registrarId',
   UsersComponent: 'users',
+  RegistryDash: 'registry-dash',
 };
 export const routes: RouteWithIcon[] = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -64,6 +69,7 @@ export const routes: RouteWithIcon[] = [
     component: HomeComponent,
     title: 'Dashboard',
     iconName: 'view_comfy_alt',
+    canActivate: [udRegistrarPageGuard], // UD: Registry Dashboard — redirect REGISTRY_OPERATOR
   },
   {
     path: DomainListComponent.PATH,
@@ -145,6 +151,67 @@ export const routes: RouteWithIcon[] = [
     component: SupportComponent,
     title: 'Support',
     iconName: 'help',
+  },
+  {
+    path: PATHS.RegistryDash,
+    title: 'Registry Dashboard',
+    iconName: 'analytics',
+    loadComponent: () =>
+      import('./registry-dash/registry-dash.component').then(
+        (mod) => mod.RegistryDashComponent
+      ),
+    children: [
+      { path: '', redirectTo: 'overview', pathMatch: 'full' },
+      {
+        path: 'overview',
+        title: 'Overview',
+        loadComponent: () =>
+          import('./registry-dash/overview/overview.component').then(
+            (mod) => mod.OverviewComponent
+          ),
+      },
+      {
+        path: 'portfolio',
+        title: 'Portfolio',
+        loadComponent: () =>
+          import('./registry-dash/portfolio/portfolio.component').then(
+            (mod) => mod.PortfolioComponent
+          ),
+      },
+      {
+        path: 'pricing',
+        title: 'Custom Pricing',
+        loadComponent: () =>
+          import('./registry-dash/pricing/pricing.component').then(
+            (mod) => mod.PricingComponent
+          ),
+      },
+      {
+        path: 'domain-activity',
+        title: 'Domain Activity',
+        loadComponent: () =>
+          import('./registry-dash/domain-activity/domain-activity.component').then(
+            (mod) => mod.DomainActivityComponent
+          ),
+      },
+      {
+        path: 'financials',
+        title: 'Financials',
+        loadComponent: () =>
+          import('./registry-dash/financials/financials.component').then(
+            (mod) => mod.FinancialsComponent
+          ),
+      },
+      {
+        path: 'admin',
+        title: 'Admin',
+        canActivate: [udFteOnlyGuard], // UD: Registry Dashboard — admin is FTE-only
+        loadComponent: () =>
+          import('./registry-dash/admin/admin.component').then(
+            (mod) => mod.AdminComponent
+          ),
+      },
+    ],
   },
 ];
 

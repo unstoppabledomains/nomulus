@@ -22,17 +22,33 @@ export enum RESTRICTED_ELEMENTS {
   USERS,
   BULK_DELETE,
   SUSPEND,
+  REGISTRY_DASH,
+  REGISTRAR_PAGES, // UD: Registry Dashboard — hide registrar-specific pages for REGISTRY_OPERATOR
+  REGISTRY_DASH_ADMIN, // UD: Registry Dashboard — admin tab is FTE-only
 }
 
-export const DISABLED_ELEMENTS_PER_ROLE = {
+export const DISABLED_ELEMENTS_PER_ROLE: Record<string, RESTRICTED_ELEMENTS[]> = {
   NONE: [
     RESTRICTED_ELEMENTS.REGISTRAR_ELEMENT,
     RESTRICTED_ELEMENTS.OTE,
     RESTRICTED_ELEMENTS.SUSPEND,
     RESTRICTED_ELEMENTS.ACTIVITY_PER_USER,
+    RESTRICTED_ELEMENTS.REGISTRY_DASH,
   ],
-  SUPPORT_LEAD: [],
-  SUPPORT_AGENT: [RESTRICTED_ELEMENTS.ACTIVITY_PER_USER],
+  SUPPORT_LEAD: [RESTRICTED_ELEMENTS.REGISTRY_DASH],
+  SUPPORT_AGENT: [
+    RESTRICTED_ELEMENTS.ACTIVITY_PER_USER,
+    RESTRICTED_ELEMENTS.REGISTRY_DASH,
+  ],
+  REGISTRY_OPERATOR: [
+    RESTRICTED_ELEMENTS.OTE,
+    RESTRICTED_ELEMENTS.SUSPEND,
+    RESTRICTED_ELEMENTS.ACTIVITY_PER_USER,
+    RESTRICTED_ELEMENTS.REGISTRAR_ELEMENT,
+    RESTRICTED_ELEMENTS.USERS,
+    RESTRICTED_ELEMENTS.REGISTRAR_PAGES, // UD: Registry Dashboard — hide all registrar pages
+    RESTRICTED_ELEMENTS.REGISTRY_DASH_ADMIN, // UD: Registry Dashboard — admin is FTE-only
+  ],
 };
 
 @Directive({
@@ -52,7 +68,15 @@ export class UserLevelVisibility {
   }
 
   processElement() {
-    const globalRole = this.userDataService?.userData()?.globalRole || 'NONE';
+    const userData = this.userDataService?.userData();
+    // UD: Hide role-restricted elements until user data loads to prevent flash
+    if (!userData) {
+      if (this.elementId !== null) {
+        this.el.nativeElement.style.display = 'none';
+      }
+      return;
+    }
+    const globalRole = userData.globalRole || 'NONE';
     if (this.elementId === null) {
       return;
     }

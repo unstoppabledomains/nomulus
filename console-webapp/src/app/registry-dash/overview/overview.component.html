@@ -1,0 +1,76 @@
+<div class="registry-dash-overview">
+  @if (dashService.loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (dashService.error()) {
+    <div class="error-banner">{{ dashService.error() }}</div>
+  }
+
+  @if (dashService.overview(); as overview) {
+    <p class="time-indicator">Showing data for the last 12 months</p>
+    <div class="summary-cards">
+      <mat-card appearance="outlined">
+        <mat-card-content>
+          <h3>
+            <mat-icon class="secondary-text">domain</mat-icon>
+            Total Domains
+          </h3>
+          <p class="stat-value">{{ overview.totalDomains | number }}</p>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-content>
+          <h3>
+            <mat-icon class="secondary-text">account_circle</mat-icon>
+            Active Registrars
+          </h3>
+          <p class="stat-value">{{ overview.activeRegistrars | number }}</p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Registrar Market Share (horizontal bar) -->
+    @if (barChartData().length > 0) {
+      <mat-card appearance="outlined" class="chart-card">
+        <mat-card-content>
+          <h3 class="chart-title">Registrar Market Share</h3>
+          <p class="chart-description">Number of active domains managed by each registrar. Longer bars indicate a larger share of the total domain portfolio.</p>
+          <div class="h-bar-chart">
+            @for (bar of barChartData(); track bar.registrarId) {
+              <div class="h-bar-row">
+                <span class="h-bar-label">{{ bar.name }}</span>
+                <div class="h-bar-track">
+                  <div class="h-bar-fill" [style.width.%]="bar.widthPct" [style.background]="bar.color">
+                    <span class="h-bar-value" *ngIf="bar.widthPct > 20">{{ bar.count | number }}</span>
+                  </div>
+                </div>
+                <span class="h-bar-value-outside" *ngIf="bar.widthPct <= 20">{{ bar.count | number }}</span>
+              </div>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <!-- ECharts row: Activity Trend + Renewal Rates -->
+    <div class="charts-row">
+      <mat-card appearance="outlined" class="chart-card" *ngIf="activityLineOptions()">
+        <mat-card-content>
+          <h3 class="chart-title">Domain Activity Trend</h3>
+          <p class="chart-description">Domain registration activity over time — creates, renews, transfers, deletes, and restores aggregated across all TLDs.</p>
+          <div echarts [options]="activityLineOptions()!" [theme]="'ud-brand'" class="echart"></div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="chart-card" *ngIf="renewalRateOptions()">
+        <mat-card-content>
+          <h3 class="chart-title">Renewal Rate by TLD</h3>
+          <p class="chart-description">Percentage of expiring domains that were renewed (vs. deleted/expired) per TLD over the last 12 months. The dashed line marks the 85% industry benchmark.</p>
+          <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"></div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
+</div>

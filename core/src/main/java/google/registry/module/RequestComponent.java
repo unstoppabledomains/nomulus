@@ -130,6 +130,17 @@ import google.registry.ui.server.console.PasswordResetRequestAction;
 import google.registry.ui.server.console.PasswordResetVerifyAction;
 import google.registry.ui.server.console.RegistrarsAction;
 import google.registry.ui.server.console.domains.ConsoleBulkDomainAction;
+import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
+import google.registry.ui.server.console.registrydash.RegistryDashCostBasisAction;
+import google.registry.ui.server.console.registrydash.RegistryDashDomainActivityAction;
+import google.registry.ui.server.console.registrydash.RegistryDashForecastingAction;
+import google.registry.ui.server.console.registrydash.RegistryDashOverviewAction;
+import google.registry.ui.server.console.registrydash.RegistryDashPortfolioAction;
+import google.registry.ui.server.console.registrydash.RegistryDashPricingAction;
+import google.registry.ui.server.console.registrydash.RegistryDashRevenueBillingAction;
+import google.registry.ui.server.console.registrydash.RegistryDashSettingsAction;
+import google.registry.ui.server.console.registrydash.UDRegistryDashEffectiveFeesAction;
+import google.registry.ui.server.console.registrydash.UDRegistryDashTldFeesAction;
 import google.registry.ui.server.console.settings.ContactAction;
 import google.registry.ui.server.console.settings.RdapRegistrarFieldsAction;
 import google.registry.ui.server.console.settings.SecurityAction;
@@ -311,6 +322,28 @@ interface RequestComponent {
   RefreshDnsForAllDomainsAction refreshDnsForAllDomainsAction();
 
   RefreshDnsOnHostRenameAction refreshDnsOnHostRenameAction();
+
+  RegistryDashAdminAction registryDashAdminAction();
+
+  RegistryDashCostBasisAction registryDashCostBasisAction();
+
+  RegistryDashOverviewAction registryDashOverviewAction();
+
+  RegistryDashPortfolioAction registryDashPortfolioAction();
+
+  RegistryDashPricingAction registryDashPricingAction();
+
+  RegistryDashRevenueBillingAction registryDashRevenueBillingAction();
+
+  RegistryDashDomainActivityAction registryDashDomainActivityAction();
+
+  RegistryDashForecastingAction registryDashForecastingAction();
+
+  RegistryDashSettingsAction registryDashSettingsAction();
+
+  UDRegistryDashTldFeesAction udRegistryDashTldFeesAction();
+
+  UDRegistryDashEffectiveFeesAction udRegistryDashEffectiveFeesAction();
 
   RegistrarsAction registrarsAction();
 

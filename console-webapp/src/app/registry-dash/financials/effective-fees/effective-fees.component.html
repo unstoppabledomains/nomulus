@@ -1,0 +1,94 @@
+<div class="effective-fees">
+  <div class="effective-fees-header">
+    <h3>Effective Fees by Registrar</h3>
+    <p class="effective-fees-description">
+      What each registrar is actually paying per TLD per operation. Default TLD prices are shown unless overridden by an active custom pricing rule.<span *ngIf="fetchedAt()"> Data active as of {{ fetchedAt() }}.</span>
+    </p>
+  </div>
+
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Filters -->
+  <div class="effective-fees-filters" *ngIf="dashService.effectiveFees().length > 0">
+    <mat-form-field appearance="outline">
+      <mat-label>Registrar</mat-label>
+      <mat-select [value]="filterRegistrar()" (selectionChange)="onRegistrarFilterChange($event.value)">
+        <mat-option value="all">All Registrars</mat-option>
+        <mat-option *ngFor="let reg of uniqueRegistrars()" [value]="reg">{{ reg }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>TLD</mat-label>
+      <mat-select [value]="filterTld()" (selectionChange)="onTldFilterChange($event.value)">
+        <mat-option value="all">All TLDs</mat-option>
+        <mat-option *ngFor="let tld of uniqueTlds()" [value]="tld">.{{ tld }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Source</mat-label>
+      <mat-select [value]="filterSource()" (selectionChange)="onSourceFilterChange($event.value)">
+        <mat-option value="all">All Sources</mat-option>
+        <mat-option value="Default">Default</mat-option>
+        <mat-option value="Custom">Custom</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Table -->
+  <table mat-table [dataSource]="dataSource" matSort class="effective-fees-table" *ngIf="dataSource.data.length > 0">
+    <ng-container matColumnDef="registrarId">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar ID</th>
+      <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="registrarName">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Registrar Name</th>
+      <td mat-cell *matCellDef="let row">{{ row.registrarName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="tld">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>TLD</th>
+      <td mat-cell *matCellDef="let row">.{{ row.tld }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="operation">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Operation</th>
+      <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="price">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Effective Price</th>
+      <td mat-cell *matCellDef="let row">${{ row.price | number:'1.2-2' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="currency">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Currency</th>
+      <td mat-cell *matCellDef="let row">{{ row.currency }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="source">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Source</th>
+      <td mat-cell *matCellDef="let row">
+        <span class="source-badge" [class.source-custom]="row.source === 'Custom'" [class.source-default]="row.source === 'Default'">
+          {{ row.source }}
+        </span>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+
+  <div *ngIf="dashService.effectiveFees().length === 0 && !dashService.loading()" class="empty-state">
+    <mat-icon>info</mat-icon>
+    <p>No effective fee data available.</p>
+  </div>
+</div>

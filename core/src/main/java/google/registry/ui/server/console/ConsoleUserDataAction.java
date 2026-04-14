@@ -69,7 +69,7 @@ public class ConsoleUserDataAction extends ConsoleApiAction {
 
     JSONObject json =
         new JSONObject(
-            ImmutableMap.of(
+            ImmutableMap.builder()
                 // Both isAdmin and globalRole flags are used by UI as an indicator to hide / show
                 // specific set of widgets and screens.
                 // For example:
@@ -78,16 +78,19 @@ public class ConsoleUserDataAction extends ConsoleApiAction {
                 // screens and widgets.
                 // This however is merely for visual representation, as any back-end action contains
                 // auth checks.
-                "isAdmin", user.getUserRoles().isAdmin(),
-                "globalRole", user.getUserRoles().getGlobalRole(),
+                .put("isAdmin", user.getUserRoles().isAdmin())
+                .put("globalRole", user.getUserRoles().getGlobalRole())
                 // registrar-specific roles
-                "userRoles", user.getUserRoles().getRegistrarRoles(),
+                .put("userRoles", user.getUserRoles().getRegistrarRoles())
                 // Include static contact resources in this call to minimize round trips
-                "productName", productName,
-                "supportEmail", supportEmail,
-                "supportPhoneNumber", supportPhoneNumber,
+                .put("productName", productName)
+                .put("supportEmail", supportEmail)
+                .put("supportPhoneNumber", supportPhoneNumber)
                 // Is used by UI to construct a link to registry resources
-                "technicalDocsUrl", technicalDocsUrl));
+                .put("technicalDocsUrl", technicalDocsUrl)
+                // UD: logged-in user's email for header display
+                .put("userEmail", user.getEmailAddress())
+                .buildOrThrow());
 
     consoleApiParams.response().setPayload(json.toString());
     consoleApiParams.response().setStatus(SC_OK);

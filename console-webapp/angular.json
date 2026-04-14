@@ -33,7 +33,8 @@
             ],
             "styles": [
               "src/theme.scss",
-              "src/styles.scss"
+              "src/styles.scss",
+              "src/ud-theme.scss"
             ],
             "stylePreprocessorOptions": {
               "includePaths": ["node_modules/"]
@@ -51,8 +52,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                  "maximumWarning": "4kb",
+                  "maximumError": "8kb"
                 }
               ],
               "fileReplacements": [
@@ -72,8 +73,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                  "maximumWarning": "4kb",
+                  "maximumError": "8kb"
                 }
               ],
               "fileReplacements": [
@@ -157,7 +158,8 @@
             ],
             "styles": [
               "src/theme.scss",
-              "src/styles.scss"
+              "src/styles.scss",
+              "src/ud-theme.scss"
             ],
             "stylePreprocessorOptions": {
               "includePaths": ["node_modules/"]

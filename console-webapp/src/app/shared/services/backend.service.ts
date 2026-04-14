@@ -21,6 +21,18 @@ import { DomainLocksResult } from 'src/app/domains/registryLock.service';
 import { RegistryLockVerificationResponse } from 'src/app/lock/registryLockVerify.service';
 import { OteCreateResponse } from 'src/app/ote/newOte.component';
 import { OteStatusResponse } from 'src/app/ote/oteStatus.component';
+import {
+  OverviewData,
+  PortfolioEntry,
+  PricingRule,
+  CostBasisEntry,
+  AdminData,
+  RevenueBillingData,
+  DomainActivityData,
+  ForecastingData,
+  TldFeeEntry,
+  EffectiveFeeEntry,
+} from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
   Registrar,
@@ -134,10 +146,12 @@ export class BackendService {
       .pipe(catchError((err) => this.errorCatcher<HistoryRecord[]>(err)));
   }
 
+  // UD: Registry Dashboard — return empty array for users without registrar access
+  // (e.g. REGISTRY_OPERATOR) so the app doesn't hang on startup
   getRegistrars(): Observable<Registrar[]> {
     return this.http
       .get<Registrar[]>('/console-api/registrars')
-      .pipe(catchError((err) => this.errorCatcher<Registrar[]>(err)));
+      .pipe(catchError((err) => this.errorCatcher<Registrar[]>(err, [])));
   }
 
   createRegistrar(registrar: Registrar): Observable<Registrar> {
@@ -324,5 +338,135 @@ export class BackendService {
       `/console-api/password-reset-verify?resetRequestVerificationCode=${verificationCode}`,
       newPassword
     );
+  }
+
+  // --- Registry Dashboard ---
+
+  getRegistryDashOverview(): Observable<OverviewData> {
+    return this.http
+      .get<OverviewData>('/console-api/registry-dash/overview')
+      .pipe(catchError((err) => this.errorCatcher<OverviewData>(err)));
+  }
+
+  getRegistryDashPortfolio(): Observable<PortfolioEntry[]> {
+    return this.http
+      .get<PortfolioEntry[]>('/console-api/registry-dash/portfolio')
+      .pipe(catchError((err) => this.errorCatcher<PortfolioEntry[]>(err)));
+  }
+
+  getRegistryDashPricing(): Observable<PricingRule[]> {
+    return this.http
+      .get<PricingRule[]>('/console-api/registry-dash/pricing')
+      .pipe(catchError((err) => this.errorCatcher<PricingRule[]>(err)));
+  }
+
+  createRegistryDashPricing(rule: PricingRule): Observable<PricingRule> {
+    return this.http.post<PricingRule>(
+      '/console-api/registry-dash/pricing',
+      rule
+    );
+  }
+
+  updateRegistryDashPricing(rule: PricingRule): Observable<PricingRule> {
+    return this.http.put<PricingRule>(
+      '/console-api/registry-dash/pricing',
+      rule
+    );
+  }
+
+  getRegistryDashCostBasis(): Observable<CostBasisEntry[]> {
+    return this.http
+      .get<CostBasisEntry[]>('/console-api/registry-dash/cost-basis')
+      .pipe(catchError((err) => this.errorCatcher<CostBasisEntry[]>(err)));
+  }
+
+  createRegistryDashCostBasis(
+    entry: CostBasisEntry
+  ): Observable<CostBasisEntry> {
+    return this.http.post<CostBasisEntry>(
+      '/console-api/registry-dash/cost-basis',
+      entry
+    );
+  }
+
+  updateRegistryDashCostBasis(
+    entry: CostBasisEntry
+  ): Observable<CostBasisEntry> {
+    return this.http.put<CostBasisEntry>(
+      '/console-api/registry-dash/cost-basis',
+      entry
+    );
+  }
+
+  // --- Registry Dashboard Admin ---
+
+  getRegistryDashAdmin(): Observable<AdminData> {
+    return this.http
+      .get<AdminData>('/console-api/registry-dash/admin')
+      .pipe(catchError((err) => this.errorCatcher<AdminData>(err)));
+  }
+
+  postRegistryDashAdmin(payload: unknown): Observable<unknown> {
+    return this.http.post('/console-api/registry-dash/admin', payload);
+  }
+
+  // --- Registry Dashboard Settings ---
+
+  getRegistryDashSettings(): Observable<Record<string, any>> {
+    return this.http
+      .get<Record<string, any>>('/console-api/registry-dash/settings')
+      .pipe(catchError((err) => this.errorCatcher<Record<string, any>>(err)));
+  }
+
+  updateRegistryDashSettings(registryId: number, settings: string): Observable<unknown> {
+    return this.http.post('/console-api/registry-dash/admin', {
+      action: 'updateSettings',
+      registryId,
+      settings,
+    });
+  }
+
+  // --- Registry Dashboard Analytics ---
+
+  getRegistryDashRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length ? `?${parts.join('&')}` : '';
+    return this.http
+      .get<RevenueBillingData>(`/console-api/registry-dash/revenue-billing${params}`)
+      .pipe(catchError((err) => this.errorCatcher<RevenueBillingData>(err)));
+  }
+
+  getRegistryDashDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
+    return this.http
+      .get<DomainActivityData>(`/console-api/registry-dash/domain-activity${params}`)
+      .pipe(catchError((err) => this.errorCatcher<DomainActivityData>(err)));
+  }
+
+  getRegistryDashForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
+    return this.http
+      .get<ForecastingData>(`/console-api/registry-dash/forecasting${params}`)
+      .pipe(catchError((err) => this.errorCatcher<ForecastingData>(err)));
+  }
+
+  getRegistryDashTldFees(): Observable<TldFeeEntry[]> {
+    return this.http
+      .get<TldFeeEntry[]>('/console-api/registry-dash/tld-fees')
+      .pipe(catchError((err) => this.errorCatcher<TldFeeEntry[]>(err)));
+  }
+
+  getRegistryDashEffectiveFees(): Observable<EffectiveFeeEntry[]> {
+    return this.http
+      .get<EffectiveFeeEntry[]>('/console-api/registry-dash/effective-fees')
+      .pipe(catchError((err) => this.errorCatcher<EffectiveFeeEntry[]>(err)));
   }
 }

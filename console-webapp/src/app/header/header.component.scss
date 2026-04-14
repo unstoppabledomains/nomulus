@@ -16,7 +16,30 @@
   &__logo {
     color: inherit;
     text-decoration: none;
-    margin-left: -15px;
+    margin-left: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+  &__logo-subtitle {
+    font-size: 11px;
+    font-weight: 400;
+    font-style: italic;
+    color: #9AA0A6;
+    letter-spacing: 0.1px;
+    margin-top: 1px;
+    line-height: 1.2;
+  }
+  &__logo-text {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0D67FE;
+    letter-spacing: -0.5px;
+    font-family: 'Inter', 'Google Sans', sans-serif;
+
+    .logo-registry {
+      font-weight: 400;
+      color: #5F6368;
+    }
   }
   &__menu-btn {
     width: 30px;
@@ -32,8 +55,15 @@
       margin-bottom: 10px;
     }
 
+    &-user-email {
+      font-size: 11px;
+      font-weight: 400;
+      color: #9AA0A6;
+      letter-spacing: 0.1px;
+      margin-right: 2px;
+    }
     &-user-icon {
-      margin-left: 20px;
+      margin-left: 8px;
     }
   }
 }

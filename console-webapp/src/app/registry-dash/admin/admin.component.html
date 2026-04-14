@@ -1,0 +1,292 @@
+<div class="admin-container">
+  <!-- Error display -->
+  <div *ngIf="dashService.error()" class="error-banner">
+    {{ dashService.error() }}
+  </div>
+
+  <!-- Loading spinner -->
+  <div *ngIf="dashService.loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- My View — FTE session-only column visibility -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>My View</mat-card-title>
+      <mat-card-subtitle>Session-only toggles that control what you see on Pricing and Financials tabs. Not persisted — resets on page reload.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="visibility-toggles">
+        <div *ngFor="let item of visibilityKeys" class="toggle-row">
+          <mat-slide-toggle
+            [checked]="myViewToggles()[item.key] !== false"
+            (change)="onMyViewToggle(item.key, $event.checked)">
+            {{ item.label }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+      <button mat-button (click)="onResetMyView()">Reset to All Visible</button>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Registries Section -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>Registries</mat-card-title>
+      <mat-card-subtitle>Each registry owns a set of TLDs. Users assigned to a registry can see all its TLD data.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- Create Registry Form -->
+      <form [formGroup]="registryForm" (ngSubmit)="onCreateRegistry()" class="add-form">
+        <mat-form-field>
+          <mat-label>Registry Name</mat-label>
+          <input matInput formControlName="name" placeholder="e.g. registryXYZ">
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="registryForm.invalid">
+          Create Registry
+        </button>
+      </form>
+
+      <!-- Registry List -->
+      <div class="registry-list">
+        <div *ngFor="let reg of registries()"
+             class="registry-item"
+             [class.selected]="selectedRegistry()?.id === reg.id"
+             (click)="onSelectRegistry(reg)">
+          <div class="registry-info">
+            <span class="registry-name">{{ reg.name }}</span>
+            <span class="registry-meta">
+              {{ reg.tlds.length }} TLD{{ reg.tlds.length !== 1 ? 's' : '' }} &middot;
+              {{ reg.users.length }} user{{ reg.users.length !== 1 ? 's' : '' }}
+            </span>
+          </div>
+          <button mat-icon-button color="warn" (click)="onDeleteRegistry(reg.id!); $event.stopPropagation()">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+        <p *ngIf="registries().length === 0" class="empty-state">No registries created yet.</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Selected Registry Detail -->
+  <mat-card *ngIf="selectedRegistry()" class="admin-card detail-card">
+    <mat-card-header>
+      <mat-card-title>{{ selectedRegistry()!.name }}</mat-card-title>
+      <mat-card-subtitle>Manage TLDs and users for this registry</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- TLD Assignments -->
+      <h3>TLDs</h3>
+      <form [formGroup]="tldForm" (ngSubmit)="onAddTld()" class="add-form">
+        <mat-form-field>
+          <mat-label>TLD</mat-label>
+          <mat-select formControlName="tld">
+            <mat-option *ngFor="let tld of availableTlds()" [value]="tld">
+              .{{ tld }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="tldForm.invalid">
+          Add TLD
+        </button>
+      </form>
+      <mat-chip-set>
+        <mat-chip *ngFor="let t of selectedRegistry()!.tlds" [removable]="true" (removed)="onRemoveTld(t.id!)">
+          .{{ t.tld }}
+          <mat-icon matChipRemove>cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-set>
+      <p *ngIf="selectedRegistry()!.tlds.length === 0" class="empty-state">No TLDs assigned yet.</p>
+
+      <!-- User Assignments -->
+      <h3>Users</h3>
+      <form [formGroup]="userForm" (ngSubmit)="onAddUser()" class="add-form">
+        <mat-form-field>
+          <mat-label>User Email</mat-label>
+          <input matInput formControlName="userEmail" type="email" placeholder="user@example.com">
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="userForm.invalid">
+          Add User
+        </button>
+      </form>
+      <mat-chip-set>
+        <mat-chip *ngFor="let u of selectedRegistry()!.users" [removable]="true" (removed)="onRemoveUser(u.id!)">
+          {{ u.userEmail }}
+          <mat-icon matChipRemove>cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-set>
+      <p *ngIf="selectedRegistry()!.users.length === 0" class="empty-state">No users assigned yet.</p>
+
+      <!-- Column Visibility Policy (per-registry, persisted) -->
+      <h3>Column Visibility Policy</h3>
+      <p class="section-description">Controls what non-FTE users of this registry can see. Saved to the database.</p>
+      <div class="visibility-toggles">
+        <div *ngFor="let item of visibilityKeys" class="toggle-row">
+          <mat-slide-toggle
+            [checked]="visibilityToggles()[item.key] !== false"
+            (change)="onVisibilityToggle(item.key, $event.checked)">
+            {{ item.label }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+      <div class="visibility-actions">
+        <button mat-raised-button color="primary" (click)="onSaveVisibility()">
+          Save for Registry Users
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Fees per TLD Management -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>Fees per TLD (Defaults)</mat-card-title>
+      <mat-card-subtitle>Per-operation RSP fees per TLD — the amount the RSP retains per operation. The registry receives the remainder (Registrar Pays minus RSP Fee). Configure one entry per TLD/operation combination. To set what individual registrars are charged, use the Pricing tab.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <button mat-raised-button color="primary" (click)="onAddCostBasis()" *ngIf="!showCostBasisForm()">
+        <mat-icon>add</mat-icon> Add Entry
+      </button>
+
+      <!-- Add/Edit Form -->
+      <div *ngIf="showCostBasisForm()" class="cost-basis-form">
+        <h3>{{ editingCostBasis() ? 'Edit' : 'Add' }} Fees per TLD Entry</h3>
+        <form [formGroup]="costBasisForm" (ngSubmit)="onSaveCostBasis()" class="add-form cost-basis-fields">
+          <mat-form-field>
+            <mat-label>TLD</mat-label>
+            <mat-select formControlName="tld">
+              <mat-option value="*">Default (all TLDs)</mat-option>
+              <mat-option *ngFor="let tld of systemInfo()?.tlds || []" [value]="tld">.{{ tld }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Operation</mat-label>
+            <mat-select formControlName="operation">
+              <mat-option *ngFor="let op of operations" [value]="op">{{ op }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>RSP Fee</mat-label>
+            <input matInput formControlName="rspRetainedFeeAmount" type="number" step="0.01">
+            <mat-hint>Amount RSP retains per operation. Net to Registry = Registrar Pays − RSP Fee.</mat-hint>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Currency</mat-label>
+            <input matInput formControlName="costCurrency">
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Notes</mat-label>
+            <input matInput formControlName="notes">
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="costBasisForm.invalid">
+              {{ editingCostBasis() ? 'Update' : 'Create' }}
+            </button>
+            <button mat-button type="button" (click)="onCancelCostBasis()">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Fees per TLD Table -->
+      <table mat-table [dataSource]="costBasisEntries()" class="cost-basis-table" *ngIf="costBasisEntries().length > 0">
+        <ng-container matColumnDef="tld">
+          <th mat-header-cell *matHeaderCellDef>TLD</th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="!row.isDefault">.{{ row.tld }}</ng-container>
+            <span *ngIf="row.isDefault" class="default-badge">Default (all TLDs)</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="operation">
+          <th mat-header-cell *matHeaderCellDef>Operation</th>
+          <td mat-cell *matCellDef="let row">{{ row.operation }}</td>
+        </ng-container>
+        <ng-container matColumnDef="registrarPays">
+          <th mat-header-cell *matHeaderCellDef>
+            Registrar Pays
+            <mat-icon class="header-help" matTooltip="The default amount the registrar is billed per operation for this TLD, sourced from the Nomulus TLD configuration. Read-only — change this in the TLD config.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="row.registrarBilledAmount != null">{{ row.registrarBilledAmount | number:'1.2-2' }}</ng-container>
+            <span *ngIf="row.registrarBilledAmount == null" class="muted">—</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="rspFee">
+          <th mat-header-cell *matHeaderCellDef>
+            RSP Fee
+            <mat-icon class="header-help" matTooltip="The service fee the RSP charges per operation. The registry receives the remainder: Registrar Pays minus RSP Fee. Configurable per TLD and operation.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">{{ row.rspRetainedFeeAmount | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="netToRegistry">
+          <th mat-header-cell *matHeaderCellDef>
+            Net to Registry
+            <mat-icon class="header-help" matTooltip="The amount the registry receives per operation — calculated as Registrar Pays minus RSP Fee. Not stored; updates automatically when RSP Fee changes.">help_outline</mat-icon>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="row.netAmountToRegistry != null">{{ row.netAmountToRegistry | number:'1.2-2' }}</ng-container>
+            <span *ngIf="row.netAmountToRegistry == null" class="muted">—</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="costCurrency">
+          <th mat-header-cell *matHeaderCellDef>Currency</th>
+          <td mat-cell *matCellDef="let row">{{ row.currency || row.costCurrency }}</td>
+        </ng-container>
+        <ng-container matColumnDef="notes">
+          <th mat-header-cell *matHeaderCellDef>Notes</th>
+          <td mat-cell *matCellDef="let row">{{ row.notes || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button (click)="onEditCostBasis(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="costBasisColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: costBasisColumns;"></tr>
+      </table>
+
+      <p *ngIf="costBasisEntries().length === 0 && !dashService.loading()" class="empty-state">
+        No fee entries configured yet.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- System Reference Section -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>System Reference</mat-card-title>
+      <mat-card-subtitle>Available TLDs and registrars in the system (read-only)</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <h3>TLDs</h3>
+      <mat-chip-set>
+        <mat-chip *ngFor="let tld of systemInfo()?.tlds || []">.{{ tld }}</mat-chip>
+      </mat-chip-set>
+
+      <h3>Registrars</h3>
+      <table mat-table [dataSource]="systemInfo()?.registrars || []" class="registrars-table">
+        <ng-container matColumnDef="registrarId">
+          <th mat-header-cell *matHeaderCellDef>Registrar ID</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarId }}</td>
+        </ng-container>
+        <ng-container matColumnDef="registrarName">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrarName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="allowedTlds">
+          <th mat-header-cell *matHeaderCellDef>Allowed TLDs</th>
+          <td mat-cell *matCellDef="let row">
+            <mat-chip-set>
+              <mat-chip *ngFor="let tld of row.allowedTlds">.{{ tld }}</mat-chip>
+            </mat-chip-set>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="registrarColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: registrarColumns;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+</div>

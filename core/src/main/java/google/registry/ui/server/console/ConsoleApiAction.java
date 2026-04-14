@@ -143,10 +143,13 @@ public abstract class ConsoleApiAction implements Runnable {
   }
 
   private boolean verifyXSRF(User user) {
+    Cookie[] cookies = consoleApiParams.request().getCookies();
     Optional<Cookie> maybeCookie =
-        Arrays.stream(consoleApiParams.request().getCookies())
-            .filter(c -> XsrfTokenManager.X_CSRF_TOKEN.equals(c.getName()))
-            .findFirst();
+        cookies == null
+            ? Optional.empty()
+            : Arrays.stream(cookies)
+                .filter(c -> XsrfTokenManager.X_CSRF_TOKEN.equals(c.getName()))
+                .findFirst();
     if (maybeCookie.isEmpty()
         || !consoleApiParams
             .xsrfTokenManager()
