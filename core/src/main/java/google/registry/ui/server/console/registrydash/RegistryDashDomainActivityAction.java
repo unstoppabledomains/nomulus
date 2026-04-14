@@ -54,97 +54,112 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private static final Set<String> VALID_GRANULARITIES = Set.of("15min", "hour", "day", "month");
 
   // --- Standard granularity SQL (hour, day, month) ---
+  // Uses DomainHistory.history_modification_time (actual event time) instead of
+  // DomainTransactionRecord.reporting_time (which includes grace period offsets
+  // that push dates into the future by days or weeks).
 
   private static final String ACTIVITY_ALL_TEMPLATE =
       """
-      SELECT date_trunc('%s', dtr.reporting_time) AS period,
-             dtr.tld,
+      SELECT date_trunc('%s', dh.history_modification_time) AS period,
+             d.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
-               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN (
-                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
-               ) THEN 'DELETES'
-               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               WHEN dh.history_type = 'DOMAIN_CREATE' THEN 'CREATES'
+               WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 'RENEWS'
+               WHEN dh.history_type = 'DOMAIN_TRANSFER_APPROVE' THEN 'TRANSFERS'
+               WHEN dh.history_type = 'DOMAIN_DELETE' THEN 'DELETES'
+               WHEN dh.history_type = 'DOMAIN_RESTORE' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
-             SUM(dtr.report_amount) AS total_count
-      FROM "DomainTransactionRecord" dtr
-      WHERE dtr.reporting_time >= :startDate
-      GROUP BY period, dtr.tld, activity_type
-      ORDER BY period, dtr.tld
+             COUNT(*) AS total_count
+      FROM "DomainHistory" dh
+      JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
+        AND dh.history_type IN (
+          'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
+          'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
+      GROUP BY period, d.tld, activity_type
+      ORDER BY period, d.tld
       """;
 
   private static final String ACTIVITY_SCOPED_TEMPLATE =
       """
-      SELECT date_trunc('%s', dtr.reporting_time) AS period,
-             dtr.tld,
+      SELECT date_trunc('%s', dh.history_modification_time) AS period,
+             d.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
-               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN (
-                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
-               ) THEN 'DELETES'
-               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               WHEN dh.history_type = 'DOMAIN_CREATE' THEN 'CREATES'
+               WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 'RENEWS'
+               WHEN dh.history_type = 'DOMAIN_TRANSFER_APPROVE' THEN 'TRANSFERS'
+               WHEN dh.history_type = 'DOMAIN_DELETE' THEN 'DELETES'
+               WHEN dh.history_type = 'DOMAIN_RESTORE' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
-             SUM(dtr.report_amount) AS total_count
-      FROM "DomainTransactionRecord" dtr
-      WHERE dtr.reporting_time >= :startDate
-        AND dtr.tld IN :tlds
-      GROUP BY period, dtr.tld, activity_type
-      ORDER BY period, dtr.tld
+             COUNT(*) AS total_count
+      FROM "DomainHistory" dh
+      JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
+        AND d.tld IN :tlds
+        AND dh.history_type IN (
+          'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
+          'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
+      GROUP BY period, d.tld, activity_type
+      ORDER BY period, d.tld
       """;
 
   // --- 15-minute bucket SQL ---
 
   private static final String ACTIVITY_15MIN_ALL =
       """
-      SELECT date_trunc('hour', dtr.reporting_time)
-               + floor(extract(minute from dtr.reporting_time) / 15)
+      SELECT date_trunc('hour', dh.history_modification_time)
+               + floor(extract(minute from dh.history_modification_time) / 15)
                * interval '15 minutes' AS period,
-             dtr.tld,
+             d.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
-               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN (
-                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
-               ) THEN 'DELETES'
-               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               WHEN dh.history_type = 'DOMAIN_CREATE' THEN 'CREATES'
+               WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 'RENEWS'
+               WHEN dh.history_type = 'DOMAIN_TRANSFER_APPROVE' THEN 'TRANSFERS'
+               WHEN dh.history_type = 'DOMAIN_DELETE' THEN 'DELETES'
+               WHEN dh.history_type = 'DOMAIN_RESTORE' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
-             SUM(dtr.report_amount) AS total_count
-      FROM "DomainTransactionRecord" dtr
-      WHERE dtr.reporting_time >= :startDate
-      GROUP BY period, dtr.tld, activity_type
-      ORDER BY period, dtr.tld
+             COUNT(*) AS total_count
+      FROM "DomainHistory" dh
+      JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
+        AND dh.history_type IN (
+          'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
+          'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
+      GROUP BY period, d.tld, activity_type
+      ORDER BY period, d.tld
       """;
 
   private static final String ACTIVITY_15MIN_SCOPED =
       """
-      SELECT date_trunc('hour', dtr.reporting_time)
-               + floor(extract(minute from dtr.reporting_time) / 15)
+      SELECT date_trunc('hour', dh.history_modification_time)
+               + floor(extract(minute from dh.history_modification_time) / 15)
                * interval '15 minutes' AS period,
-             dtr.tld,
+             d.tld,
              CASE
-               WHEN dtr.report_field LIKE 'NET_ADDS_%%%%' THEN 'CREATES'
-               WHEN dtr.report_field LIKE 'NET_RENEWS_%%%%' THEN 'RENEWS'
-               WHEN dtr.report_field = 'TRANSFER_SUCCESSFUL' THEN 'TRANSFERS'
-               WHEN dtr.report_field IN (
-                 'DELETED_DOMAINS_GRACE', 'DELETED_DOMAINS_NOGRACE'
-               ) THEN 'DELETES'
-               WHEN dtr.report_field = 'RESTORED_DOMAINS' THEN 'RESTORES'
+               WHEN dh.history_type = 'DOMAIN_CREATE' THEN 'CREATES'
+               WHEN dh.history_type IN ('DOMAIN_RENEW', 'DOMAIN_AUTORENEW') THEN 'RENEWS'
+               WHEN dh.history_type = 'DOMAIN_TRANSFER_APPROVE' THEN 'TRANSFERS'
+               WHEN dh.history_type = 'DOMAIN_DELETE' THEN 'DELETES'
+               WHEN dh.history_type = 'DOMAIN_RESTORE' THEN 'RESTORES'
                ELSE 'OTHER'
              END AS activity_type,
-             SUM(dtr.report_amount) AS total_count
-      FROM "DomainTransactionRecord" dtr
-      WHERE dtr.reporting_time >= :startDate
-        AND dtr.tld IN :tlds
-      GROUP BY period, dtr.tld, activity_type
-      ORDER BY period, dtr.tld
+             COUNT(*) AS total_count
+      FROM "DomainHistory" dh
+      JOIN "Domain" d ON d.repo_id = dh.domain_repo_id
+      WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
+        AND d.tld IN :tlds
+        AND dh.history_type IN (
+          'DOMAIN_CREATE', 'DOMAIN_RENEW', 'DOMAIN_AUTORENEW',
+          'DOMAIN_TRANSFER_APPROVE', 'DOMAIN_DELETE', 'DOMAIN_RESTORE')
+      GROUP BY period, d.tld, activity_type
+      ORDER BY period, d.tld
       """;
 
   private static final String CURRENT_COUNTS_ALL =
@@ -165,6 +180,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private final Optional<Integer> months;
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
+  private final java.time.Clock clock;
 
   @Inject
   public RegistryDashDomainActivityAction(
@@ -172,10 +188,21 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
       @Parameter("granularity") Optional<String> granularity) {
+    this(consoleApiParams, months, lookbackHours, granularity, java.time.Clock.systemUTC());
+  }
+
+  /** Constructor that accepts a clock for testing. */
+  RegistryDashDomainActivityAction(
+      ConsoleApiParams consoleApiParams,
+      Optional<Integer> months,
+      Optional<Integer> lookbackHours,
+      Optional<String> granularity,
+      java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
+    this.clock = clock;
   }
 
   @Override
@@ -213,26 +240,29 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       gran = "month";
     }
 
-    Instant startDate = ZonedDateTime.now(ZoneOffset.UTC)
-        .minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    ZonedDateTime now = ZonedDateTime.now(clock);
+    Instant startDate = now.minus(hoursBack, ChronoUnit.HOURS).toInstant();
+    Instant endDate = now.toInstant();
 
     String resolvedGran = gran;
     tm().transact(
         () -> {
           String sql = buildSql(resolvedGran, isAdmin);
 
-          // Activity data from DomainTransactionRecord
+          // Activity data from DomainHistory (uses actual event time)
           @SuppressWarnings("unchecked")
           List<Object[]> activityResults;
           if (isAdmin) {
             activityResults = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .getResultList();
           } else {
             activityResults = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)
+                .setParameter("endDate", endDate)
                 .setParameter("tlds", tlds)
                 .getResultList();
           }
