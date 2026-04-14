@@ -19,11 +19,13 @@
     }
     {{ node.title }}
   </mat-tree-node>
+  <!-- UD: Registry Dashboard — apply visibility directive to parent nodes -->
   <mat-nested-tree-node
     *matTreeNodeDef="let node; when: hasChild"
     (click)="onClick(node)"
     tabindex="0"
     (keyup.enter)="onClick(node)"
+    [elementId]="getElementId(node)"
   >
     <div class="mat-tree-node" [class.active]="router.url.includes(node.path)">
       <button

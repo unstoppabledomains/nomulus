@@ -18,11 +18,16 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.testing.DatabaseHelper.persistActiveDomain;
 import static google.registry.testing.DatabaseHelper.persistDomainAsDeleted;
+import static google.registry.testing.DatabaseHelper.persistResource;
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
+import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Iterables;
 import google.registry.model.ForeignKeyUtils;
+import google.registry.model.console.GlobalRole;
+import google.registry.model.console.User;
+import google.registry.model.console.UserRoles;
 import google.registry.model.domain.Domain;
 import google.registry.request.Action;
 import google.registry.request.auth.AuthResult;
@@ -46,6 +51,35 @@ public class ConsoleDomainListActionTest extends ConsoleActionBaseTestCase {
       clock.advanceOneMilli();
     }
     DatabaseHelper.persistDeletedDomain("deleted.tld", clock.nowUtc().minusDays(1));
+  }
+
+  // UD: Registry Dashboard — verify REGISTRY_OPERATOR cannot list domains
+  @Test
+  void testForbidden_registryOperatorCannotListDomains() {
+    User roUser =
+        persistResource(
+            new User.Builder()
+                .setEmailAddress("ro@email.tld")
+                .setUserRoles(
+                    new UserRoles.Builder()
+                        .setGlobalRole(GlobalRole.REGISTRY_OPERATOR)
+                        .build())
+                .build());
+    AuthResult authResult = AuthResult.createUser(roUser);
+    consoleApiParams = ConsoleApiParamsUtils.createFake(authResult);
+    when(consoleApiParams.request().getMethod()).thenReturn(Action.Method.GET.toString());
+    response = (FakeResponse) consoleApiParams.response();
+    ConsoleDomainListAction action =
+        new ConsoleDomainListAction(
+            consoleApiParams,
+            "TheRegistrar",
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty());
+    action.run();
+    assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
   }
 
   @Test

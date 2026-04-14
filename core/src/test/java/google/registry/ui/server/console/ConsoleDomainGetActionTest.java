@@ -21,6 +21,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import google.registry.model.console.GlobalRole;
 import google.registry.model.console.RegistrarRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
@@ -76,6 +77,21 @@ public class ConsoleDomainGetActionTest extends ConsoleActionBaseTestCase {
         createAction(AuthResult.createApp("service@registry.example"), "exists.tld");
     action.run();
     assertThat(response.getStatus()).isEqualTo(SC_UNAUTHORIZED);
+  }
+
+  // UD: Registry Dashboard — verify REGISTRY_OPERATOR cannot get domain details
+  @Test
+  void testFailure_registryOperatorCannotGetDomain() {
+    ConsoleDomainGetAction action =
+        createAction(
+            AuthResult.createUser(
+                createUser(
+                    new UserRoles.Builder()
+                        .setGlobalRole(GlobalRole.REGISTRY_OPERATOR)
+                        .build())),
+            "exists.tld");
+    action.run();
+    assertThat(response.getStatus()).isEqualTo(SC_NOT_FOUND);
   }
 
   @Test

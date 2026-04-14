@@ -70,7 +70,7 @@ steps:
     else
       base_domain="${_BASE_DOMAIN}"
     fi
-    ./deploy-nomulus-for-env.sh ${_ENV} ${base_domain}
+    ./deploy-nomulus-for-env.sh ${_ENV} ${base_domain} ${_GCR_HOSTNAME} ${COMMIT_SHA}
   dir: 'jetty'
 # Deploy Proxy to GKE.
 - id: Deploy-Proxy
@@ -80,7 +80,7 @@ steps:
   - -c
   - |
     set -e
-    ./deploy-proxy-for-env.sh ${_ENV}
+    ./deploy-proxy-for-env.sh ${_ENV} ${_GCR_HOSTNAME} ${COMMIT_SHA}
   dir: 'proxy'
 timeout: 3600s
 options:

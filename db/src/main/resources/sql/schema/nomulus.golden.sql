@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.4
--- Dumped by pg_dump version 17.4
+-- Dumped from database version 17.9
+-- Dumped by pg_dump version 17.9
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1135,6 +1135,80 @@ CREATE TABLE public."RegistrarUpdateHistory" (
 
 
 --
+-- Name: RegistryDashboardCostBasis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RegistryDashboardCostBasis" (
+    id bigint NOT NULL,
+    tld text NOT NULL,
+    operation text NOT NULL,
+    rsp_retained_fee_amount numeric(19,2) NOT NULL,
+    cost_currency text NOT NULL,
+    effective_date timestamp with time zone DEFAULT now() NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RegistryDashboardCostBasis_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RegistryDashboardCostBasis_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RegistryDashboardCostBasis_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RegistryDashboardCostBasis_id_seq" OWNED BY public."RegistryDashboardCostBasis".id;
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RegistryDashboardRegistrarPricing" (
+    id bigint NOT NULL,
+    registrar_id text NOT NULL,
+    tld text NOT NULL,
+    operation text NOT NULL,
+    price_amount numeric(19,2) NOT NULL,
+    price_currency text NOT NULL,
+    effective_date timestamp with time zone DEFAULT now() NOT NULL,
+    expiry_date timestamp with time zone,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RegistryDashboardRegistrarPricing_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RegistryDashboardRegistrarPricing_id_seq" OWNED BY public."RegistryDashboardRegistrarPricing".id;
+
+
+--
 -- Name: RegistryLock; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1215,6 +1289,99 @@ CREATE SEQUENCE public."ReservedList_revision_id_seq"
 --
 
 ALTER SEQUENCE public."ReservedList_revision_id_seq" OWNED BY public."ReservedList".revision_id;
+
+
+--
+-- Name: RoRegistry; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistry" (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    settings jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: RoRegistryTld; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistryTld" (
+    id bigint NOT NULL,
+    registry_id bigint NOT NULL,
+    tld text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RoRegistryTld_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistryTld_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistryTld_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistryTld_id_seq" OWNED BY public."RoRegistryTld".id;
+
+
+--
+-- Name: RoRegistryUser; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public."RoRegistryUser" (
+    id bigint NOT NULL,
+    registry_id bigint NOT NULL,
+    user_email text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: RoRegistryUser_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistryUser_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistryUser_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistryUser_id_seq" OWNED BY public."RoRegistryUser".id;
+
+
+--
+-- Name: RoRegistry_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public."RoRegistry_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: RoRegistry_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public."RoRegistry_id_seq" OWNED BY public."RoRegistry".id;
 
 
 --
@@ -1473,6 +1640,20 @@ ALTER TABLE ONLY public."RegistrarPoc" ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: RegistryDashboardCostBasis id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardCostBasis" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardCostBasis_id_seq"'::regclass);
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing" ALTER COLUMN id SET DEFAULT nextval('public."RegistryDashboardRegistrarPricing_id_seq"'::regclass);
+
+
+--
 -- Name: RegistryLock revision_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1484,6 +1665,27 @@ ALTER TABLE ONLY public."RegistryLock" ALTER COLUMN revision_id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public."ReservedList" ALTER COLUMN revision_id SET DEFAULT nextval('public."ReservedList_revision_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistry id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistry_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistryTld id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistryTld_id_seq"'::regclass);
+
+
+--
+-- Name: RoRegistryUser id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser" ALTER COLUMN id SET DEFAULT nextval('public."RoRegistryUser_id_seq"'::regclass);
 
 
 --
@@ -1797,6 +1999,38 @@ ALTER TABLE ONLY public."Registrar"
 
 
 --
+-- Name: RegistryDashboardCostBasis RegistryDashboardCostBasis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardCostBasis"
+    ADD CONSTRAINT "RegistryDashboardCostBasis_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RegistryDashboardCostBasis RegistryDashboardCostBasis_tld_operation_effective_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardCostBasis"
+    ADD CONSTRAINT "RegistryDashboardCostBasis_tld_operation_effective_date_key" UNIQUE (tld, operation, effective_date);
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing RegistryDashboardRegistrarPri_registrar_id_tld_operation_ef_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing"
+    ADD CONSTRAINT "RegistryDashboardRegistrarPri_registrar_id_tld_operation_ef_key" UNIQUE (registrar_id, tld, operation, effective_date);
+
+
+--
+-- Name: RegistryDashboardRegistrarPricing RegistryDashboardRegistrarPricing_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RegistryDashboardRegistrarPricing"
+    ADD CONSTRAINT "RegistryDashboardRegistrarPricing_pkey" PRIMARY KEY (id);
+
+
+--
 -- Name: RegistryLock RegistryLock_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1818,6 +2052,54 @@ ALTER TABLE ONLY public."ReservedEntry"
 
 ALTER TABLE ONLY public."ReservedList"
     ADD CONSTRAINT "ReservedList_pkey" PRIMARY KEY (revision_id);
+
+
+--
+-- Name: RoRegistryTld RoRegistryTld_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RoRegistryTld RoRegistryTld_registry_id_tld_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_registry_id_tld_key" UNIQUE (registry_id, tld);
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_registry_id_user_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_registry_id_user_email_key" UNIQUE (registry_id, user_email);
+
+
+--
+-- Name: RoRegistry RoRegistry_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry"
+    ADD CONSTRAINT "RoRegistry_name_key" UNIQUE (name);
+
+
+--
+-- Name: RoRegistry RoRegistry_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistry"
+    ADD CONSTRAINT "RoRegistry_pkey" PRIMARY KEY (id);
 
 
 --
@@ -2309,6 +2591,13 @@ CREATE INDEX idx_console_update_history_type ON public."ConsoleUpdateHistory" US
 
 
 --
+-- Name: idx_pricing_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pricing_lookup ON public."RegistryDashboardRegistrarPricing" USING btree (registrar_id, tld, is_active);
+
+
+--
 -- Name: idx_registry_lock_registrar_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2320,6 +2609,20 @@ CREATE INDEX idx_registry_lock_registrar_id ON public."RegistryLock" USING btree
 --
 
 CREATE INDEX idx_registry_lock_verification_code ON public."RegistryLock" USING btree (verification_code);
+
+
+--
+-- Name: idx_ro_registry_tld_registry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_registry_tld_registry ON public."RoRegistryTld" USING btree (registry_id);
+
+
+--
+-- Name: idx_ro_registry_user_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_registry_user_email ON public."RoRegistryUser" USING btree (user_email);
 
 
 --
@@ -2831,6 +3134,22 @@ CREATE INDEX spec11threatmatch_registrar_id_idx ON public."Spec11ThreatMatch" US
 --
 
 CREATE INDEX spec11threatmatch_tld_idx ON public."Spec11ThreatMatch" USING btree (tld);
+
+
+--
+-- Name: RoRegistryTld RoRegistryTld_registry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryTld"
+    ADD CONSTRAINT "RoRegistryTld_registry_id_fkey" FOREIGN KEY (registry_id) REFERENCES public."RoRegistry"(id) ON DELETE CASCADE;
+
+
+--
+-- Name: RoRegistryUser RoRegistryUser_registry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public."RoRegistryUser"
+    ADD CONSTRAINT "RoRegistryUser_registry_id_fkey" FOREIGN KEY (registry_id) REFERENCES public."RoRegistry"(id) ON DELETE CASCADE;
 
 
 --

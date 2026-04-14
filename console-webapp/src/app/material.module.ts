@@ -29,6 +29,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatNativeDateModule, MatRippleModule } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -42,9 +43,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatTimepickerModule } from '@angular/material/timepicker';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTreeModule } from '@angular/material/tree';
@@ -68,6 +71,7 @@ import { MatTreeModule } from '@angular/material/tree';
     MatInputModule,
     MatListModule,
     MatMenuModule,
+    MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
@@ -75,8 +79,10 @@ import { MatTreeModule } from '@angular/material/tree';
     MatRippleModule,
     MatSelectModule,
     MatSidenavModule,
+    MatSlideToggleModule,
     MatTableModule,
     MatTabsModule,
+    MatTimepickerModule,
     MatToolbarModule,
     MatTooltipModule,
     MatTreeModule,

@@ -57,7 +57,7 @@ registryPolicy:
 
   # Custom logic factory fully-qualified class name.
   # See flows/custom/CustomLogicFactory.java
-  customLogicFactoryClass: google.registry.flows.custom.CustomLogicFactory
+  customLogicFactoryClass: google.registry.flows.custom.RegistryDashboardCustomLogicFactory
 
   # Custom logic class for handling DNS query count reporting for ICANN.
   # See reporting/icann/DnsCountQueryCoordinator.java

@@ -1,0 +1,152 @@
+@use '../ud-mixins' as ud;
+
+.admin-container {
+  padding: 16px;
+  max-width: 1200px;
+}
+
+.admin-card {
+  margin-bottom: 24px;
+}
+
+.error-banner {
+  @include ud.error-banner;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.add-form {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.add-form mat-form-field {
+  flex: 1;
+  min-width: 200px;
+}
+
+.registrars-table {
+  width: 100%;
+}
+
+.registry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.registry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--ud-radius-md);
+  cursor: pointer;
+  transition: border-color var(--ud-transition), background-color var(--ud-transition);
+
+  &:hover {
+    background-color: var(--lightest-highlight);
+  }
+
+  &.selected {
+    border-color: var(--ud-accent);
+    background-color: var(--ud-accent-light);
+  }
+}
+
+.registry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.registry-name {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.registry-meta {
+  font-size: 13px;
+  color: var(--ud-text-secondary);
+}
+
+.detail-card {
+  border-left: 4px solid var(--ud-accent);
+}
+
+.empty-state {
+  color: var(--ud-text-secondary);
+  text-align: center;
+  padding: 24px;
+}
+
+h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.default-badge {
+  font-style: italic;
+  color: #666;
+}
+
+.cost-basis-table {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.cost-basis-form {
+  margin-bottom: 16px;
+}
+
+.cost-basis-fields {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cost-basis-fields mat-form-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding-top: 8px;
+}
+
+.section-description {
+  font-size: 13px;
+  color: var(--ud-text-secondary);
+  margin-bottom: 12px;
+}
+
+.visibility-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.toggle-row {
+  padding: 4px 0;
+}
+
+.visibility-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}

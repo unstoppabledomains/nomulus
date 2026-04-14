@@ -1,0 +1,30 @@
+@use '../ud-mixins' as ud;
+
+.registry-dash-portfolio {
+  .error-banner {
+    @include ud.error-banner;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  .state-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+  }
+
+  .state-active {
+    @include ud.status-badge(var(--ud-success-bg), var(--ud-success));
+  }
+
+  .state-suspended {
+    @include ud.status-badge(var(--ud-warning-bg), var(--ud-warning));
+  }
+
+  .state-pending {
+    @include ud.status-badge(var(--ud-accent-light), var(--ud-accent));
+  }
+}

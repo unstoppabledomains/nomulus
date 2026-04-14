@@ -1236,6 +1236,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_renewGracePeriodCredit_v06() throws Exception {
+    // FEE_0_6 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
@@ -1245,6 +1247,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
   @Test
   void testSuccess_renewGracePeriodCredit_v11() throws Exception {
     setEppInput("domain_delete.xml", FEE_11_MAP);
+    // FEE_0_11 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     doSuccessfulTest_noAddGracePeriod("domain_delete_response_pending_fee.xml", FEE_11_MAP);
@@ -1252,12 +1256,16 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_renewGracePeriodCredit_v12() throws Exception {
+    // FEE_0_12 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     doSuccessfulTest_noAddGracePeriod("domain_delete_response_pending_fee.xml", FEE_12_MAP);
   }
 
   @Test
   void testSuccess_addGracePeriodCredit_v06() throws Exception {
+    // FEE_0_6 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
@@ -1266,6 +1274,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_addGracePeriodCredit_v11() throws Exception {
+    // FEE_0_11 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     doAddGracePeriodDeleteTest(GracePeriodStatus.ADD, "domain_delete_response_fee.xml", FEE_11_MAP);
@@ -1273,12 +1283,16 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_addGracePeriodCredit_v12() throws Exception {
+    // FEE_0_12 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     doAddGracePeriodDeleteTest(GracePeriodStatus.ADD, "domain_delete_response_fee.xml", FEE_12_MAP);
   }
 
   @Test
   void testSuccess_autoRenewGracePeriod_v06() throws Exception {
+    // FEE_0_6 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
@@ -1289,6 +1303,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_autoRenewGracePeriod_v11() throws Exception {
+    // FEE_0_11 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     setUpAutorenewGracePeriod();
@@ -1298,6 +1314,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_autoRenewGracePeriod_v12() throws Exception {
+    // FEE_0_12 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     setUpAutorenewGracePeriod();
     clock.advanceOneMilli();
@@ -1306,6 +1324,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_autoRenewGracePeriod_priceChanges_v06() throws Exception {
+    // FEE_0_6 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_6.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
@@ -1326,6 +1346,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_autoRenewGracePeriod_priceChanges_v11() throws Exception {
+    // FEE_0_11 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_11.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     persistResource(
@@ -1345,6 +1367,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_autoRenewGracePeriod_priceChanges_v12() throws Exception {
+    // FEE_0_12 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     persistResource(
         Tld.get("tld")
@@ -1363,6 +1387,8 @@ class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow, Domain
 
   @Test
   void testSuccess_freeCreation_deletionDuringGracePeriod_v12() throws Exception {
+    // FEE_0_12 is hidden by default; add it back for testing
+    addServiceExtensionUri(ServiceExtension.FEE_0_12.getUri());
     removeServiceExtensionUri(ServiceExtension.FEE_1_00.getUri());
     // Deletion during the add grace period should still work even if the credit is 0
     setUpSuccessfulTest();

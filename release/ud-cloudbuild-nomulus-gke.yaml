@@ -107,7 +107,9 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  env:
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c
@@ -131,12 +133,10 @@ steps:
   - -c
   - |
     set -e
-    if [ ${_ENV} == production ]; then
-      project_id="ud-registry"
-    elif [ ${_ENV} == sandbox ]; then
-      project_id="ud-registry-sandbox-gke"
+    if [[ "${_ENV}" == production ]]; then
+      project_id="ud-registry-prod-gke"
     else
-      project_id="ud-registry-${_ENV}"
+      project_id="ud-registry-${_ENV}-gke"
     fi
     echo "Deploying Cloud Scheduler and Cloud Tasks"
     deployCloudSchedulerAndQueue core/src/main/java/google/registry/config/files/nomulus-config-${_ENV}.yaml core/src/main/java/google/registry/config/files/tasks/cloud-scheduler-tasks-${_ENV}.xml $project_id
@@ -146,7 +146,9 @@ steps:
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
   # Set home for Gradle caches. Must be consistent with last step below
   # and ./build_nomulus_for_env.sh
-  env: [ 'GRADLE_USER_HOME=/workspace/cloudbuild-caches' ]
+  env:
+    - 'GRADLE_USER_HOME=/workspace/cloudbuild-caches'
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c
@@ -214,6 +216,8 @@ steps:
 # nomulus.jar built earlier.
 - id: Build-And-Push-Prober-Cert-Updater-Image
   name: '$_GCR_HOSTNAME/${PROJECT_ID}/nomulus/builder:latest'
+  env:
+    - 'DOCKER_API_VERSION=1.41'
   entrypoint: /bin/bash
   args:
   - -c

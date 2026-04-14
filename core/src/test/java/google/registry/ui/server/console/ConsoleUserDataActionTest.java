@@ -64,7 +64,9 @@ class ConsoleUserDataActionTest extends ConsoleActionBaseTestCase {
             "supportPhoneNumber",
             "+1 (212) 867 5309",
             "supportEmail",
-            "support@example.com");
+            "support@example.com",
+            "userEmail",
+            "fte@email.tld");
   }
 
   @Test

@@ -14,27 +14,43 @@
 def consoleDir = "${rootDir}/console-webapp"
 def projectParam = "--project=${rootProject.gcpProject}"
 
+// Use the node-gradle plugin's downloaded Node if available.
+def nodeDir = "${rootDir}/.gradle/nodejs/" +
+    "node-v${rootProject.node.version.get()}-" +
+    (System.getProperty("os.name").toLowerCase().contains("mac") ? "darwin" : "linux") +
+    "-" +
+    (System.getProperty("os.arch") == "aarch64" ? "arm64" : "x64") +
+    "/bin"
+
+def npmEnv = { task ->
+  task.environment 'PATH', "${nodeDir}:${System.getenv('PATH')}"
+}
+
 clean {
   delete "${consoleDir}/node_modules"
   delete "${consoleDir}/staged/dist"
 }
 
 task npmInstallDeps(type: Exec) {
+  dependsOn(rootProject.tasks.nodeSetup)
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'i', '--no-audit', '--no-fund', '--loglevel=error'
+  npmEnv(it)
 }
 
 task runConsoleWebappLocally(type: Exec) {
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'run', 'start:dev'
+  npmEnv(it)
 }
 
 task runConsoleWebappUnitTests(type: Exec) {
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'run', 'test'
+  npmEnv(it)
 }
 
 task buildConsoleWebapp(type: Exec) {
@@ -45,6 +61,7 @@ task buildConsoleWebapp(type: Exec) {
   doFirst {
     println "Building console for environment: ${configuration}"
   }
+  npmEnv(it)
 }
 
 task buildConsoleForAll() {}
@@ -65,6 +82,7 @@ def createConsoleTask = { env ->
       delete "${consoleDir}/staged/dist"
     }
     dependsOn(tasks.npmInstallDeps)
+    npmEnv(it)
   }
   project.tasks.register("deleteConsoleFor${env.capitalize()}", Delete) {
     delete "${consoleDir}/staged/console-${env}"
@@ -93,12 +111,14 @@ task applyFormatting(type: Exec) {
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'run', 'prettify'
+  npmEnv(it)
 }
 
 task checkFormatting(type: Exec) {
   workingDir "${consoleDir}/"
   executable 'npm'
   args 'run', 'prettify:check'
+  npmEnv(it)
 }
 
 tasks.buildConsoleWebapp.dependsOn(tasks.npmInstallDeps)

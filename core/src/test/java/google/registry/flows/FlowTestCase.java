@@ -107,6 +107,20 @@ public abstract class FlowTestCase<F extends Flow> {
         difference(sessionMetadata.getServiceExtensionUris(), ImmutableSet.of(uri)));
   }
 
+  // UD CUSTOMIZATION: Helper method to declare hidden service extensions in tests.
+  // UD hides draft fee extensions (FEE_0_6, FEE_0_11, FEE_0_12) to avoid IANA registry warnings.
+  // Since they're hidden (visibility.NONE), tests that use them must explicitly declare them
+  // at login time. This method adds the extension URI to the EPP session metadata.
+  // See FEE_EXTENSION_CUSTOMIZATION.md for details.
+  protected void addServiceExtensionUri(String uri) {
+    // Build a proper ImmutableSet instead of using Sets.union() which returns a read-only view.
+    // Sets.union() creates a SetView that doesn't persist properly when used with sessionMetadata.
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    builder.addAll(sessionMetadata.getServiceExtensionUris());
+    builder.add(uri);
+    sessionMetadata.setServiceExtensionUris(builder.build());
+  }
+
   protected void setEppInput(String inputFilename) {
     eppLoader = new EppLoader(this, inputFilename);
   }

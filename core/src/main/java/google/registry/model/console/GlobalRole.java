@@ -15,6 +15,7 @@
 package google.registry.model.console;
 
 import static google.registry.model.console.ConsoleRoleDefinitions.FTE_PERMISSIONS;
+import static google.registry.model.console.ConsoleRoleDefinitions.REGISTRY_OPERATOR_PERMISSIONS;
 import static google.registry.model.console.ConsoleRoleDefinitions.SUPPORT_AGENT_PERMISSIONS;
 import static google.registry.model.console.ConsoleRoleDefinitions.SUPPORT_LEAD_PERMISSIONS;
 
@@ -25,6 +26,8 @@ public enum GlobalRole {
 
   /** The user has no global role, i.e. they're a registrar partner. */
   NONE(ImmutableSet.of()),
+  /** The user is a registry operator (dashboard user). */
+  REGISTRY_OPERATOR(REGISTRY_OPERATOR_PERMISSIONS),
   /** The user is a registry support agent. */
   SUPPORT_AGENT(SUPPORT_AGENT_PERMISSIONS),
   /** The user is a registry support lead. */
