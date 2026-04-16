@@ -23,6 +23,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
@@ -118,7 +119,7 @@ class RegistryDashDomainActivityActionTest {
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashDomainActivityAction action =
         new RegistryDashDomainActivityAction(
-            params, Optional.empty(), lookbackHours, granularity, javaClock);
+            params, Optional.empty(), lookbackHours, granularity, ImmutableSet.of(), javaClock);
     action.run();
     return new RunResult((FakeResponse) params.response());
   }

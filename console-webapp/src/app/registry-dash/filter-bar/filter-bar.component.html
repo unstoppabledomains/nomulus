@@ -1,0 +1,46 @@
+@if (dashService.filterOptions()) {
+  <div class="filter-bar">
+    <div class="filter-fields">
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>TLDs</mat-label>
+        <mat-select
+          multiple
+          [value]="dashService.selectedTlds()"
+          (selectionChange)="onTldsChange($event.value)">
+          @for (tld of filteredTldOptions(); track tld) {
+            <mat-option [value]="tld">.{{ tld }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Registrars</mat-label>
+        <mat-select
+          multiple
+          [value]="dashService.selectedRegistrarIds()"
+          (selectionChange)="onRegistrarsChange($event.value)">
+          @for (reg of filteredRegistrarOptions(); track reg.registrarId) {
+            <mat-option [value]="reg.registrarId">{{ reg.registrarName || reg.registrarId }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    @if (dashService.hasActiveFilters()) {
+      <div class="filter-status">
+        <mat-icon
+          class="filter-mode-icon"
+          [matTooltip]="filterModeTooltip()">
+          {{ filterModeIcon() }}
+        </mat-icon>
+        <span class="filter-count">
+          {{ dashService.selectedTlds().length + dashService.selectedRegistrarIds().length }} active
+        </span>
+        <button mat-button class="clear-btn" (click)="clearFilters()">
+          <mat-icon>close</mat-icon>
+          Clear
+        </button>
+      </div>
+    }
+  </div>
+}

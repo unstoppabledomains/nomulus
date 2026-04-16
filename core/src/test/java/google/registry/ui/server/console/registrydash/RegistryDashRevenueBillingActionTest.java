@@ -23,6 +23,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingBase.Reason;
@@ -125,7 +126,7 @@ class RegistryDashRevenueBillingActionTest {
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashRevenueBillingAction action =
         new RegistryDashRevenueBillingAction(
-            params, months, lookbackHours, granularity, javaClock);
+            params, months, lookbackHours, granularity, ImmutableSet.of(), javaClock);
     action.run();
     return new RunResult((FakeResponse) params.response());
   }

@@ -15,7 +15,7 @@
 import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { switchMap } from 'rxjs';
+import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
@@ -159,15 +159,21 @@ export class RevenueBillingComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    toObservable(this.selectedRange)
-      .pipe(
-        switchMap(range => {
-          const config = RANGE_CONFIG[range];
-          return this.dashService.getRevenueBilling(config.lookbackHours, config.granularity);
-        }),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe();
+    combineLatest([
+      toObservable(this.selectedRange),
+      toObservable(this.dashService.selectedTlds),
+      toObservable(this.dashService.selectedRegistrarIds),
+    ]).pipe(
+      switchMap(([range, tlds, regIds]) => {
+        const config = RANGE_CONFIG[range];
+        const ft = tlds.length > 0 ? tlds : undefined;
+        const fr = regIds.length > 0 ? regIds : undefined;
+        return this.dashService.getRevenueBilling(
+          config.lookbackHours, config.granularity, ft, fr
+        ).pipe(catchError(() => EMPTY));
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
   }
 
   ngOnInit() {

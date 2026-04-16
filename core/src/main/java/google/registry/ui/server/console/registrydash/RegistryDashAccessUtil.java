@@ -17,6 +17,7 @@ package google.registry.ui.server.console.registrydash;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrydash.RoRegistry;
 import google.registry.model.registrydash.RoRegistryTld;
@@ -83,6 +84,25 @@ public final class RegistryDashAccessUtil {
   public static ImmutableSet<String> getMappedRegistrarIds(String userEmail) {
     ImmutableSet<String> tlds = getMappedTlds(userEmail);
     return getRegistrarIdsForTlds(tlds);
+  }
+
+  /**
+   * Intersects a user-requested filter set with their access-scoped set.
+   *
+   * <p>If the filter is empty, returns the access scope unchanged. For admins (whose access scope
+   * is empty, meaning "all"), returns the filter directly. For non-admins, returns the intersection
+   * so users can never see data outside their scope.
+   */
+  public static ImmutableSet<String> applyFilter(
+      ImmutableSet<String> accessScope,
+      ImmutableSet<String> requestedFilter,
+      boolean isAdmin) {
+    if (requestedFilter.isEmpty()) {
+      return accessScope;
+    }
+    return isAdmin
+        ? requestedFilter
+        : Sets.intersection(accessScope, requestedFilter).immutableCopy();
   }
 
   /** Returns the RoRegistry for a user, if any. A non-FTE user belongs to at most one registry. */

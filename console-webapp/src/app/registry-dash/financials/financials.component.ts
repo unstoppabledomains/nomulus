@@ -15,7 +15,7 @@
 import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { combineLatest, switchMap } from 'rxjs';
+import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
@@ -57,7 +57,7 @@ export class FinancialsComponent implements OnInit {
 
   // --- Fees by TLD tab ---
 
-  tldFeeEntries = computed(() => this.dashService.tldFees());
+  tldFeeEntries = computed(() => this.dashService.filteredTldFees());
 
   feesTableColumns = ['tld', 'operation', 'defaultPrice', 'currency'];
 
@@ -131,18 +131,24 @@ export class FinancialsComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Re-fetch all overview data when range or tab changes
+    // Re-fetch all overview data when range, tab, or global filters change
     combineLatest([
       toObservable(this.selectedTab),
       toObservable(this.selectedOverviewRange),
+      toObservable(this.dashService.selectedTlds),
+      toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
-      switchMap(([tab, range]) => {
+      switchMap(([tab, range, tlds, regIds]) => {
         const config = RANGE_CONFIG[range];
+        const ft = tlds.length > 0 ? tlds : undefined;
+        const fr = regIds.length > 0 ? regIds : undefined;
         if (tab === 0) {
           // Fetch all three in parallel for overview tab
-          this.dashService.getDomainActivity(config.lookbackHours, config.granularity).subscribe();
-          this.dashService.getForecasting(config.lookbackHours, config.granularity).subscribe();
-          return this.dashService.getRevenueBilling(config.lookbackHours, config.granularity);
+          this.dashService.getDomainActivity(config.lookbackHours, config.granularity, ft, fr).subscribe();
+          this.dashService.getForecasting(config.lookbackHours, config.granularity, ft, fr).subscribe();
+          return this.dashService.getRevenueBilling(
+            config.lookbackHours, config.granularity, ft, fr
+          ).pipe(catchError(() => EMPTY));
         }
         return [];
       }),

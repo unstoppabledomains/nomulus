@@ -15,7 +15,7 @@
 import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { EMPTY, switchMap, catchError } from 'rxjs';
+import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
@@ -157,18 +157,22 @@ export class DomainActivityComponent implements OnInit {
   });
 
   constructor(public dashService: RegistryDashService) {
-    // Refetch when selectedRange changes, cancel previous request on new selection
-    toObservable(this.selectedRange)
-      .pipe(
-        switchMap(range => {
-          const config = RANGE_CONFIG[range];
-          return this.dashService.getDomainActivity(config.lookbackHours, config.granularity).pipe(
-            catchError(() => EMPTY) // Prevent subscription death on HTTP errors
-          );
-        }),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe();
+    // Refetch when selectedRange or global filters change
+    combineLatest([
+      toObservable(this.selectedRange),
+      toObservable(this.dashService.selectedTlds),
+      toObservable(this.dashService.selectedRegistrarIds),
+    ]).pipe(
+      switchMap(([range, tlds, regIds]) => {
+        const config = RANGE_CONFIG[range];
+        const ft = tlds.length > 0 ? tlds : undefined;
+        const fr = regIds.length > 0 ? regIds : undefined;
+        return this.dashService.getDomainActivity(
+          config.lookbackHours, config.granularity, ft, fr
+        ).pipe(catchError(() => EMPTY));
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
   }
 
   ngOnInit() {

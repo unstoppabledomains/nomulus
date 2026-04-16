@@ -145,17 +145,20 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
   private final Optional<Integer> months;
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
+  private final ImmutableSet<String> filterTlds;
 
   @Inject
   public RegistryDashForecastingAction(
       ConsoleApiParams consoleApiParams,
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
-      @Parameter("granularity") Optional<String> granularity) {
+      @Parameter("granularity") Optional<String> granularity,
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
+    this.filterTlds = filterTlds;
   }
 
   @Override
@@ -166,9 +169,11 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
-    ImmutableSet<String> tlds =
+    ImmutableSet<String> accessTlds =
         isAdmin ? ImmutableSet.of()
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+    ImmutableSet<String> tlds =
+        RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("expirationCurve", List.of());
@@ -198,6 +203,8 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
 
     tm().transact(
         () -> {
+          boolean useScoped = !tlds.isEmpty();
+
           // Expiration curve
           ZonedDateTime endZdt = ZonedDateTime.now(ZoneOffset.UTC)
               .plus(hoursForward, ChronoUnit.HOURS);
@@ -207,7 +214,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           if (use15min) {
             // Native SQL for 15-minute buckets
             Instant endInstant = endZdt.toInstant();
-            if (isAdmin) {
+            if (!useScoped) {
               expirationResults = tm().getEntityManager()
                   .createNativeQuery(EXPIRATION_CURVE_15MIN_ALL)
                   .setParameter("endDate", endInstant)
@@ -226,7 +233,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
             org.joda.time.DateTime endDate =
                 org.joda.time.DateTime.now(org.joda.time.DateTimeZone.UTC)
                     .plusHours(hoursForward);
-            if (isAdmin) {
+            if (!useScoped) {
               expirationResults = tm().getEntityManager()
                   .createQuery(jpqlAll)
                   .setParameter("endDate", endDate)
@@ -267,7 +274,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           Instant startDate = ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant();
           @SuppressWarnings("unchecked")
           List<Object[]> renewalResults =
-              isAdmin
+              !useScoped
                   ? tm().getEntityManager()
                       .createNativeQuery(RENEWAL_RATES_NATIVE_ALL)
                       .setParameter("startDate", startDate)

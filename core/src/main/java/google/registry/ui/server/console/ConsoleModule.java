@@ -18,7 +18,9 @@ import static google.registry.request.RequestParameters.extractBooleanParameter;
 import static google.registry.request.RequestParameters.extractOptionalIntParameter;
 import static google.registry.request.RequestParameters.extractOptionalParameter;
 import static google.registry.request.RequestParameters.extractRequiredParameter;
+import static google.registry.request.RequestParameters.extractSetOfParameters;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -424,5 +426,17 @@ public final class ConsoleModule {
               obj.has("id") ? obj.get("id").getAsLong() : null,
               obj.has("settings") ? obj.get("settings").getAsString() : null);
         });
+  }
+
+  @Provides
+  @Parameter("filterTlds")
+  public static ImmutableSet<String> provideFilterTlds(HttpServletRequest req) {
+    return extractSetOfParameters(req, "filterTlds");
+  }
+
+  @Provides
+  @Parameter("filterRegistrarIds")
+  public static ImmutableSet<String> provideFilterRegistrarIds(HttpServletRequest req) {
+    return extractSetOfParameters(req, "filterRegistrarIds");
   }
 }

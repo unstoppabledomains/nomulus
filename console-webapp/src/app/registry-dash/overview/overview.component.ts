@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, computed } from '@angular/core';
+import { Component, DestroyRef, computed, inject } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { combineLatest, switchMap, EMPTY, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { NgxEchartsDirective } from 'ngx-echarts';
@@ -41,6 +43,7 @@ const ACTIVITY_COLORS: Record<string, string> = {
   styleUrls: ['./overview.component.scss'],
 })
 export class OverviewComponent {
+  private destroyRef = inject(DestroyRef);
   barChartData = computed(() => {
     const overview = this.dashService.overview();
     if (!overview) return [];
@@ -138,8 +141,21 @@ export class OverviewComponent {
   });
 
   constructor(protected dashService: RegistryDashService) {
-    this.dashService.getOverview().subscribe();
-    this.dashService.getDomainActivity().subscribe();
-    this.dashService.getForecasting().subscribe();
+    // Re-fetch when global filters change
+    combineLatest([
+      toObservable(this.dashService.selectedTlds),
+      toObservable(this.dashService.selectedRegistrarIds),
+    ]).pipe(
+      switchMap(([tlds, regIds]) => {
+        const ft = tlds.length > 0 ? tlds : undefined;
+        const fr = regIds.length > 0 ? regIds : undefined;
+        this.dashService.getOverview(ft, fr).subscribe();
+        this.dashService.getDomainActivity(undefined, undefined, ft, fr).subscribe();
+        return this.dashService.getForecasting(undefined, undefined, ft, fr).pipe(
+          catchError(() => EMPTY)
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
   }
 }
