@@ -190,6 +190,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
   private final Optional<Integer> months;
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
+  private final ImmutableSet<String> filterTlds;
   private final java.time.Clock clock;
 
   @Inject
@@ -197,8 +198,10 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       ConsoleApiParams consoleApiParams,
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
-      @Parameter("granularity") Optional<String> granularity) {
-    this(consoleApiParams, months, lookbackHours, granularity, java.time.Clock.systemUTC());
+      @Parameter("granularity") Optional<String> granularity,
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds) {
+    this(consoleApiParams, months, lookbackHours, granularity, filterTlds,
+        java.time.Clock.systemUTC());
   }
 
   /** Constructor that accepts a clock for testing. */
@@ -207,11 +210,13 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       Optional<Integer> months,
       Optional<Integer> lookbackHours,
       Optional<String> granularity,
+      ImmutableSet<String> filterTlds,
       java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
+    this.filterTlds = filterTlds;
     this.clock = clock;
   }
 
@@ -223,9 +228,11 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
-    ImmutableSet<String> tlds =
+    ImmutableSet<String> accessTlds =
         isAdmin ? ImmutableSet.of()
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
+    ImmutableSet<String> tlds =
+        RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("periodRevenue", List.of());
@@ -263,11 +270,12 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
     String resolvedGran = gran;
     tm().transact(
         () -> {
-          String sql = buildSql(resolvedGran, isAdmin);
+          boolean useScoped = !tlds.isEmpty();
+          String sql = buildSql(resolvedGran, !useScoped);
 
           @SuppressWarnings("unchecked")
           List<Object[]> results;
-          if (isAdmin) {
+          if (!useScoped) {
             results = tm().getEntityManager()
                 .createNativeQuery(sql)
                 .setParameter("startDate", startDate)

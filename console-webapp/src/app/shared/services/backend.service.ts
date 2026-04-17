@@ -32,6 +32,7 @@ import {
   ForecastingData,
   TldFeeEntry,
   EffectiveFeeEntry,
+  FilterOptionsData,
 } from 'src/app/registry-dash/registry-dash.service';
 import { User } from 'src/app/users/users.service';
 import {
@@ -342,15 +343,23 @@ export class BackendService {
 
   // --- Registry Dashboard ---
 
-  getRegistryDashOverview(): Observable<OverviewData> {
+  getRegistryDashFilterOptions(): Observable<FilterOptionsData> {
     return this.http
-      .get<OverviewData>('/console-api/registry-dash/overview')
+      .get<FilterOptionsData>('/console-api/registry-dash/filter-options')
+      .pipe(catchError((err) => this.errorCatcher<FilterOptionsData>(err)));
+  }
+
+  getRegistryDashOverview(filterTlds?: string[], filterRegistrarIds?: string[]): Observable<OverviewData> {
+    const params = this.buildFilterParams(undefined, undefined, filterTlds, filterRegistrarIds);
+    return this.http
+      .get<OverviewData>(`/console-api/registry-dash/overview${params}`)
       .pipe(catchError((err) => this.errorCatcher<OverviewData>(err)));
   }
 
-  getRegistryDashPortfolio(): Observable<PortfolioEntry[]> {
+  getRegistryDashPortfolio(filterTlds?: string[], filterRegistrarIds?: string[]): Observable<PortfolioEntry[]> {
+    const params = this.buildFilterParams(undefined, undefined, filterTlds, filterRegistrarIds);
     return this.http
-      .get<PortfolioEntry[]>('/console-api/registry-dash/portfolio')
+      .get<PortfolioEntry[]>(`/console-api/registry-dash/portfolio${params}`)
       .pipe(catchError((err) => this.errorCatcher<PortfolioEntry[]>(err)));
   }
 
@@ -428,34 +437,47 @@ export class BackendService {
 
   // --- Registry Dashboard Analytics ---
 
-  getRegistryDashRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {
-    const parts: string[] = [];
-    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
-    if (granularity) parts.push(`granularity=${granularity}`);
-    const params = parts.length ? `?${parts.join('&')}` : '';
+  getRegistryDashRevenueBilling(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<RevenueBillingData> {
+    const params = this.buildFilterParams(lookbackHours, granularity, filterTlds, filterRegistrarIds);
     return this.http
       .get<RevenueBillingData>(`/console-api/registry-dash/revenue-billing${params}`)
       .pipe(catchError((err) => this.errorCatcher<RevenueBillingData>(err)));
   }
 
-  getRegistryDashDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
-    const parts: string[] = [];
-    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
-    if (granularity) parts.push(`granularity=${granularity}`);
-    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
+  getRegistryDashDomainActivity(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<DomainActivityData> {
+    const params = this.buildFilterParams(lookbackHours, granularity, filterTlds, filterRegistrarIds);
     return this.http
       .get<DomainActivityData>(`/console-api/registry-dash/domain-activity${params}`)
       .pipe(catchError((err) => this.errorCatcher<DomainActivityData>(err)));
   }
 
-  getRegistryDashForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
-    const parts: string[] = [];
-    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
-    if (granularity) parts.push(`granularity=${granularity}`);
-    const params = parts.length > 0 ? `?${parts.join('&')}` : '';
+  getRegistryDashForecasting(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<ForecastingData> {
+    const params = this.buildFilterParams(lookbackHours, granularity, filterTlds, filterRegistrarIds);
     return this.http
       .get<ForecastingData>(`/console-api/registry-dash/forecasting${params}`)
       .pipe(catchError((err) => this.errorCatcher<ForecastingData>(err)));
+  }
+
+  /** Builds query string for analytics endpoints with optional time + filter params. */
+  private buildFilterParams(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): string {
+    const parts: string[] = [];
+    if (lookbackHours) parts.push(`lookbackHours=${lookbackHours}`);
+    if (granularity) parts.push(`granularity=${granularity}`);
+    if (filterTlds?.length) parts.push(`filterTlds=${filterTlds.join(',')}`);
+    if (filterRegistrarIds?.length) parts.push(`filterRegistrarIds=${filterRegistrarIds.join(',')}`);
+    return parts.length > 0 ? `?${parts.join('&')}` : '';
   }
 
   getRegistryDashTldFees(): Observable<TldFeeEntry[]> {

@@ -26,6 +26,7 @@ import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
 import google.registry.request.Action;
 import google.registry.request.Action.Service;
+import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
@@ -60,9 +61,17 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
       GROUP BY d.currentSponsorRegistrarId
       """;
 
+  private final ImmutableSet<String> filterTlds;
+  private final ImmutableSet<String> filterRegistrarIds;
+
   @Inject
-  public RegistryDashPortfolioAction(ConsoleApiParams consoleApiParams) {
+  public RegistryDashPortfolioAction(
+      ConsoleApiParams consoleApiParams,
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds,
+      @Parameter("filterRegistrarIds") ImmutableSet<String> filterRegistrarIds) {
     super(consoleApiParams);
+    this.filterTlds = filterTlds;
+    this.filterRegistrarIds = filterRegistrarIds;
   }
 
   @Override
@@ -73,12 +82,21 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
     }
 
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
-    ImmutableSet<String> tlds =
+    ImmutableSet<String> accessTlds =
         isAdmin ? ImmutableSet.of()
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
-    ImmutableSet<String> registrarIds =
+    ImmutableSet<String> tlds =
+        RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
+    ImmutableSet<String> accessRegistrarIds =
         isAdmin ? ImmutableSet.of()
-            : RegistryDashAccessUtil.getRegistrarIdsForTlds(tlds);
+            : RegistryDashAccessUtil.getRegistrarIdsForTlds(accessTlds);
+    ImmutableSet<String> registrarIds;
+    if (!filterTlds.isEmpty() && filterRegistrarIds.isEmpty() && !tlds.isEmpty()) {
+      registrarIds = RegistryDashAccessUtil.getRegistrarIdsForTlds(tlds);
+    } else {
+      registrarIds =
+          RegistryDashAccessUtil.applyFilter(accessRegistrarIds, filterRegistrarIds, isAdmin);
+    }
     if (!isAdmin && registrarIds.isEmpty()) {
       consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(List.of()));
       consoleApiParams.response().setStatus(SC_OK);
@@ -87,9 +105,10 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
 
     tm().transact(
         () -> {
+          boolean useScoped = !tlds.isEmpty() || !registrarIds.isEmpty();
           @SuppressWarnings("unchecked")
           List<Registrar> registrars =
-              isAdmin
+              !useScoped
                   ? tm().getEntityManager()
                       .createQuery("SELECT r FROM Registrar r", Registrar.class)
                       .getResultList()
@@ -100,7 +119,7 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
 
           @SuppressWarnings("unchecked")
           List<Object[]> domainCounts =
-              isAdmin
+              !useScoped
                   ? tm().getEntityManager()
                       .createQuery(
                           "SELECT d.currentSponsorRegistrarId, COUNT(d)"
@@ -121,8 +140,8 @@ public class RegistryDashPortfolioAction extends ConsoleApiAction {
 
           List<Map<String, Object>> portfolio = new java.util.ArrayList<>();
           for (Registrar r : registrars) {
-            // Filter allowedTlds to only show TLDs the user's registry owns
-            ImmutableSet<String> visibleTlds = isAdmin
+            // Filter allowedTlds to scope — shows all TLDs when unscoped, or only matching ones
+            ImmutableSet<String> visibleTlds = !useScoped
                 ? r.getAllowedTlds()
                 : r.getAllowedTlds().stream()
                     .filter(tlds::contains)

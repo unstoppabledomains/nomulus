@@ -133,3 +133,5 @@ AI-generated-content-not-for-git/**
 
 # Local dev test data (ephemeral, Testcontainers-only)
 local-test-data-setup.sql
+local-create-domains.sql
+local-demo-data.sql

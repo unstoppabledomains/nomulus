@@ -173,6 +173,17 @@ export interface EffectiveFeeEntry {
   source: 'Default' | 'Custom';
 }
 
+export interface FilterRegistrarOption {
+  registrarId: string;
+  registrarName: string;
+  allowedTlds: string[];
+}
+
+export interface FilterOptionsData {
+  tlds: string[];
+  registrars: FilterRegistrarOption[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class RegistryDashService {
   overview = signal<OverviewData | undefined>(undefined);
@@ -195,6 +206,57 @@ export class RegistryDashService {
   columnVisibility = signal<Record<string, boolean>>({ ...RegistryDashService.DEFAULT_VISIBILITY });
   loading = signal(false);
   error = signal<string | undefined>(undefined);
+
+  // --- Global filter state ---
+  filterOptions = signal<FilterOptionsData | undefined>(undefined);
+  selectedRegistrarIds = signal<string[]>([]);
+  selectedTlds = signal<string[]>([]);
+
+  availableRegistrars = computed(() => this.filterOptions()?.registrars ?? []);
+  availableTlds = computed(() => this.filterOptions()?.tlds ?? []);
+  hasActiveFilters = computed(
+    () => this.selectedRegistrarIds().length > 0 || this.selectedTlds().length > 0
+  );
+
+  /** Client-side filtered computeds for non-analytics pages. */
+  filteredPortfolio = computed(() => {
+    let data = this.portfolio();
+    const regIds = this.selectedRegistrarIds();
+    const tlds = this.selectedTlds();
+    if (regIds.length > 0) data = data.filter(e => regIds.includes(e.registrarId));
+    if (tlds.length > 0) data = data.filter(e => e.allowedTlds.some(t => tlds.includes(t)));
+    return data;
+  });
+
+  filteredPricingRules = computed(() => {
+    let data = this.pricingRules();
+    const regIds = this.selectedRegistrarIds();
+    const tlds = this.selectedTlds();
+    if (regIds.length > 0) data = data.filter(r => regIds.includes(r.registrarId));
+    if (tlds.length > 0) data = data.filter(r => tlds.includes(r.tld));
+    return data;
+  });
+
+  filteredEffectiveFees = computed(() => {
+    let data = this.effectiveFees();
+    const regIds = this.selectedRegistrarIds();
+    const tlds = this.selectedTlds();
+    if (regIds.length > 0) data = data.filter(f => regIds.includes(f.registrarId));
+    if (tlds.length > 0) data = data.filter(f => tlds.includes(f.tld));
+    return data;
+  });
+
+  filteredTldFees = computed(() => {
+    const data = this.tldFees();
+    const tlds = this.selectedTlds();
+    if (tlds.length === 0) return data;
+    return data.filter(f => tlds.includes(f.tld));
+  });
+
+  clearFilters() {
+    this.selectedRegistrarIds.set([]);
+    this.selectedTlds.set([]);
+  }
 
   systemInfo = computed(() => this.adminData()?.systemInfo);
 
@@ -249,11 +311,20 @@ export class RegistryDashService {
     );
   }
 
-  getOverview(): Observable<OverviewData> {
+  getFilterOptions(): Observable<FilterOptionsData> {
+    return this.backend
+      .getRegistryDashFilterOptions()
+      .pipe(
+        tap((data) => this.filterOptions.set(data)),
+        catchError((err) => this.handleError<FilterOptionsData>(err))
+      );
+  }
+
+  getOverview(filterTlds?: string[], filterRegistrarIds?: string[]): Observable<OverviewData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashOverview()
+      .getRegistryDashOverview(filterTlds, filterRegistrarIds)
       .pipe(
         tap((data) => {
           this.overview.set(data);
@@ -263,11 +334,11 @@ export class RegistryDashService {
       );
   }
 
-  getPortfolio(): Observable<PortfolioEntry[]> {
+  getPortfolio(filterTlds?: string[], filterRegistrarIds?: string[]): Observable<PortfolioEntry[]> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashPortfolio()
+      .getRegistryDashPortfolio(filterTlds, filterRegistrarIds)
       .pipe(
         tap((data) => {
           this.portfolio.set(data);
@@ -375,11 +446,14 @@ export class RegistryDashService {
     );
   }
 
-  getRevenueBilling(lookbackHours?: number, granularity?: string): Observable<RevenueBillingData> {
+  getRevenueBilling(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<RevenueBillingData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashRevenueBilling(lookbackHours, granularity)
+      .getRegistryDashRevenueBilling(lookbackHours, granularity, filterTlds, filterRegistrarIds)
       .pipe(
         tap((data) => {
           this.revenueBilling.set(data);
@@ -389,11 +463,14 @@ export class RegistryDashService {
       );
   }
 
-  getDomainActivity(lookbackHours?: number, granularity?: string): Observable<DomainActivityData> {
+  getDomainActivity(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<DomainActivityData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashDomainActivity(lookbackHours, granularity)
+      .getRegistryDashDomainActivity(lookbackHours, granularity, filterTlds, filterRegistrarIds)
       .pipe(
         tap((data) => {
           this.domainActivity.set(data);
@@ -403,11 +480,14 @@ export class RegistryDashService {
       );
   }
 
-  getForecasting(lookbackHours?: number, granularity?: string): Observable<ForecastingData> {
+  getForecasting(
+    lookbackHours?: number, granularity?: string,
+    filterTlds?: string[], filterRegistrarIds?: string[]
+  ): Observable<ForecastingData> {
     this.loading.set(true);
     this.error.set(undefined);
     return this.backend
-      .getRegistryDashForecasting(lookbackHours, granularity)
+      .getRegistryDashForecasting(lookbackHours, granularity, filterTlds, filterRegistrarIds)
       .pipe(
         tap((data) => {
           this.forecasting.set(data);

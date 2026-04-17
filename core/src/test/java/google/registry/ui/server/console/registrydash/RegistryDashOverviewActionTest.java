@@ -24,6 +24,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
@@ -84,7 +85,8 @@ class RegistryDashOverviewActionTest {
     User user = createNonRoUser("regular@example.com");
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params);
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
@@ -95,7 +97,8 @@ class RegistryDashOverviewActionTest {
     User user = createRoUser("ro@example.com");
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params);
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
@@ -121,7 +124,8 @@ class RegistryDashOverviewActionTest {
 
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params);
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_OK);

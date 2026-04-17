@@ -55,17 +55,18 @@ export class PricingComponent implements AfterViewInit {
   filterTld = signal<string>('all');
 
   uniqueRegistrars = computed(() => {
-    const rules = this.dashService.pricingRules();
+    const rules = this.dashService.filteredPricingRules();
     return [...new Set(rules.map(r => r.registrarId))].sort();
   });
 
   uniqueTlds = computed(() => {
-    const rules = this.dashService.pricingRules();
+    const rules = this.dashService.filteredPricingRules();
     return [...new Set(rules.map(r => r.tld))].sort();
   });
 
   filteredRules = computed(() => {
-    let rules = this.dashService.pricingRules();
+    // Start from globally filtered data, then apply local filters
+    let rules = this.dashService.filteredPricingRules();
     const reg = this.filterRegistrar();
     const tld = this.filterTld();
     if (reg !== 'all') rules = rules.filter(r => r.registrarId === reg);

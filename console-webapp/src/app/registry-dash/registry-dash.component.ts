@@ -16,10 +16,11 @@ import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { MaterialModule } from '../material.module';
 import { RegistryDashService } from './registry-dash.service';
+import { FilterBarComponent } from './filter-bar/filter-bar.component';
 
 @Component({
   selector: 'app-registry-dash',
-  imports: [MaterialModule, RouterModule],
+  imports: [MaterialModule, RouterModule, FilterBarComponent],
   templateUrl: './registry-dash.component.html',
   styleUrls: ['./registry-dash.component.scss'],
 })
@@ -30,5 +31,6 @@ export class RegistryDashComponent implements OnInit {
 
   ngOnInit() {
     this.dashService.getSettings().subscribe();
+    this.dashService.getFilterOptions().subscribe();
   }
 }
