@@ -85,7 +85,8 @@ class RegistryDashOverviewActionTest {
     User user = createNonRoUser("regular@example.com");
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params, ImmutableSet.of(), ImmutableSet.of());
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_FORBIDDEN);
@@ -96,7 +97,8 @@ class RegistryDashOverviewActionTest {
     User user = createRoUser("ro@example.com");
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params, ImmutableSet.of(), ImmutableSet.of());
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
@@ -122,7 +124,8 @@ class RegistryDashOverviewActionTest {
 
     ConsoleApiParams params = ConsoleApiParamsUtils.createFake(AuthResult.createUser(user));
     when(params.request().getMethod()).thenReturn("GET");
-    RegistryDashOverviewAction action = new RegistryDashOverviewAction(params, ImmutableSet.of(), ImmutableSet.of());
+    RegistryDashOverviewAction action = new RegistryDashOverviewAction(
+            params, ImmutableSet.of(), ImmutableSet.of());
     action.run();
     FakeResponse response = (FakeResponse) params.response();
     assertThat(response.getStatus()).isEqualTo(SC_OK);
