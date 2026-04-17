@@ -21,6 +21,8 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
 import { RegistryDashService } from '../registry-dash.service';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing/revenue-billing.component';
+import { DrillDownService } from '../drilldown/drilldown.service';
+import { withDrillDown } from '../ud-echarts';
 import { ForecastingComponent } from './forecasting/forecasting.component';
 import { EffectiveFeesComponent } from './effective-fees/effective-fees.component';
 
@@ -120,17 +122,20 @@ export class FinancialsComponent implements OnInit {
       tooltip: { trigger: 'axis' as const },
       xAxis: { type: 'category' as const, data: operations },
       yAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
-      series: [{
+      series: [withDrillDown({
         type: 'bar' as const,
         data: operations.map(op => ({
           value: byOp[op],
           itemStyle: { color: OPERATION_COLORS[op] || '#9191A1' },
         })),
-      }],
+      })],
     };
   });
 
-  constructor(public dashService: RegistryDashService) {
+  constructor(
+    public dashService: RegistryDashService,
+    private drillDown: DrillDownService,
+  ) {
     // Re-fetch all overview data when range, tab, or global filters change
     combineLatest([
       toObservable(this.selectedTab),
@@ -170,5 +175,19 @@ export class FinancialsComponent implements OnInit {
 
   getOperationColor(operation: string): string {
     return OPERATION_COLORS[operation] || '#9191A1';
+  }
+
+  onOverviewRevenueByOpContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownRevenueByOperation(event.name);
+  }
+
+  onFeesByTldClick(tld: string) {
+    this.drillDown.applyTldFilter(tld);
+  }
+
+  onFeesByTldContext(event: MouseEvent, tld: string) {
+    event.preventDefault();
+    this.drillDown.drillDownFeesByTld(tld);
   }
 }

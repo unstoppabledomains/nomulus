@@ -21,6 +21,8 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
 import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
+import { DrillDownService } from '../../drilldown/drilldown.service';
+import { withDrillDown } from '../../ud-echarts';
 
 const TLD_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -84,7 +86,7 @@ export class ForecastingComponent implements OnInit {
     const tldLabels = tlds.map(t => `.${t}`);
     const series: any[] = tlds.map((tld, i) => {
       const monthMap = tldMap.get(tld)!;
-      return {
+      return withDrillDown({
         name: `.${tld}`,
         type: 'line' as const,
         stack: 'expirations',
@@ -92,7 +94,7 @@ export class ForecastingComponent implements OnInit {
         emphasis: { focus: 'series' as const },
         data: months.map(m => monthMap.get(m) ?? 0),
         color: TLD_COLORS[i % TLD_COLORS.length],
-      };
+      });
     });
 
     return {
@@ -131,7 +133,7 @@ export class ForecastingComponent implements OnInit {
     const allPeriods = [...periods, ...futurePeriods];
 
     const series: any[] = [
-      {
+      withDrillDown({
         name: 'Net Growth',
         type: 'line' as const,
         smooth: true,
@@ -147,7 +149,7 @@ export class ForecastingComponent implements OnInit {
         data: method !== 'none'
           ? [...values, ...new Array(FORECAST_HORIZON).fill(null)]
           : values,
-      },
+      }),
     ];
 
     if (method === 'trend' || method === 'confidence') {
@@ -259,7 +261,10 @@ export class ForecastingComponent implements OnInit {
     };
   });
 
-  constructor(public dashService: RegistryDashService) {
+  constructor(
+    public dashService: RegistryDashService,
+    private drillDown: DrillDownService,
+  ) {
     combineLatest([
       toObservable(this.selectedRange),
       toObservable(this.dashService.selectedTlds),
@@ -290,6 +295,20 @@ export class ForecastingComponent implements OnInit {
 
   onForecastMethodChange(method: string) {
     this.forecastMethod.set(method as ForecastMethod);
+  }
+
+  onExpirationClick(event: any) {
+    if (event.seriesName) this.drillDown.applyTldFilter(event.seriesName);
+  }
+
+  onExpirationContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.seriesName) this.drillDown.drillDownExpirationByTld(event.seriesName);
+  }
+
+  onNetGrowthContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownNetGrowthByPeriod(event.name);
   }
 
   // --- Forecasting utilities ---

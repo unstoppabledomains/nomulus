@@ -105,6 +105,15 @@ echarts.registerTheme('ud-brand', {
   },
 });
 
+/** Adds click affordance to an ECharts series: pointer cursor + emphasis focus. */
+export function withDrillDown<T extends Record<string, any>>(series: T): T {
+  return {
+    ...series,
+    emphasis: { ...(series['emphasis'] ?? {}), focus: 'series' },
+    cursor: 'pointer',
+  };
+}
+
 /** Provide this in component `providers` to wire up ngx-echarts with tree-shaken core. */
 export const UD_ECHARTS_PROVIDER = provideEchartsCore({ echarts });
 

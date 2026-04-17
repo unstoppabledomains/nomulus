@@ -58,12 +58,15 @@
     <div class="chart-container full-width" *ngIf="revenueLineOptions()">
       <h3>Registry Revenue by TLD</h3>
       <p class="chart-description">Net registry revenue per TLD over the selected period — what the registry received after RSP fees.</p>
-      <div echarts [options]="revenueLineOptions()!" [theme]="'ud-brand'" class="chart"></div>
+      <div echarts [options]="revenueLineOptions()!" [theme]="'ud-brand'" class="chart"
+           (chartClick)="onRevenueByTldClick($event)"
+           (chartContextMenu)="onRevenueByTldContext($event)"></div>
     </div>
     <div class="chart-container full-width" *ngIf="operationBarOptions()">
       <h3>Registry Revenue by Operation</h3>
       <p class="chart-description">Net registry revenue by operation type over the selected period — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
-      <div echarts [options]="operationBarOptions()!" [theme]="'ud-brand'" class="chart"></div>
+      <div echarts [options]="operationBarOptions()!" [theme]="'ud-brand'" class="chart"
+           (chartContextMenu)="onRevenueByOpContext($event)"></div>
     </div>
   </div>
 

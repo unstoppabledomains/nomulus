@@ -1,0 +1,18 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+<mat-dialog-content>
+  <p *ngIf="data.subtitle" class="dialog-subtitle">{{ data.subtitle }}</p>
+
+  <div *ngIf="data.chartOptions" echarts [options]="data.chartOptions" [theme]="'ud-brand'" class="mini-chart"></div>
+
+  <table mat-table [dataSource]="dataSource" matSort class="drilldown-table">
+    <ng-container *ngFor="let col of data.columns" [matColumnDef]="col.key">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ col.label }}</th>
+      <td mat-cell *matCellDef="let row">{{ formatValue(row[col.key], col.format) }}</td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

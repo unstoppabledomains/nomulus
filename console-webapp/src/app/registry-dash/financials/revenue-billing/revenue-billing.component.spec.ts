@@ -45,6 +45,8 @@ describe('RevenueBillingComponent', () => {
       revenueBilling: signal<RevenueBillingData | undefined>(mockData),
       loading: signal(false),
       error: signal<string | undefined>(undefined),
+      selectedTlds: signal<string[]>([]),
+      selectedRegistrarIds: signal<string[]>([]),
     });
     mockDashService.getRevenueBilling.and.returnValue(of(mockData));
 
@@ -92,7 +94,7 @@ describe('RevenueBillingComponent', () => {
     mockDashService.getRevenueBilling.calls.reset();
     component.onRangeChange('7d');
     fixture.detectChanges();
-    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(168, 'day');
+    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(168, 'day', undefined, undefined);
   });
 
   it('should call getRevenueBilling with correct params for 6h range', () => {
@@ -100,13 +102,13 @@ describe('RevenueBillingComponent', () => {
     mockDashService.getRevenueBilling.calls.reset();
     component.onRangeChange('6h');
     fixture.detectChanges();
-    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(6, '15min');
+    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(6, '15min', undefined, undefined);
   });
 
   it('should call getRevenueBilling with correct params for 12m range', () => {
     fixture.detectChanges();
     // 12m is the default, so the effect already fired with these params
-    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(8760, 'month');
+    expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(8760, 'month', undefined, undefined);
   });
 
   // --- Chart data tests ---
@@ -127,7 +129,7 @@ describe('RevenueBillingComponent', () => {
     fixture.detectChanges();
     const options = component.operationBarOptions();
     expect(options).toBeTruthy();
-    expect(options!.xAxis.data).toContain('CREATE');
-    expect(options!.xAxis.data).toContain('RENEW');
+    expect(options!.yAxis.data).toContain('CREATE');
+    expect(options!.yAxis.data).toContain('RENEW');
   });
 });
