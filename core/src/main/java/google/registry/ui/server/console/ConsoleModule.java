@@ -40,6 +40,7 @@ import google.registry.ui.server.SendEmailUtils;
 import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordData;
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
+import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
 import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
 import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
@@ -426,6 +427,13 @@ public final class ConsoleModule {
               obj.has("id") ? obj.get("id").getAsLong() : null,
               obj.has("settings") ? obj.get("settings").getAsString() : null);
         });
+  }
+
+  @Provides
+  @Parameter("registryDashExplore")
+  public static Optional<ExploreQueryDescriptor> provideExploreQuery(
+      Gson gson, @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload.map(e -> gson.fromJson(e, ExploreQueryDescriptor.class));
   }
 
   @Provides
