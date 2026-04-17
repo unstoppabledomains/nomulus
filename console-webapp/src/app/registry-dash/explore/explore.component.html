@@ -1,0 +1,54 @@
+<div class="explore-container">
+  <h2>Data Exploration</h2>
+  <p class="subtitle">Build custom queries across registry data sources, visualize results, and discover insights.</p>
+
+  <!-- Loading -->
+  <div *ngIf="loading()" class="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error()" class="error-banner">
+    {{ error() }}
+  </div>
+
+  <!-- Query Builder -->
+  <app-explore-builder [(query)]="query" [(chartType)]="chartType"></app-explore-builder>
+
+  <!-- Result Info -->
+  <div class="result-info" *ngIf="result()">
+    <span class="row-count">{{ result()!.totalRows | number }} rows</span>
+    <span class="truncated-badge" *ngIf="result()!.truncated">
+      Showing first {{ result()!.rows.length | number }} of {{ result()!.totalRows | number }}
+    </span>
+  </div>
+
+  <!-- Chart -->
+  <app-explore-chart
+    [result]="result()"
+    [chartType]="chartType()"
+    [dimensions]="query().dimensions"
+    [metricColumn]="metricColumn()">
+  </app-explore-chart>
+
+  <!-- Raw Data Table -->
+  <div class="data-table-wrapper" *ngIf="result() && result()!.rows.length > 0">
+    <h3>Raw Data</h3>
+    <div class="table-scroll">
+      <table mat-table [dataSource]="result()!.rows">
+        <ng-container *ngFor="let col of tableColumns()" [matColumnDef]="col">
+          <th mat-header-cell *matHeaderCellDef>{{ col }}</th>
+          <td mat-cell *matCellDef="let row">{{ row[col] }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="tableColumns()"></tr>
+        <tr mat-row *matRowDef="let row; columns: tableColumns();"></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!result() && !loading() && !error()" class="empty-state">
+    <mat-icon>explore</mat-icon>
+    <p>Configure a data source and metrics above to start exploring.</p>
+  </div>
+</div>

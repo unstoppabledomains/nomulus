@@ -211,6 +211,14 @@ export const routes: RouteWithIcon[] = [
             (mod) => mod.AdminComponent
           ),
       },
+      {
+        path: 'explore',
+        title: 'Data Exploration',
+        loadComponent: () =>
+          import('./registry-dash/explore/explore.component').then(
+            (mod) => mod.ExploreComponent
+          ),
+      },
     ],
   },
 ];
