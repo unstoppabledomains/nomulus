@@ -30,15 +30,11 @@
   @include ud.empty-state;
 }
 
-.run-query {
+.run-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 20px;
-
-  button {
-    font-weight: 500;
-    mat-icon {
-      margin-right: 4px;
-    }
-  }
 }
 
 .result-info {

@@ -15,12 +15,15 @@
   <!-- Query Builder -->
   <app-explore-builder [(query)]="query" [(chartType)]="chartType"></app-explore-builder>
 
-  <!-- Run Query -->
-  <div class="run-query">
-    <button mat-flat-button color="primary" (click)="runQuery()" [disabled]="loading()">
+  <!-- Run Controls -->
+  <div class="run-controls">
+    <button mat-flat-button color="primary" (click)="runQuery()" [disabled]="loading()" *ngIf="!autoUpdate()">
       <mat-icon>play_arrow</mat-icon>
       {{ loading() ? 'Running...' : 'Run Query' }}
     </button>
+    <mat-slide-toggle [checked]="autoUpdate()" (change)="autoUpdate.set($event.checked)">
+      Auto-update
+    </mat-slide-toggle>
   </div>
 
   <!-- Result Info -->

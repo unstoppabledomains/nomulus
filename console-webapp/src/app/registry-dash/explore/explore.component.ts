@@ -1,5 +1,7 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { catchError, debounceTime, EMPTY, filter, switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { RegistryDashService } from '../registry-dash.service';
 import { ExploreService } from './explore.service';
@@ -15,11 +17,13 @@ import { ChartType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
   styleUrls: ['./explore.component.scss'],
 })
 export class ExploreComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private dashService = inject(RegistryDashService);
   exploreService = inject(ExploreService);
 
   query = signal<ExploreQuery>({ ...DEFAULT_QUERY, filters: { ...DEFAULT_QUERY.filters } });
   chartType = signal<ChartType>('bar');
+  autoUpdate = signal(false);
 
   result = computed(() => this.exploreService.result());
   loading = computed(() => this.exploreService.loading());
@@ -34,6 +38,17 @@ export class ExploreComponent implements OnInit {
     const r = this.result();
     return r ? r.columns : [];
   });
+
+  constructor() {
+    toObservable(this.query).pipe(
+      debounceTime(500),
+      filter(() => this.autoUpdate()),
+      switchMap(q =>
+        this.exploreService.explore(q).pipe(catchError(() => EMPTY))
+      ),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+  }
 
   ngOnInit(): void {
     if (this.dashService.hasActiveFilters()) {
