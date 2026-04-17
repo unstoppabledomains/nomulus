@@ -1,11 +1,25 @@
+// Copyright 2024 The Nomulus Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package google.registry.ui.server.console.registrydash;
 
 import com.google.common.collect.ImmutableSet;
 
 /**
- * Enum defining valid data sources for the explore endpoint. Each source declares its
- * allowed metrics, dimensions, and filters. The query builder uses these to validate
- * requests and reject unknown fields with 400 (not 500).
+ * Enum defining valid data sources for the explore endpoint. Each source declares its allowed
+ * metrics, dimensions, and filters. The query builder uses these to validate requests and reject
+ * unknown fields with 400 (not 500).
  */
 public enum ExploreDataSource {
 
@@ -52,40 +66,58 @@ public enum ExploreDataSource {
     this.allowedFilters = allowedFilters;
   }
 
-  public ImmutableSet<String> getAllowedMetrics() { return allowedMetrics; }
-  public ImmutableSet<String> getAllowedDimensions() { return allowedDimensions; }
+  public ImmutableSet<String> getAllowedMetrics() {
+    return allowedMetrics;
+  }
 
-  /** Validates the descriptor against this source's allowlist. Throws IllegalArgumentException on unknown fields. */
+  public ImmutableSet<String> getAllowedDimensions() {
+    return allowedDimensions;
+  }
+
+  /**
+   * Validates the descriptor against this source's allowlist. Throws IllegalArgumentException on
+   * unknown fields.
+   */
   public void validate(ExploreQueryDescriptor desc) {
     for (ExploreQueryDescriptor.MetricSpec m : desc.getMetrics()) {
       if (!allowedMetrics.contains(m.getField())) {
         throw new IllegalArgumentException(
-            String.format("Unknown metric '%s' for data source %s. Allowed: %s",
+            String.format(
+                "Unknown metric '%s' for data source %s. Allowed: %s",
                 m.getField(), name(), allowedMetrics));
       }
     }
     for (String dim : desc.getDimensions()) {
       if (!allowedDimensions.contains(dim)) {
         throw new IllegalArgumentException(
-            String.format("Unknown dimension '%s' for data source %s. Allowed: %s",
+            String.format(
+                "Unknown dimension '%s' for data source %s. Allowed: %s",
                 dim, name(), allowedDimensions));
       }
     }
     ExploreQueryDescriptor.ExploreFilters f = desc.getFilters();
     if (!f.getTlds().isEmpty() && !allowedFilters.contains("tlds")) {
-      throw new IllegalArgumentException("Filter 'tlds' not supported for " + name());
+      throw new IllegalArgumentException(
+          "Filter 'tlds' not supported for " + name());
     }
-    if (!f.getRegistrarIds().isEmpty() && !allowedFilters.contains("registrarIds")) {
-      throw new IllegalArgumentException("Filter 'registrarIds' not supported for " + name());
+    if (!f.getRegistrarIds().isEmpty()
+        && !allowedFilters.contains("registrarIds")) {
+      throw new IllegalArgumentException(
+          "Filter 'registrarIds' not supported for " + name());
     }
-    if (!f.getActivityTypes().isEmpty() && !allowedFilters.contains("activityTypes")) {
-      throw new IllegalArgumentException("Filter 'activityTypes' not supported for " + name());
+    if (!f.getActivityTypes().isEmpty()
+        && !allowedFilters.contains("activityTypes")) {
+      throw new IllegalArgumentException(
+          "Filter 'activityTypes' not supported for " + name());
     }
-    if (!f.getOperations().isEmpty() && !allowedFilters.contains("operations")) {
-      throw new IllegalArgumentException("Filter 'operations' not supported for " + name());
+    if (!f.getOperations().isEmpty()
+        && !allowedFilters.contains("operations")) {
+      throw new IllegalArgumentException(
+          "Filter 'operations' not supported for " + name());
     }
     if (f.getDateRange() != null && !allowedFilters.contains("dateRange")) {
-      throw new IllegalArgumentException("Filter 'dateRange' not supported for " + name());
+      throw new IllegalArgumentException(
+          "Filter 'dateRange' not supported for " + name());
     }
   }
 }
