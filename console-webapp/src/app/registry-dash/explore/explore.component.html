@@ -15,6 +15,14 @@
   <!-- Query Builder -->
   <app-explore-builder [(query)]="query" [(chartType)]="chartType"></app-explore-builder>
 
+  <!-- Run Query -->
+  <div class="run-query">
+    <button mat-flat-button color="primary" (click)="runQuery()" [disabled]="loading()">
+      <mat-icon>play_arrow</mat-icon>
+      {{ loading() ? 'Running...' : 'Run Query' }}
+    </button>
+  </div>
+
   <!-- Result Info -->
   <div class="result-info" *ngIf="result()">
     <span class="row-count">{{ result()!.totalRows | number }} rows</span>
