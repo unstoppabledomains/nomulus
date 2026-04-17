@@ -89,5 +89,7 @@ public enum ConsolePermission {
   /** View domain activity analytics in the registry dashboard. */
   VIEW_DOMAIN_ACTIVITY,
   /** View domain forecasting data in the registry dashboard. */
-  VIEW_FORECASTING
+  VIEW_FORECASTING,
+  /** Explore raw registry data via the data exploration endpoint. */
+  VIEW_DATA_EXPLORE
 }
