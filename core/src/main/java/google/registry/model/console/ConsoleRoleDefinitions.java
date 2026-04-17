@@ -78,7 +78,8 @@ public class ConsoleRoleDefinitions {
           ConsolePermission.MANAGE_COST_BASIS,
           ConsolePermission.VIEW_REVENUE_BILLING,
           ConsolePermission.VIEW_DOMAIN_ACTIVITY,
-          ConsolePermission.VIEW_FORECASTING);
+          ConsolePermission.VIEW_FORECASTING,
+          ConsolePermission.VIEW_DATA_EXPLORE);
 
   /** Permissions for a registry full-time employee. */
   static final ImmutableSet<ConsolePermission> FTE_PERMISSIONS =

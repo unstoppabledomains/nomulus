@@ -1,0 +1,132 @@
+<div class="builder-panel">
+  <!-- Data Source -->
+  <div class="builder-section">
+    <h4>Data Source</h4>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Source</mat-label>
+      <mat-select [value]="query().dataSource"
+                  (selectionChange)="onDataSourceChange($event.value)">
+        <mat-option *ngFor="let key of dataSourceKeys" [value]="key">
+          {{ schemas[key].label }}
+        </mat-option>
+      </mat-select>
+      <mat-hint>{{ currentSchema().description }}</mat-hint>
+    </mat-form-field>
+  </div>
+
+  <!-- Metrics -->
+  <div class="builder-section">
+    <h4>Metrics</h4>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select metrics</mat-label>
+      <mat-select multiple
+                  [value]="selectedMetricFields()"
+                  (selectionChange)="onMetricsChange($event.value)">
+        <mat-option *ngFor="let m of currentSchema().metrics" [value]="m.field">
+          {{ m.label }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Dimensions (Group By) -->
+  <div class="builder-section">
+    <h4>Group By</h4>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Dimensions</mat-label>
+      <mat-select multiple
+                  [value]="query().dimensions"
+                  (selectionChange)="onDimensionsChange($event.value)">
+        <mat-option *ngFor="let d of currentSchema().dimensions" [value]="d.field">
+          {{ d.label }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Granularity -->
+  <div class="builder-section" *ngIf="showGranularity()">
+    <h4>Granularity</h4>
+    <mat-button-toggle-group [value]="query().granularity || 'month'"
+                             (change)="onGranularityChange($event.value)">
+      <mat-button-toggle *ngFor="let g of granularityOptions" [value]="g.value">
+        {{ g.label }}
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Filters -->
+  <div class="builder-section">
+    <h4>Filters</h4>
+    <div class="filter-row">
+      <!-- TLD Filter -->
+      <mat-form-field appearance="outline" *ngIf="showTldFilter()">
+        <mat-label>TLDs</mat-label>
+        <mat-select multiple
+                    [value]="query().filters.tlds || []"
+                    (selectionChange)="onTldFilterChange($event.value)">
+          <mat-option *ngFor="let tld of availableTlds()" [value]="tld">
+            .{{ tld }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Registrar Filter -->
+      <mat-form-field appearance="outline" *ngIf="showRegistrarFilter()">
+        <mat-label>Registrars</mat-label>
+        <mat-select multiple
+                    [value]="query().filters.registrarIds || []"
+                    (selectionChange)="onRegistrarFilterChange($event.value)">
+          <mat-option *ngFor="let r of availableRegistrars()" [value]="r.registrarId">
+            {{ r.registrarName }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Date Range -->
+      <ng-container *ngIf="showDateRange()">
+        <mat-form-field appearance="outline">
+          <mat-label>Start Date</mat-label>
+          <input matInput type="date"
+                 [value]="query().filters.dateRange?.start || ''"
+                 (change)="onDateStartChange($any($event.target).value)">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>End Date</mat-label>
+          <input matInput type="date"
+                 [value]="query().filters.dateRange?.end || ''"
+                 (change)="onDateEndChange($any($event.target).value)">
+        </mat-form-field>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- Chart Type -->
+  <div class="builder-section">
+    <h4>Chart Type</h4>
+    <mat-button-toggle-group [value]="chartType()"
+                             (change)="onChartTypeChange($event.value)">
+      <mat-button-toggle *ngFor="let ct of chartTypes" [value]="ct.value"
+                         [matTooltip]="ct.label">
+        <mat-icon>{{ ct.icon }}</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Save / Load -->
+  <div class="builder-actions">
+    <button mat-stroked-button (click)="saveView()">
+      <mat-icon>save</mat-icon> Save View
+    </button>
+    <button mat-stroked-button [matMenuTriggerFor]="recentMenu"
+            [disabled]="recentViews().length === 0">
+      <mat-icon>history</mat-icon> Recent Views
+    </button>
+    <mat-menu #recentMenu="matMenu">
+      <button mat-menu-item *ngFor="let v of recentViews()" (click)="loadView(v)">
+        <span>{{ v.name }}</span>
+        <mat-icon class="delete-icon" (click)="deleteView(v, $event)">close</mat-icon>
+      </button>
+    </mat-menu>
+  </div>
+</div>

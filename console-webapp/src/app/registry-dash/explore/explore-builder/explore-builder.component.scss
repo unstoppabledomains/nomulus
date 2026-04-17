@@ -1,0 +1,56 @@
+@use '../../ud-mixins' as ud;
+
+.builder-panel {
+  background: var(--ud-surface-muted);
+  border-radius: var(--ud-radius-md);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.builder-section {
+  margin-bottom: 16px;
+
+  h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ud-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  mat-form-field {
+    flex: 1;
+    min-width: 180px;
+  }
+}
+
+.builder-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ud-border-subtle);
+}
+
+.delete-icon {
+  font-size: 16px;
+  height: 16px;
+  width: 16px;
+  margin-left: 8px;
+  color: var(--ud-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ud-error);
+  }
+}

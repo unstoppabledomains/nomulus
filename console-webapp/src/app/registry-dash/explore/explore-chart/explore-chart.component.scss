@@ -1,0 +1,16 @@
+@use '../../ud-mixins' as ud;
+
+.chart-wrapper {
+  background: var(--ud-surface-muted);
+  border-radius: var(--ud-radius-md);
+  padding: 20px 24px;
+}
+
+.chart {
+  height: 400px;
+  width: 100%;
+}
+
+.empty-chart {
+  @include ud.empty-state;
+}

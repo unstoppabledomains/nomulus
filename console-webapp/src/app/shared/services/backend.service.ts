@@ -491,4 +491,10 @@ export class BackendService {
       .get<EffectiveFeeEntry[]>('/console-api/registry-dash/effective-fees')
       .pipe(catchError((err) => this.errorCatcher<EffectiveFeeEntry[]>(err)));
   }
+
+  postRegistryDashExplore(query: any): Observable<any> {
+    return this.http
+      .post<any>('/console-api/registry-dash/explore', query)
+      .pipe(catchError((err) => this.errorCatcher<any>(err)));
+  }
 }

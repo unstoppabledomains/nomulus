@@ -1,0 +1,7 @@
+<div class="chart-wrapper" *ngIf="hasData()">
+  <div echarts [options]="chartOptions()!" [theme]="'ud-brand'" class="chart"></div>
+</div>
+<div *ngIf="!hasData()" class="empty-chart">
+  <mat-icon>insert_chart_outlined</mat-icon>
+  <p>Configure your query to see results</p>
+</div>
