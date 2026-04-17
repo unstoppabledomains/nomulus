@@ -1,3 +1,4 @@
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 SERVICE  PATH                                               CLASS                                          METHODS             OK MIN  USER_POLICY
 FRONTEND /_dr/epp                                           EppTlsAction                                   POST                n  APP  ADMIN
 FRONTEND /ready/frontend                                    ReadinessProbeActionFrontend                   GET                 n  NONE PUBLIC
@@ -84,6 +85,7 @@ CONSOLE  /console-api/registry-dash/admin                   RegistryDashAdminAct
 CONSOLE  /console-api/registry-dash/cost-basis              RegistryDashCostBasisAction                    GET,POST,PUT        n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/domain-activity         RegistryDashDomainActivityAction               GET                 n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/effective-fees          UDRegistryDashEffectiveFeesAction              GET                 n  USER PUBLIC
+CONSOLE  /console-api/registry-dash/explore                 RegistryDashExploreAction                      POST                n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/filter-options          RegistryDashFilterOptionsAction                GET                 n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/forecasting             RegistryDashForecastingAction                  GET                 n  USER PUBLIC
 CONSOLE  /console-api/registry-dash/overview                RegistryDashOverviewAction                     GET                 n  USER PUBLIC
