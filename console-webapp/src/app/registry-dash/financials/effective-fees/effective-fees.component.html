@@ -14,24 +14,8 @@
     {{ dashService.error() }}
   </div>
 
-  <!-- Filters -->
+  <!-- Source filter (Registrar/TLD filtering handled by global filter bar) -->
   <div class="effective-fees-filters" *ngIf="dashService.effectiveFees().length > 0">
-    <mat-form-field appearance="outline">
-      <mat-label>Registrar</mat-label>
-      <mat-select [value]="filterRegistrar()" (selectionChange)="onRegistrarFilterChange($event.value)">
-        <mat-option value="all">All Registrars</mat-option>
-        <mat-option *ngFor="let reg of uniqueRegistrars()" [value]="reg">{{ reg }}</mat-option>
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>TLD</mat-label>
-      <mat-select [value]="filterTld()" (selectionChange)="onTldFilterChange($event.value)">
-        <mat-option value="all">All TLDs</mat-option>
-        <mat-option *ngFor="let tld of uniqueTlds()" [value]="tld">.{{ tld }}</mat-option>
-      </mat-select>
-    </mat-form-field>
-
     <mat-form-field appearance="outline">
       <mat-label>Source</mat-label>
       <mat-select [value]="filterSource()" (selectionChange)="onSourceFilterChange($event.value)">
