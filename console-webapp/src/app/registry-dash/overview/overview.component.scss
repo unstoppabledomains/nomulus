@@ -75,6 +75,11 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(13, 103, 254, 0.04);
+    }
   }
 
   .h-bar-label {

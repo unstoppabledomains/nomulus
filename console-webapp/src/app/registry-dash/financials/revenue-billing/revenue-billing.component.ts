@@ -20,6 +20,8 @@ import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
+import { DrillDownService } from '../../drilldown/drilldown.service';
+import { withDrillDown } from '../../ud-echarts';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -113,7 +115,7 @@ export class RevenueBillingComponent implements OnInit {
     const tldLabels = tlds.map(t => `.${t}`);
     const series = tlds.map((tld, i) => {
       const periodMap = tldMap.get(tld)!;
-      return {
+      return withDrillDown({
         name: `.${tld}`,
         type: 'line' as const,
         stack: 'revenue',
@@ -121,7 +123,7 @@ export class RevenueBillingComponent implements OnInit {
         emphasis: { focus: 'series' as const },
         data: periods.map(m => periodMap.get(m) ?? 0),
         color: TLD_COLORS[i % TLD_COLORS.length],
-      };
+      });
     });
 
     return {
@@ -147,18 +149,21 @@ export class RevenueBillingComponent implements OnInit {
       xAxis: { type: 'value' as const, axisLabel: { formatter: '${value}' } },
       yAxis: { type: 'category' as const, data: operations, inverse: true },
       series: [
-        {
+        withDrillDown({
           type: 'bar' as const,
           data: operations.map(op => ({
             value: byOp[op],
             itemStyle: { color: OPERATION_COLORS[op] || '#9191A1' },
           })),
-        },
+        }),
       ],
     };
   });
 
-  constructor(public dashService: RegistryDashService) {
+  constructor(
+    public dashService: RegistryDashService,
+    private drillDown: DrillDownService,
+  ) {
     combineLatest([
       toObservable(this.selectedRange),
       toObservable(this.dashService.selectedTlds),
@@ -182,5 +187,19 @@ export class RevenueBillingComponent implements OnInit {
 
   onRangeChange(range: string) {
     this.selectedRange.set(range);
+  }
+
+  onRevenueByTldClick(event: any) {
+    if (event.seriesName) this.drillDown.applyTldFilter(event.seriesName);
+  }
+
+  onRevenueByTldContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.seriesName) this.drillDown.drillDownRevenueByTld(event.seriesName);
+  }
+
+  onRevenueByOpContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownRevenueByOperation(event.name);
   }
 }

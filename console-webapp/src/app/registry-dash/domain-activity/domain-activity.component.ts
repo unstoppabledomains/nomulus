@@ -21,6 +21,8 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
 import { RegistryDashService } from '../registry-dash.service';
 import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.component';
+import { DrillDownService } from '../drilldown/drilldown.service';
+import { withDrillDown } from '../ud-echarts';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',
@@ -108,7 +110,7 @@ export class DomainActivityComponent implements OnInit {
     const tldLabels = tlds.map(t => `.${t}`);
     const types = [...typeSet].sort();
 
-    const series = types.map(type => ({
+    const series = types.map(type => withDrillDown({
       name: type,
       type: 'bar' as const,
       data: tlds.map(tld => data.get(tld)?.get(type) ?? 0),
@@ -145,18 +147,21 @@ export class DomainActivityComponent implements OnInit {
         inverse: true,
       },
       series: [
-        {
+        withDrillDown({
           type: 'bar' as const,
           data: counts.map((val, i) => ({
             value: val,
             itemStyle: { color: TLD_COLORS[i % TLD_COLORS.length] },
           })),
-        },
+        }),
       ],
     };
   });
 
-  constructor(public dashService: RegistryDashService) {
+  constructor(
+    public dashService: RegistryDashService,
+    private drillDown: DrillDownService,
+  ) {
     // Refetch when selectedRange or global filters change
     combineLatest([
       toObservable(this.selectedRange),
@@ -181,5 +186,23 @@ export class DomainActivityComponent implements OnInit {
 
   onRangeChange(range: string) {
     this.selectedRange.set(range);
+  }
+
+  onActivityByTldClick(event: any) {
+    if (event.name) this.drillDown.applyTldFilter(event.name);
+  }
+
+  onActivityByTldContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownActivityByTld(event.name);
+  }
+
+  onDomainCountsClick(event: any) {
+    if (event.name) this.drillDown.applyTldFilter(event.name);
+  }
+
+  onDomainCountsContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownDomainCountsByTld(event.name);
   }
 }

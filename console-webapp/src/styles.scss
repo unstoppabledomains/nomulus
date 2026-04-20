@@ -28,6 +28,11 @@ body {
   text-align: center;
 }
 
+// Ensure Angular Material dialog overlays render above all page content
+.cdk-overlay-container {
+  z-index: 1100;
+}
+
 .console-app {
   .mat-headline-4 {
     margin-top: 6px !important;
