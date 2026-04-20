@@ -22,10 +22,11 @@ import { MatTableDataSource } from '@angular/material/table';
 import { SnackBarModule } from '../../snackbar.module';
 import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-dash.service';
 import { UserDataService } from '../../shared/services/userData.service';
+import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 @Component({
   selector: 'app-registry-dash-pricing',
-  imports: [MaterialModule, CommonModule, ReactiveFormsModule, SnackBarModule, MatSortModule],
+  imports: [MaterialModule, CommonModule, ReactiveFormsModule, SnackBarModule, MatSortModule, FilterPanelComponent],
   templateUrl: './pricing.component.html',
   styleUrls: ['./pricing.component.scss'],
 })

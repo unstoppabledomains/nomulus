@@ -1,0 +1,69 @@
+@if (dashService.filterOptions()) {
+  <div class="filter-panel">
+    @if (!expanded()) {
+      <!-- Collapsed: chip summary -->
+      <div class="filter-header" (click)="toggleExpanded()">
+        <mat-icon class="filter-icon">filter_list</mat-icon>
+        <div class="chip-area">
+          @if (activeChips().length > 0) {
+            <mat-chip-set>
+              @for (chip of activeChips(); track chip.value) {
+                <mat-chip (removed)="removeChip(chip)" (click)="$event.stopPropagation()">
+                  {{ chip.label }}
+                  <mat-icon matChipRemove>close</mat-icon>
+                </mat-chip>
+              }
+            </mat-chip-set>
+          } @else {
+            <span class="no-filters">No filters active</span>
+          }
+        </div>
+        <span class="edit-link">
+          Edit <mat-icon>tune</mat-icon>
+        </span>
+      </div>
+    } @else {
+      <!-- Expanded: full dropdowns -->
+      <div class="filter-header" (click)="toggleExpanded()">
+        <mat-icon class="filter-icon">filter_list</mat-icon>
+        <span class="filter-title">Filters</span>
+        @if (activeChips().length > 0) {
+          <span class="badge">{{ activeChips().length }} active</span>
+        }
+        <div class="header-spacer"></div>
+        <span class="done-link">
+          Done <mat-icon>check</mat-icon>
+        </span>
+      </div>
+      <div class="filter-body">
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>TLDs</mat-label>
+          <mat-select multiple
+                      [value]="dashService.selectedTlds()"
+                      (selectionChange)="onTldsChange($event.value)">
+            @for (tld of filteredTldOptions(); track tld) {
+              <mat-option [value]="tld">.{{ tld }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Registrars</mat-label>
+          <mat-select multiple
+                      [value]="dashService.selectedRegistrarIds()"
+                      (selectionChange)="onRegistrarsChange($event.value)">
+            @for (reg of filteredRegistrarOptions(); track reg.registrarId) {
+              <mat-option [value]="reg.registrarId">{{ reg.registrarName || reg.registrarId }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <ng-content></ng-content>
+
+        @if (activeChips().length > 0) {
+          <button mat-button class="clear-btn" (click)="clearFilters()">Clear All</button>
+        }
+      </div>
+    }
+  </div>
+}

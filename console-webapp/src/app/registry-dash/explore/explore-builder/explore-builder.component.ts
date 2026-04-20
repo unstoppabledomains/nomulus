@@ -126,30 +126,47 @@ export class ExploreBuilderComponent {
     }));
   }
 
-  onDateStartChange(value: string): void {
+  startDateValue = computed(() => {
+    const s = this.query().filters.dateRange?.start;
+    return s ? new Date(s + 'T00:00:00') : null;
+  });
+
+  endDateValue = computed(() => {
+    const e = this.query().filters.dateRange?.end;
+    return e ? new Date(e + 'T00:00:00') : null;
+  });
+
+  onDateStartChange(value: Date | null): void {
     this.query.update(q => ({
       ...q,
       filters: {
         ...q.filters,
         dateRange: {
-          start: value,
+          start: value ? this.formatDate(value) : '',
           end: q.filters.dateRange?.end ?? '',
         },
       },
     }));
   }
 
-  onDateEndChange(value: string): void {
+  onDateEndChange(value: Date | null): void {
     this.query.update(q => ({
       ...q,
       filters: {
         ...q.filters,
         dateRange: {
           start: q.filters.dateRange?.start ?? '',
-          end: value,
+          end: value ? this.formatDate(value) : '',
         },
       },
     }));
+  }
+
+  private formatDate(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   // --- Save / Load ---
