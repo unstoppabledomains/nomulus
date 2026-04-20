@@ -51,28 +51,7 @@ export class PricingComponent implements AfterViewInit {
   @ViewChild(MatSort) sort!: MatSort;
   dataSource = new MatTableDataSource<PricingRule>([]);
 
-  filterRegistrar = signal<string>('all');
-  filterTld = signal<string>('all');
-
-  uniqueRegistrars = computed(() => {
-    const rules = this.dashService.filteredPricingRules();
-    return [...new Set(rules.map(r => r.registrarId))].sort();
-  });
-
-  uniqueTlds = computed(() => {
-    const rules = this.dashService.filteredPricingRules();
-    return [...new Set(rules.map(r => r.tld))].sort();
-  });
-
-  filteredRules = computed(() => {
-    // Start from globally filtered data, then apply local filters
-    let rules = this.dashService.filteredPricingRules();
-    const reg = this.filterRegistrar();
-    const tld = this.filterTld();
-    if (reg !== 'all') rules = rules.filter(r => r.registrarId === reg);
-    if (tld !== 'all') rules = rules.filter(r => r.tld === tld);
-    return rules;
-  });
+  filteredRules = computed(() => this.dashService.filteredPricingRules());
 
   showForm = signal(false);
   editingRule = signal<PricingRule | undefined>(undefined);
@@ -179,11 +158,6 @@ export class PricingComponent implements AfterViewInit {
     if (diff < 0) return 'diff-discount';
     if (diff > 0) return 'diff-premium';
     return 'diff-zero';
-  }
-
-  clearFilters() {
-    this.filterRegistrar.set('all');
-    this.filterTld.set('all');
   }
 
   openAddForm() {

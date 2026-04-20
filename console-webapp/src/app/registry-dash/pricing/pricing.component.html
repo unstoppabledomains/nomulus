@@ -132,32 +132,6 @@
     </mat-card>
   }
 
-  <div class="pricing-filters">
-    <mat-form-field>
-      <mat-label>Filter by Registrar</mat-label>
-      <mat-select [value]="filterRegistrar()" (selectionChange)="filterRegistrar.set($event.value)">
-        <mat-option value="all">All Registrars</mat-option>
-        @for (reg of uniqueRegistrars(); track reg) {
-          <mat-option [value]="reg">{{ reg }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-    <mat-form-field>
-      <mat-label>Filter by TLD</mat-label>
-      <mat-select [value]="filterTld()" (selectionChange)="filterTld.set($event.value)">
-        <mat-option value="all">All TLDs</mat-option>
-        @for (tld of uniqueTlds(); track tld) {
-          <mat-option [value]="tld">.{{ tld }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-    @if (filterRegistrar() !== 'all' || filterTld() !== 'all') {
-      <button mat-button (click)="clearFilters()">
-        <mat-icon>clear</mat-icon> Clear Filters
-      </button>
-    }
-  </div>
-
   @if (filteredRules().length > 0) {
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z1">
       <ng-container matColumnDef="registrarId">

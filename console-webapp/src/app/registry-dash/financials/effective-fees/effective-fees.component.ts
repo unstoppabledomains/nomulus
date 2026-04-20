@@ -34,28 +34,11 @@ export class EffectiveFeesComponent implements AfterViewInit {
   ];
 
   fetchedAt = signal<string>('');
-  filterRegistrar = signal<string>('all');
-  filterTld = signal<string>('all');
   filterSource = signal<string>('all');
 
-  uniqueRegistrars = computed(() => {
-    const fees = this.dashService.filteredEffectiveFees();
-    return [...new Set(fees.map(f => f.registrarId))].sort();
-  });
-
-  uniqueTlds = computed(() => {
-    const fees = this.dashService.filteredEffectiveFees();
-    return [...new Set(fees.map(f => f.tld))].sort();
-  });
-
   filteredFees = computed(() => {
-    // Start from globally filtered data, then apply local filters
     let fees = this.dashService.filteredEffectiveFees();
-    const reg = this.filterRegistrar();
-    const tld = this.filterTld();
     const source = this.filterSource();
-    if (reg !== 'all') fees = fees.filter(f => f.registrarId === reg);
-    if (tld !== 'all') fees = fees.filter(f => f.tld === tld);
     if (source !== 'all') fees = fees.filter(f => f.source === source);
     return fees;
   });
@@ -79,14 +62,6 @@ export class EffectiveFeesComponent implements AfterViewInit {
 
   ngAfterViewInit() {
     this.dataSource.sort = this.sort;
-  }
-
-  onRegistrarFilterChange(value: string) {
-    this.filterRegistrar.set(value);
-  }
-
-  onTldFilterChange(value: string) {
-    this.filterTld.set(value);
   }
 
   onSourceFilterChange(value: string) {
