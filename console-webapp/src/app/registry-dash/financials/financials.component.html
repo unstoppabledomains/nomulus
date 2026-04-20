@@ -2,6 +2,8 @@
   <h2>Registry Financials</h2>
   <p class="subtitle">Fee schedules, revenue, and financial data (read-only)</p>
 
+  <app-filter-panel></app-filter-panel>
+
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>
   </div>
