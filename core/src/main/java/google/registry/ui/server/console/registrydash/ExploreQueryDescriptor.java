@@ -15,17 +15,18 @@
 package google.registry.ui.server.console.registrydash;
 
 import com.google.common.collect.ImmutableList;
+import com.google.gson.annotations.Expose;
 import java.util.List;
 
 /** Request body for the data exploration endpoint. Deserialized from JSON via Gson. */
 public class ExploreQueryDescriptor {
 
-  private String dataSource;
-  private List<MetricSpec> metrics;
-  private List<String> dimensions;
-  private ExploreFilters filters;
-  private String granularity;
-  private Integer limit;
+  @Expose private String dataSource;
+  @Expose private List<MetricSpec> metrics;
+  @Expose private List<String> dimensions;
+  @Expose private ExploreFilters filters;
+  @Expose private String granularity;
+  @Expose private Integer limit;
 
   public String getDataSource() {
     return dataSource;
@@ -52,8 +53,8 @@ public class ExploreQueryDescriptor {
   }
 
   public static class MetricSpec {
-    private String field;
-    private String aggregation;
+    @Expose private String field;
+    @Expose private String aggregation;
 
     public String getField() {
       return field;
@@ -65,11 +66,11 @@ public class ExploreQueryDescriptor {
   }
 
   public static class ExploreFilters {
-    private List<String> tlds;
-    private List<String> registrarIds;
-    private List<String> activityTypes;
-    private List<String> operations;
-    private DateRange dateRange;
+    @Expose private List<String> tlds;
+    @Expose private List<String> registrarIds;
+    @Expose private List<String> activityTypes;
+    @Expose private List<String> operations;
+    @Expose private DateRange dateRange;
 
     public List<String> getTlds() {
       return tlds != null ? tlds : ImmutableList.of();
@@ -93,8 +94,8 @@ public class ExploreQueryDescriptor {
   }
 
   public static class DateRange {
-    private String start;
-    private String end;
+    @Expose private String start;
+    @Expose private String end;
 
     public String getStart() {
       return start;
