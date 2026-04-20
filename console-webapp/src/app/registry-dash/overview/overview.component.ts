@@ -19,7 +19,8 @@ import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { RegistryDashService } from '../registry-dash.service';
-import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
+import { UD_ECHARTS_PROVIDER, withDrillDown } from '../ud-echarts';
+import { DrillDownService } from '../drilldown/drilldown.service';
 
 const CHART_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -73,14 +74,14 @@ export class OverviewComponent {
     const types = [...typeMap.keys()].sort();
     const series = types.map(type => {
       const periodMap = typeMap.get(type)!;
-      return {
+      return withDrillDown({
         name: type,
         type: 'line' as const,
         smooth: true,
         emphasis: { focus: 'series' as const },
         data: periods.map(p => periodMap.get(p) ?? 0),
         color: ACTIVITY_COLORS[type] || '#9191A1',
-      };
+      });
     });
     return {
       tooltip: { trigger: 'axis' as const },
@@ -120,7 +121,7 @@ export class OverviewComponent {
         inverse: true,
       },
       series: [
-        {
+        withDrillDown({
           type: 'bar' as const,
           data: rates.map(rate => ({
             value: rate,
@@ -135,12 +136,15 @@ export class OverviewComponent {
             label: { formatter: '85% benchmark', position: 'insideEndTop' as const },
             data: [{ xAxis: 85 }],
           },
-        },
+        }),
       ],
     };
   });
 
-  constructor(protected dashService: RegistryDashService) {
+  constructor(
+    protected dashService: RegistryDashService,
+    protected drillDown: DrillDownService,
+  ) {
     // Re-fetch when global filters change
     combineLatest([
       toObservable(this.dashService.selectedTlds),
@@ -157,5 +161,27 @@ export class OverviewComponent {
       }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe();
+  }
+
+  onActivityClick(event: any) {
+    if (event.name) this.drillDown.applyTldFilter(event.name);
+  }
+
+  onActivityContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownActivityByPeriod(event.name);
+  }
+
+  onRenewalClick(event: any) {
+    if (event.name) this.drillDown.applyTldFilter(event.name);
+  }
+
+  onRenewalContext(event: any) {
+    event.event?.event?.preventDefault();
+    if (event.name) this.drillDown.drillDownRenewalByTld(event.name);
+  }
+
+  onRegistrarBarClick(registrarId: string) {
+    this.drillDown.applyRegistrarFilter(registrarId);
   }
 }
