@@ -117,6 +117,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY date_trunc('%s', dh.history_modification_time), d.tld, b.reason, b.cost_currency
@@ -181,6 +182,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         LIMIT 1
       ) cb ON true
       WHERE dh.history_modification_time >= :startDate
+        AND dh.history_modification_time <= :endDate
         AND d.tld IN :tlds
         AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')
       GROUP BY period, d.tld, b.reason, b.cost_currency

@@ -45,7 +45,7 @@ export class ExploreComponent implements OnInit {
 
   metricColumn = computed(() => {
     const metrics = this.query().metrics;
-    return metrics.length > 0 ? metrics[0].field : 'count';
+    return metrics.length > 0 ? `${metrics[0].field}_${metrics[0].aggregation}` : 'count_sum';
   });
 
   tableColumns = computed(() => {
