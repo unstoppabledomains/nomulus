@@ -185,18 +185,20 @@ public class RegistryDashExploreAction extends ConsoleApiAction {
           @SuppressWarnings("unchecked")
           List<Object> rawResults = query.getResultList();
 
-          // Normalize rows: each may be Object[] or a single scalar
-          List<List<Object>> rows = new ArrayList<>();
+          // Normalize rows: convert positional arrays to named objects using columns
+          List<Map<String, Object>> rows = new ArrayList<>();
           for (Object raw : rawResults) {
-            List<Object> rowList = new ArrayList<>();
+            Map<String, Object> rowMap = new HashMap<>();
             if (raw instanceof Object[] arr) {
-              for (Object cell : arr) {
-                rowList.add(normalizeValue(cell));
+              for (int i = 0; i < arr.length && i < columns.size(); i++) {
+                rowMap.put(columns.get(i), normalizeValue(arr[i]));
               }
             } else {
-              rowList.add(normalizeValue(raw));
+              if (!columns.isEmpty()) {
+                rowMap.put(columns.get(0), normalizeValue(raw));
+              }
             }
-            rows.add(rowList);
+            rows.add(rowMap);
           }
 
           boolean truncated = rows.size() >= maxRows;
