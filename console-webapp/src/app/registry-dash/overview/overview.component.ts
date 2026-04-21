@@ -18,7 +18,7 @@ import { combineLatest, switchMap, EMPTY, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { NgxEchartsDirective } from 'ngx-echarts';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
 import { UD_ECHARTS_PROVIDER, withDrillDown } from '../ud-echarts';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { LongPressDirective } from '../drilldown/long-press.directive';
@@ -149,17 +149,18 @@ export class OverviewComponent {
     protected dashService: RegistryDashService,
     protected drillDown: DrillDownService,
   ) {
-    // Re-fetch when global filters change
     combineLatest([
+      toObservable(this.dashService.selectedTimeRange),
       toObservable(this.dashService.selectedTlds),
       toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
-      switchMap(([tlds, regIds]) => {
+      switchMap(([range, tlds, regIds]) => {
+        const config = RANGE_CONFIG[range];
         const ft = tlds.length > 0 ? tlds : undefined;
         const fr = regIds.length > 0 ? regIds : undefined;
         this.dashService.getOverview(ft, fr).subscribe();
-        this.dashService.getDomainActivity(undefined, undefined, ft, fr).subscribe();
-        return this.dashService.getForecasting(undefined, undefined, ft, fr).pipe(
+        this.dashService.getDomainActivity(config.lookbackHours, config.granularity, ft, fr).subscribe();
+        return this.dashService.getForecasting(config.lookbackHours, config.granularity, ft, fr).pipe(
           catchError(() => EMPTY)
         );
       }),

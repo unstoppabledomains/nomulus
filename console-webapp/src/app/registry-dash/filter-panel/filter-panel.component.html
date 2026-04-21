@@ -5,18 +5,17 @@
       <div class="filter-header" (click)="toggleExpanded()">
         <mat-icon class="filter-icon">filter_list</mat-icon>
         <div class="chip-area">
-          @if (activeChips().length > 0) {
-            <mat-chip-set>
-              @for (chip of activeChips(); track chip.value) {
-                <mat-chip (removed)="removeChip(chip)" (click)="$event.stopPropagation()">
-                  {{ chip.label }}
-                  <mat-icon matChipRemove>close</mat-icon>
-                </mat-chip>
-              }
-            </mat-chip-set>
-          } @else {
-            <span class="no-filters">No filters active</span>
-          }
+          <mat-chip-set>
+            <mat-chip (click)="$event.stopPropagation()">
+              {{ dashService.selectedTimeRange() }}
+            </mat-chip>
+            @for (chip of activeChips(); track chip.value) {
+              <mat-chip (removed)="removeChip(chip)" (click)="$event.stopPropagation()">
+                {{ chip.label }}
+                <mat-icon matChipRemove>close</mat-icon>
+              </mat-chip>
+            }
+          </mat-chip-set>
         </div>
         <span class="edit-link">
           Edit <mat-icon>tune</mat-icon>
@@ -36,6 +35,14 @@
         </span>
       </div>
       <div class="filter-body">
+        <div class="time-range">
+          <mat-button-toggle-group [value]="dashService.selectedTimeRange()" (change)="onTimeRangeChange($event.value)">
+            @for (key of rangeKeys; track key) {
+              <mat-button-toggle [value]="key">{{ key }}</mat-button-toggle>
+            }
+          </mat-button-toggle-group>
+        </div>
+
         <mat-form-field appearance="outline" class="filter-select">
           <mat-label>TLDs</mat-label>
           <mat-select multiple

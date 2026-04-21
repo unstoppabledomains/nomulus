@@ -21,12 +21,6 @@
     {{ dashService.error() }}
   </div>
 
-  <!-- Forecast Horizon Toggle -->
-  <div class="time-range">
-    <mat-button-toggle-group [value]="selectedRange()" (change)="onRangeChange($event.value)">
-      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">{{ key }}</mat-button-toggle>
-    </mat-button-toggle-group>
-  </div>
 
   <!-- Metric Cards -->
   <div class="metric-cards" *ngIf="data()">

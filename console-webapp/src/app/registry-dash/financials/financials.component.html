@@ -17,13 +17,6 @@
     <mat-tab label="Overview">
       <ng-template matTabContent>
         <div class="tab-content overview-tab">
-          <!-- Time Range Toggle -->
-          <div class="time-range">
-            <mat-button-toggle-group [value]="selectedOverviewRange()" (change)="onOverviewRangeChange($event.value)">
-              <mat-button-toggle *ngFor="let key of overviewRangeKeys" [value]="key">{{ key }}</mat-button-toggle>
-            </mat-button-toggle-group>
-          </div>
-
           <!-- Overview Metric Cards -->
           <div class="metric-cards" *ngIf="dashService.revenueBilling() || dashService.domainActivity() || dashService.forecasting()">
             <mat-card class="metric-card">
