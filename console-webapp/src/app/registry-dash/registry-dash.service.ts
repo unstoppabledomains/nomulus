@@ -212,6 +212,7 @@ export class RegistryDashService {
   filterOptions = signal<FilterOptionsData | undefined>(undefined);
   selectedRegistrarIds = signal<string[]>([]);
   selectedTlds = signal<string[]>([]);
+  filterPanelExpanded = signal(false);
 
   availableRegistrars = computed(() => this.filterOptions()?.registrars ?? []);
   availableTlds = computed(() => this.filterOptions()?.tlds ?? []);

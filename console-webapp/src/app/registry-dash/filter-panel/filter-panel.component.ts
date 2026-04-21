@@ -14,29 +14,39 @@
 
 import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { MaterialModule } from '../../material.module';
 import { RegistryDashService } from '../registry-dash.service';
 
-/** Routes where filtering is done server-side (re-fetches from DB). */
-const SERVER_SIDE_ROUTES = new Set([
-  'overview',
-  'domain-activity',
-  'financials',
-]);
+interface FilterChip {
+  label: string;
+  type: 'tld' | 'registrar';
+  value: string;
+}
 
 @Component({
-  selector: 'app-registry-dash-filter-bar',
+  selector: 'app-filter-panel',
   standalone: true,
   imports: [CommonModule, MaterialModule],
-  templateUrl: './filter-bar.component.html',
-  styleUrls: ['./filter-bar.component.scss'],
+  templateUrl: './filter-panel.component.html',
+  styleUrls: ['./filter-panel.component.scss'],
 })
-export class FilterBarComponent {
+export class FilterPanelComponent {
   protected dashService = inject(RegistryDashService);
-  private router = inject(Router);
 
-  /** Cross-filtered registrar options: narrow by selected TLDs. */
+  expanded = computed(() => this.dashService.filterPanelExpanded());
+
+  activeChips = computed<FilterChip[]>(() => {
+    const chips: FilterChip[] = [];
+    for (const tld of this.dashService.selectedTlds()) {
+      chips.push({ label: '.' + tld, type: 'tld', value: tld });
+    }
+    for (const id of this.dashService.selectedRegistrarIds()) {
+      const reg = this.dashService.availableRegistrars().find(r => r.registrarId === id);
+      chips.push({ label: reg?.registrarName || id, type: 'registrar', value: id });
+    }
+    return chips;
+  });
+
   filteredRegistrarOptions = computed(() => {
     const all = this.dashService.availableRegistrars();
     const selectedTlds = this.dashService.selectedTlds();
@@ -44,7 +54,6 @@ export class FilterBarComponent {
     return all.filter(r => r.allowedTlds.some(t => selectedTlds.includes(t)));
   });
 
-  /** Cross-filtered TLD options: narrow by selected registrars. */
   filteredTldOptions = computed(() => {
     const all = this.dashService.availableTlds();
     const selectedRegIds = this.dashService.selectedRegistrarIds();
@@ -55,34 +64,27 @@ export class FilterBarComponent {
     return all.filter(t => tldSet.has(t));
   });
 
-  /** Whether the current page uses server-side or client-side filtering. */
-  filterMode = computed<'server' | 'client'>(() => {
-    const url = this.router.url;
-    for (const route of SERVER_SIDE_ROUTES) {
-      if (url.includes(route)) return 'server';
+  removeChip(chip: FilterChip): void {
+    if (chip.type === 'tld') {
+      this.dashService.selectedTlds.update(t => t.filter(x => x !== chip.value));
+    } else {
+      this.dashService.selectedRegistrarIds.update(r => r.filter(x => x !== chip.value));
     }
-    return 'client';
-  });
-
-  filterModeTooltip = computed(() =>
-    this.filterMode() === 'server'
-      ? 'Filters applied server-side — data re-fetched from database'
-      : 'Filters applied locally — subset of already-loaded data'
-  );
-
-  filterModeIcon = computed(() =>
-    this.filterMode() === 'server' ? 'cloud' : 'devices'
-  );
-
-  onRegistrarsChange(ids: string[]) {
-    this.dashService.selectedRegistrarIds.set(ids);
   }
 
-  onTldsChange(tlds: string[]) {
+  onTldsChange(tlds: string[]): void {
     this.dashService.selectedTlds.set(tlds);
   }
 
-  clearFilters() {
+  onRegistrarsChange(ids: string[]): void {
+    this.dashService.selectedRegistrarIds.set(ids);
+  }
+
+  clearFilters(): void {
     this.dashService.clearFilters();
+  }
+
+  toggleExpanded(): void {
+    this.dashService.filterPanelExpanded.update(v => !v);
   }
 }

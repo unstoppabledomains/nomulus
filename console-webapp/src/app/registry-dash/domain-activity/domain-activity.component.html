@@ -16,19 +16,18 @@
   <h2>Domain Activity</h2>
   <p class="subtitle">Domain registration activity across all TLDs — creates, renews, transfers, deletes, and restores.</p>
 
+  <app-filter-panel>
+    <mat-button-toggle-group [value]="selectedRange()" (change)="onRangeChange($event.value)">
+      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">{{ key }}</mat-button-toggle>
+    </mat-button-toggle-group>
+  </app-filter-panel>
+
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
   <div *ngIf="dashService.error()" class="error-banner">
     {{ dashService.error() }}
-  </div>
-
-  <!-- Time Range Toggle -->
-  <div class="time-range">
-    <mat-button-toggle-group [value]="selectedRange()" (change)="onRangeChange($event.value)">
-      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">{{ key }}</mat-button-toggle>
-    </mat-button-toggle-group>
   </div>
 
   <!-- Metric Cards -->

@@ -24,6 +24,7 @@ import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.comp
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
+import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',
@@ -41,7 +42,7 @@ const TLD_COLORS = [
 @Component({
   selector: 'app-domain-activity',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './domain-activity.component.html',
   styleUrls: ['./domain-activity.component.scss'],

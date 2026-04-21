@@ -26,6 +26,7 @@ import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
 import { ForecastingComponent } from './forecasting/forecasting.component';
 import { EffectiveFeesComponent } from './effective-fees/effective-fees.component';
+import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -37,7 +38,7 @@ const OPERATION_COLORS: Record<string, string> = {
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, LongPressDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, LongPressDirective, FilterPanelComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],

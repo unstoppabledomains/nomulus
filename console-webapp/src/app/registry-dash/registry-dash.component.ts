@@ -16,11 +16,9 @@ import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { MaterialModule } from '../material.module';
 import { RegistryDashService } from './registry-dash.service';
-import { FilterBarComponent } from './filter-bar/filter-bar.component';
-
 @Component({
   selector: 'app-registry-dash',
-  imports: [MaterialModule, RouterModule, FilterBarComponent],
+  imports: [MaterialModule, RouterModule],
   templateUrl: './registry-dash.component.html',
   styleUrls: ['./registry-dash.component.scss'],
 })

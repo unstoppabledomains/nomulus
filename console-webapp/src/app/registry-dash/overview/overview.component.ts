@@ -22,6 +22,7 @@ import { RegistryDashService } from '../registry-dash.service';
 import { UD_ECHARTS_PROVIDER, withDrillDown } from '../ud-echarts';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { LongPressDirective } from '../drilldown/long-press.directive';
+import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 const CHART_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -39,7 +40,7 @@ const ACTIVITY_COLORS: Record<string, string> = {
 
 @Component({
   selector: 'app-registry-dash-overview',
-  imports: [MaterialModule, CommonModule, NgxEchartsDirective, LongPressDirective],
+  imports: [MaterialModule, CommonModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './overview.component.html',
   styleUrls: ['./overview.component.scss'],

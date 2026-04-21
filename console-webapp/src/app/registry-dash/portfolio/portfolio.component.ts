@@ -16,10 +16,11 @@ import { Component } from '@angular/core';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { RegistryDashService } from '../registry-dash.service';
+import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 @Component({
   selector: 'app-registry-dash-portfolio',
-  imports: [MaterialModule, CommonModule],
+  imports: [MaterialModule, CommonModule, FilterPanelComponent],
   templateUrl: './portfolio.component.html',
   styleUrls: ['./portfolio.component.scss'],
 })
