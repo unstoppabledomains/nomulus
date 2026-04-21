@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, computed, inject, model, output } from '@angular/core';
+import { Component, computed, inject, model, OnInit, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MaterialModule } from '../../../material.module';
@@ -48,9 +48,9 @@ const GRANULARITY_OPTIONS = [
   templateUrl: './explore-builder.component.html',
   styleUrls: ['./explore-builder.component.scss'],
 })
-export class ExploreBuilderComponent {
+export class ExploreBuilderComponent implements OnInit {
   private dashService = inject(RegistryDashService);
-  private exploreService = inject(ExploreService);
+  exploreService = inject(ExploreService);
 
   query = model.required<ExploreQuery>();
   chartType = model.required<ChartType>();
@@ -75,6 +75,11 @@ export class ExploreBuilderComponent {
   });
 
   recentViews = computed(() => this.exploreService.getRecentViews());
+  savedViews = computed(() => this.exploreService.savedViews());
+
+  ngOnInit(): void {
+    this.exploreService.loadSavedViews();
+  }
 
   // --- Handlers ---
 
@@ -169,6 +174,18 @@ export class ExploreBuilderComponent {
   deleteView(view: SavedExploreView, event: Event): void {
     event.stopPropagation();
     this.exploreService.deleteRecentView(view.name);
+  }
+
+  saveNamedView(): void {
+    const name = prompt('Enter a name for this saved view:');
+    if (name) {
+      this.exploreService.saveNamedView(name, this.query(), this.chartType());
+    }
+  }
+
+  deleteNamedView(view: SavedExploreView, event: Event): void {
+    event.stopPropagation();
+    this.exploreService.deleteNamedView(view.name);
   }
 
   /** Helper to get the metric fields from the current query. */

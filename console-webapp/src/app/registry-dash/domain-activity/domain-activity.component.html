@@ -60,16 +60,22 @@
     <div class="chart-container" *ngIf="activityByTldOptions()">
       <h3>Activity Breakdown by TLD</h3>
       <p class="chart-description">Total domain transactions grouped by TLD and operation type for the selected time period.</p>
-      <div echarts [options]="activityByTldOptions()!" [theme]="'ud-brand'" class="chart"
-           (chartClick)="onActivityByTldClick($event)"
-           (chartContextMenu)="onActivityByTldContext($event)"></div>
+      <div appLongPress (longPress)="onActivityByTldLongPress()">
+        <div echarts [options]="activityByTldOptions()!" [theme]="'ud-brand'" class="chart"
+             (chartClick)="onActivityByTldClick($event)"
+             (chartContextMenu)="onActivityByTldContext($event)"
+             (chartMouseOver)="lastHoveredActivityByTld = $event"></div>
+      </div>
     </div>
     <div class="chart-container" *ngIf="domainCountsBarOptions()">
       <h3>Current Domain Counts by TLD</h3>
       <p class="chart-description">Current number of active (non-deleted) domains per TLD. This count is independent of the selected time period.</p>
-      <div echarts [options]="domainCountsBarOptions()!" [theme]="'ud-brand'" class="chart"
-           (chartClick)="onDomainCountsClick($event)"
-           (chartContextMenu)="onDomainCountsContext($event)"></div>
+      <div appLongPress (longPress)="onDomainCountsLongPress()">
+        <div echarts [options]="domainCountsBarOptions()!" [theme]="'ud-brand'" class="chart"
+             (chartClick)="onDomainCountsClick($event)"
+             (chartContextMenu)="onDomainCountsContext($event)"
+             (chartMouseOver)="lastHoveredDomainCounts = $event"></div>
+      </div>
     </div>
   </div>
 

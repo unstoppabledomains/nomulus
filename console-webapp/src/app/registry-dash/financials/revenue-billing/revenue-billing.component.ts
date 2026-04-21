@@ -22,6 +22,7 @@ import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
 import { DrillDownService } from '../../drilldown/drilldown.service';
 import { withDrillDown } from '../../ud-echarts';
+import { LongPressDirective } from '../../drilldown/long-press.directive';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -55,13 +56,15 @@ export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
 @Component({
   selector: 'app-revenue-billing',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './revenue-billing.component.html',
   styleUrls: ['./revenue-billing.component.scss'],
 })
 export class RevenueBillingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  lastHoveredRevenueByTld: any = null;
+  lastHoveredRevenueByOp: any = null;
   selectedRange = signal('12m');
   rangeKeys = Object.keys(RANGE_CONFIG);
 
@@ -201,5 +204,17 @@ export class RevenueBillingComponent implements OnInit {
   onRevenueByOpContext(event: any) {
     event.event?.event?.preventDefault();
     if (event.name) this.drillDown.drillDownRevenueByOperation(event.name);
+  }
+
+  onRevenueByTldLongPress() {
+    if (this.lastHoveredRevenueByTld?.seriesName) {
+      this.drillDown.drillDownRevenueByTld(this.lastHoveredRevenueByTld.seriesName);
+    }
+  }
+
+  onRevenueByOpLongPress() {
+    if (this.lastHoveredRevenueByOp?.name) {
+      this.drillDown.drillDownRevenueByOperation(this.lastHoveredRevenueByOp.name);
+    }
   }
 }

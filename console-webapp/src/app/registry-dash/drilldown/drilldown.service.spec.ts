@@ -17,14 +17,17 @@ import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { DrillDownService } from './drilldown.service';
 import { RegistryDashService } from '../registry-dash.service';
+import { BackendService } from '../../shared/services/backend.service';
 
 describe('DrillDownService', () => {
   let service: DrillDownService;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let dashServiceStub: any;
+  let backendSpy: jasmine.SpyObj<BackendService>;
 
   beforeEach(() => {
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    backendSpy = jasmine.createSpyObj('BackendService', ['getRegistryDashRegistrarDetail']);
     dashServiceStub = {
       selectedTlds: signal<string[]>([]),
       selectedRegistrarIds: signal<string[]>([]),
@@ -67,6 +70,7 @@ describe('DrillDownService', () => {
         DrillDownService,
         { provide: MatDialog, useValue: dialogSpy },
         { provide: RegistryDashService, useValue: dashServiceStub },
+        { provide: BackendService, useValue: backendSpy },
       ],
     });
     service = TestBed.inject(DrillDownService);

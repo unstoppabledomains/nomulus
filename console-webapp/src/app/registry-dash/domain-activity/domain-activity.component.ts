@@ -23,6 +23,7 @@ import { RegistryDashService } from '../registry-dash.service';
 import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.component';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { withDrillDown } from '../ud-echarts';
+import { LongPressDirective } from '../drilldown/long-press.directive';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',
@@ -40,13 +41,15 @@ const TLD_COLORS = [
 @Component({
   selector: 'app-domain-activity',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './domain-activity.component.html',
   styleUrls: ['./domain-activity.component.scss'],
 })
 export class DomainActivityComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  lastHoveredActivityByTld: any = null;
+  lastHoveredDomainCounts: any = null;
   selectedRange = signal('12m');
   rangeKeys = Object.keys(RANGE_CONFIG);
 
@@ -204,5 +207,17 @@ export class DomainActivityComponent implements OnInit {
   onDomainCountsContext(event: any) {
     event.event?.event?.preventDefault();
     if (event.name) this.drillDown.drillDownDomainCountsByTld(event.name);
+  }
+
+  onActivityByTldLongPress() {
+    if (this.lastHoveredActivityByTld?.name) {
+      this.drillDown.drillDownActivityByTld(this.lastHoveredActivityByTld.name);
+    }
+  }
+
+  onDomainCountsLongPress() {
+    if (this.lastHoveredDomainCounts?.name) {
+      this.drillDown.drillDownDomainCountsByTld(this.lastHoveredDomainCounts.name);
+    }
   }
 }

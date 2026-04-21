@@ -39,7 +39,10 @@
           <p class="chart-description">Number of active domains managed by each registrar. Longer bars indicate a larger share of the total domain portfolio.</p>
           <div class="h-bar-chart">
             @for (bar of barChartData(); track bar.registrarId) {
-              <div class="h-bar-row" (click)="onRegistrarBarClick(bar.registrarId)">
+              <div class="h-bar-row" appLongPress
+                   (longPress)="onRegistrarBarContext($event, bar.registrarId)"
+                   (click)="onRegistrarBarClick(bar.registrarId)"
+                   (contextmenu)="onRegistrarBarContext($event, bar.registrarId)">
                 <span class="h-bar-label">{{ bar.name }}</span>
                 <div class="h-bar-track">
                   <div class="h-bar-fill" [style.width.%]="bar.widthPct" [style.background]="bar.color">
@@ -60,9 +63,12 @@
         <mat-card-content>
           <h3 class="chart-title">Domain Activity Trend</h3>
           <p class="chart-description">Domain registration activity over time — creates, renews, transfers, deletes, and restores aggregated across all TLDs.</p>
-          <div echarts [options]="activityLineOptions()!" [theme]="'ud-brand'" class="echart"
-               (chartClick)="onActivityClick($event)"
-               (chartContextMenu)="onActivityContext($event)"></div>
+          <div appLongPress (longPress)="onActivityLongPress()">
+            <div echarts [options]="activityLineOptions()!" [theme]="'ud-brand'" class="echart"
+                 (chartClick)="onActivityClick($event)"
+                 (chartContextMenu)="onActivityContext($event)"
+                 (chartMouseOver)="lastHoveredActivity = $event"></div>
+          </div>
         </mat-card-content>
       </mat-card>
 
@@ -70,9 +76,12 @@
         <mat-card-content>
           <h3 class="chart-title">Renewal Rate by TLD</h3>
           <p class="chart-description">Percentage of expiring domains that were renewed (vs. deleted/expired) per TLD over the last 12 months. The dashed line marks the 85% industry benchmark.</p>
-          <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"
-               (chartClick)="onRenewalClick($event)"
-               (chartContextMenu)="onRenewalContext($event)"></div>
+          <div appLongPress (longPress)="onRenewalLongPress()">
+            <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"
+                 (chartClick)="onRenewalClick($event)"
+                 (chartContextMenu)="onRenewalContext($event)"
+                 (chartMouseOver)="lastHoveredRenewal = $event"></div>
+          </div>
         </mat-card-content>
       </mat-card>
     </div>

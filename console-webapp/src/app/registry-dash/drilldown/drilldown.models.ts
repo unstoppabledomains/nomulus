@@ -24,4 +24,7 @@ export interface DrillDownDialogData {
   columns: DrillDownDialogColumn[];
   rows: Record<string, any>[];
   chartOptions?: any;
+  onRowClick?: (row: Record<string, any>) => DrillDownDialogData | null;
 }
+
+export const MAX_DRILL_DEPTH = 2;

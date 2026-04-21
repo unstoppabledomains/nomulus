@@ -61,15 +61,21 @@
     <div class="chart-container full-width" *ngIf="netGrowthOptions()">
       <h3>Net Growth Projection</h3>
       <p class="chart-description">Net domain growth per period (creates minus deletes). Dashed lines show projected values based on the selected forecast method.</p>
-      <div echarts [options]="netGrowthOptions()!" [theme]="'ud-brand'" class="chart"
-           (chartContextMenu)="onNetGrowthContext($event)"></div>
+      <div appLongPress (longPress)="onNetGrowthLongPress()">
+        <div echarts [options]="netGrowthOptions()!" [theme]="'ud-brand'" class="chart"
+             (chartContextMenu)="onNetGrowthContext($event)"
+             (chartMouseOver)="lastHoveredNetGrowth = $event"></div>
+      </div>
     </div>
     <div class="chart-container full-width" *ngIf="expirationCurveOptions()">
       <h3>Domain Expirations by TLD</h3>
       <p class="chart-description">Upcoming domain expirations grouped by TLD. Shows when domains are due to expire and may need renewal.</p>
-      <div echarts [options]="expirationCurveOptions()!" [theme]="'ud-brand'" class="chart"
-           (chartClick)="onExpirationClick($event)"
-           (chartContextMenu)="onExpirationContext($event)"></div>
+      <div appLongPress (longPress)="onExpirationLongPress()">
+        <div echarts [options]="expirationCurveOptions()!" [theme]="'ud-brand'" class="chart"
+             (chartClick)="onExpirationClick($event)"
+             (chartContextMenu)="onExpirationContext($event)"
+             (chartMouseOver)="lastHoveredExpiration = $event"></div>
+      </div>
     </div>
   </div>
 

@@ -447,4 +447,11 @@ public final class ConsoleModule {
   public static ImmutableSet<String> provideFilterRegistrarIds(HttpServletRequest req) {
     return extractSetOfParameters(req, "filterRegistrarIds");
   }
+
+  @Provides
+  @Parameter("settingsPayload")
+  public static Optional<JsonElement> provideSettingsPayload(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload;
+  }
 }

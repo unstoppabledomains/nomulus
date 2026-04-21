@@ -17,18 +17,25 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BackendService } from '../../shared/services/backend.service';
-import { ExploreQuery, ExploreResult, SavedExploreView } from './explore.models';
+import { RegistryDashService } from '../registry-dash.service';
+import { ChartType, ExploreQuery, ExploreResult, SavedExploreView } from './explore.models';
 
 const RECENT_VIEWS_KEY = 'registry-dash-explore-recent';
 const MAX_RECENT_VIEWS = 5;
+const MAX_SAVED_VIEWS = 20;
 
 @Injectable({ providedIn: 'root' })
 export class ExploreService {
   result = signal<ExploreResult | undefined>(undefined);
   loading = signal(false);
   error = signal<string | undefined>(undefined);
+  savedViews = signal<SavedExploreView[]>([]);
+  savingView = signal(false);
 
-  constructor(private backend: BackendService) {}
+  constructor(
+    private backend: BackendService,
+    private dashService: RegistryDashService,
+  ) {}
 
   explore(query: ExploreQuery): Observable<ExploreResult> {
     this.loading.set(true);
@@ -72,5 +79,35 @@ export class ExploreService {
   deleteRecentView(name: string): void {
     const views = this.getRecentViews().filter(v => v.name !== name);
     localStorage.setItem(RECENT_VIEWS_KEY, JSON.stringify(views));
+  }
+
+  // --- Server-persisted named views ---
+
+  loadSavedViews(): void {
+    const settings = this.dashService.settingsCache();
+    this.savedViews.set(settings?.['savedExploreViews'] ?? []);
+  }
+
+  saveNamedView(name: string, query: ExploreQuery, chartType: ChartType): void {
+    this.savingView.set(true);
+    const current = this.savedViews();
+    const newView: SavedExploreView = {
+      name, query, chartType, savedAt: new Date().toISOString(),
+    };
+    const updated = [newView, ...current.filter(v => v.name !== name)].slice(0, MAX_SAVED_VIEWS);
+    this.dashService.updateSettingsSelf({ savedExploreViews: updated }).subscribe({
+      next: () => {
+        this.savedViews.set(updated);
+        this.savingView.set(false);
+      },
+      error: () => this.savingView.set(false),
+    });
+  }
+
+  deleteNamedView(name: string): void {
+    const updated = this.savedViews().filter(v => v.name !== name);
+    this.dashService.updateSettingsSelf({ savedExploreViews: updated }).subscribe({
+      next: () => this.savedViews.set(updated),
+    });
   }
 }
