@@ -33,7 +33,9 @@ import google.registry.ui.server.console.ConsoleApiParams;
 import jakarta.inject.Inject;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -122,15 +124,8 @@ public class RegistryDashExploreAction extends ConsoleApiAction {
     Instant endDate = null;
     if (filters.getDateRange() != null) {
       try {
-        startDate =
-            LocalDate.parse(filters.getDateRange().getStart())
-                .atStartOfDay()
-                .toInstant(ZoneOffset.UTC);
-        endDate =
-            LocalDate.parse(filters.getDateRange().getEnd())
-                .plusDays(1)
-                .atStartOfDay()
-                .toInstant(ZoneOffset.UTC);
+        startDate = parseDateTime(filters.getDateRange().getStart(), false);
+        endDate = parseDateTime(filters.getDateRange().getEnd(), true);
       } catch (Exception e) {
         consoleApiParams.response().setStatus(SC_BAD_REQUEST);
         consoleApiParams.response().setPayload("{\"error\":\"Invalid date range format\"}");
@@ -246,6 +241,18 @@ public class RegistryDashExploreAction extends ConsoleApiAction {
       return inst.toString();
     }
     return val;
+  }
+
+  static Instant parseDateTime(String value, boolean isEndDate) {
+    try {
+      return LocalDateTime.parse(value).toInstant(ZoneOffset.UTC);
+    } catch (DateTimeParseException e) {
+      LocalDate date = LocalDate.parse(value);
+      if (isEndDate) {
+        return date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+      }
+      return date.atStartOfDay().toInstant(ZoneOffset.UTC);
+    }
   }
 
   private static List<String> mapActivityType(String friendlyName) {
