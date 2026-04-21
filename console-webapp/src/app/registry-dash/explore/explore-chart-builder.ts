@@ -34,6 +34,8 @@ export function buildChartOptions(
       return buildAreaOptions(result, primaryDim, secondaryDim, metricColumn);
     case 'stacked-bar':
       return buildStackedBarOptions(result, primaryDim, secondaryDim, metricColumn);
+    case 'horizontal-bar':
+      return buildHorizontalBarOptions(result, primaryDim, secondaryDim, metricColumn);
     case 'bar':
     default:
       return buildBarOptions(result, primaryDim, secondaryDim, metricColumn);
@@ -136,4 +138,52 @@ function buildStackedBarOptions(
     s.stack = 'total';
   }
   return opts;
+}
+
+function buildHorizontalBarOptions(
+  result: ExploreResult, primaryDim: string,
+  secondaryDim: string | null, metric: string,
+): any {
+  if (secondaryDim) {
+    return buildGroupedHorizontalBarOptions(result, primaryDim, secondaryDim, metric);
+  }
+  const categories = [...new Set(result.rows.map(r => String(r[primaryDim] ?? '')))];
+  const values = categories.map(cat => {
+    const row = result.rows.find(r => String(r[primaryDim]) === cat);
+    return Number(row?.[metric] ?? 0);
+  });
+  const maxLabelLen = Math.max(...categories.map(c => c.length));
+  return {
+    tooltip: { trigger: 'axis' },
+    yAxis: { type: 'category', data: categories, inverse: true },
+    xAxis: { type: 'value' },
+    series: [{ type: 'bar', data: values }],
+    grid: { left: Math.min(maxLabelLen * 7 + 20, 200) },
+  };
+}
+
+function buildGroupedHorizontalBarOptions(
+  result: ExploreResult, primaryDim: string,
+  secondaryDim: string, metric: string,
+): any {
+  const categories = [...new Set(result.rows.map(r => String(r[primaryDim] ?? '')))];
+  const groups = [...new Set(result.rows.map(r => String(r[secondaryDim] ?? '')))];
+  const series = groups.map(group => ({
+    name: group,
+    type: 'bar' as const,
+    data: categories.map(cat => {
+      const row = result.rows.find(
+        r => String(r[primaryDim]) === cat && String(r[secondaryDim]) === group);
+      return Number(row?.[metric] ?? 0);
+    }),
+  }));
+  const maxLabelLen = Math.max(...categories.map(c => c.length));
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { type: 'scroll', bottom: 0 },
+    yAxis: { type: 'category', data: categories, inverse: true },
+    xAxis: { type: 'value' },
+    series,
+    grid: { left: Math.min(maxLabelLen * 7 + 20, 200), bottom: 60 },
+  };
 }
