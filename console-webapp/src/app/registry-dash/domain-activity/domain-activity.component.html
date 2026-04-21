@@ -16,11 +16,7 @@
   <h2>Domain Activity</h2>
   <p class="subtitle">Domain registration activity across all TLDs — creates, renews, transfers, deletes, and restores.</p>
 
-  <app-filter-panel>
-    <mat-button-toggle-group [value]="selectedRange()" (change)="onRangeChange($event.value)">
-      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">{{ key }}</mat-button-toggle>
-    </mat-button-toggle-group>
-  </app-filter-panel>
+  <app-filter-panel></app-filter-panel>
 
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>

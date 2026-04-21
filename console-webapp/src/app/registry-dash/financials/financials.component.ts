@@ -19,8 +19,8 @@ import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
-import { RegistryDashService } from '../registry-dash.service';
-import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing/revenue-billing.component';
+import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
+import { RevenueBillingComponent } from './revenue-billing/revenue-billing.component';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
@@ -47,18 +47,8 @@ export class FinancialsComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   lastHoveredOverviewRevenueByOp: any = null;
   selectedTab = signal(0);
-  selectedOverviewRange = signal('12m');
-  overviewRangeKeys = Object.keys(RANGE_CONFIG);
 
-  private static readonly RANGE_LABELS: Record<string, string> = {
-    '6h': '6 Hours', '12h': '12 Hours', '1d': '1 Day', '7d': '7 Days',
-    '30d': '30 Days', '3m': '3 Months', '6m': '6 Months',
-    '12m': '12 Months', '24m': '24 Months',
-  };
-
-  overviewRangeLabel = computed(() =>
-    FinancialsComponent.RANGE_LABELS[this.selectedOverviewRange()] ?? this.selectedOverviewRange()
-  );
+  overviewRangeLabel = computed(() => this.dashService.timeRangeLabel());
 
   // --- Fees by TLD tab ---
 
@@ -139,10 +129,9 @@ export class FinancialsComponent implements OnInit {
     public dashService: RegistryDashService,
     private drillDown: DrillDownService,
   ) {
-    // Re-fetch all overview data when range, tab, or global filters change
     combineLatest([
       toObservable(this.selectedTab),
-      toObservable(this.selectedOverviewRange),
+      toObservable(this.dashService.selectedTimeRange),
       toObservable(this.dashService.selectedTlds),
       toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
@@ -166,10 +155,6 @@ export class FinancialsComponent implements OnInit {
 
   ngOnInit() {
     this.dashService.getTldFees().subscribe();
-  }
-
-  onOverviewRangeChange(range: string) {
-    this.selectedOverviewRange.set(range);
   }
 
   onTabChange(index: number) {

@@ -20,7 +20,7 @@ import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
 import { RegistryDashService } from '../../registry-dash.service';
-import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
+import { RANGE_CONFIG } from '../../registry-dash.service';
 import { DrillDownService } from '../../drilldown/drilldown.service';
 import { withDrillDown } from '../../ud-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
@@ -46,8 +46,6 @@ export class ForecastingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   lastHoveredNetGrowth: any = null;
   lastHoveredExpiration: any = null;
-  selectedRange = signal('12m');
-  rangeKeys = Object.keys(RANGE_CONFIG);
   forecastMethod = signal<ForecastMethod>('trend');
 
   data = computed(() => this.dashService.forecasting());
@@ -269,7 +267,7 @@ export class ForecastingComponent implements OnInit {
     private drillDown: DrillDownService,
   ) {
     combineLatest([
-      toObservable(this.selectedRange),
+      toObservable(this.dashService.selectedTimeRange),
       toObservable(this.dashService.selectedTlds),
       toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
@@ -290,10 +288,6 @@ export class ForecastingComponent implements OnInit {
 
   ngOnInit() {
     // Initial fetch is handled by the observable above
-  }
-
-  onRangeChange(range: string) {
-    this.selectedRange.set(range);
   }
 
   onForecastMethodChange(method: string) {

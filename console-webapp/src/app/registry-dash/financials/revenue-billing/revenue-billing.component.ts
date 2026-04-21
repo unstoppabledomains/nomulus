@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, DestroyRef, computed, inject } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
-import { RegistryDashService } from '../../registry-dash.service';
+import { RegistryDashService, RANGE_CONFIG } from '../../registry-dash.service';
 import { DrillDownService } from '../../drilldown/drilldown.service';
 import { withDrillDown } from '../../ud-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
@@ -36,23 +36,6 @@ const TLD_COLORS = [
   '#00C9FF', '#0A5FEA', '#4A9B30', '#9191A1',
 ];
 
-export interface RangeConfigEntry {
-  lookbackHours: number;
-  granularity: string;
-}
-
-export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
-  '6h': { lookbackHours: 6, granularity: '15min' },
-  '12h': { lookbackHours: 12, granularity: 'hour' },
-  '1d': { lookbackHours: 24, granularity: 'hour' },
-  '7d': { lookbackHours: 168, granularity: 'day' },
-  '30d': { lookbackHours: 720, granularity: 'day' },
-  '3m': { lookbackHours: 2160, granularity: 'month' },
-  '6m': { lookbackHours: 4380, granularity: 'month' },
-  '12m': { lookbackHours: 8760, granularity: 'month' },
-  '24m': { lookbackHours: 17520, granularity: 'month' },
-};
-
 @Component({
   selector: 'app-revenue-billing',
   standalone: true,
@@ -65,8 +48,6 @@ export class RevenueBillingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   lastHoveredRevenueByTld: any = null;
   lastHoveredRevenueByOp: any = null;
-  selectedRange = signal('12m');
-  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.revenueBilling());
 
@@ -168,7 +149,7 @@ export class RevenueBillingComponent implements OnInit {
     private drillDown: DrillDownService,
   ) {
     combineLatest([
-      toObservable(this.selectedRange),
+      toObservable(this.dashService.selectedTimeRange),
       toObservable(this.dashService.selectedTlds),
       toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
@@ -186,10 +167,6 @@ export class RevenueBillingComponent implements OnInit {
 
   ngOnInit() {
     // Initial fetch is handled by the observable above
-  }
-
-  onRangeChange(range: string) {
-    this.selectedRange.set(range);
   }
 
   onRevenueByTldClick(event: any) {
