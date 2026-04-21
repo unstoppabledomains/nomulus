@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, WritableSignal, computed, signal } from '@angular/core';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { BackendService } from '../shared/services/backend.service';
 
@@ -184,6 +184,31 @@ export interface FilterOptionsData {
   registrars: FilterRegistrarOption[];
 }
 
+export interface RangeConfigEntry {
+  lookbackHours: number;
+  granularity: string;
+}
+
+export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
+  '6h': { lookbackHours: 6, granularity: '15min' },
+  '12h': { lookbackHours: 12, granularity: 'hour' },
+  '1d': { lookbackHours: 24, granularity: 'hour' },
+  '7d': { lookbackHours: 168, granularity: 'day' },
+  '30d': { lookbackHours: 720, granularity: 'day' },
+  '3m': { lookbackHours: 2160, granularity: 'month' },
+  '6m': { lookbackHours: 4380, granularity: 'month' },
+  '12m': { lookbackHours: 8760, granularity: 'month' },
+  '24m': { lookbackHours: 17520, granularity: 'month' },
+};
+
+export const RANGE_KEYS = Object.keys(RANGE_CONFIG);
+
+export const RANGE_LABELS: Record<string, string> = {
+  '6h': '6 Hours', '12h': '12 Hours', '1d': '1 Day', '7d': '7 Days',
+  '30d': '30 Days', '3m': '3 Months', '6m': '6 Months',
+  '12m': '12 Months', '24m': '24 Months',
+};
+
 @Injectable({ providedIn: 'root' })
 export class RegistryDashService {
   overview = signal<OverviewData | undefined>(undefined);
@@ -213,6 +238,13 @@ export class RegistryDashService {
   selectedRegistrarIds = signal<string[]>([]);
   selectedTlds = signal<string[]>([]);
   filterPanelExpanded = signal(false);
+
+  // --- Global timeframe state ---
+  selectedTimeRange: WritableSignal<string> = signal('12m');
+  selectedRangeConfig = computed(() => RANGE_CONFIG[this.selectedTimeRange()]);
+  timeRangeLookbackHours = computed(() => this.selectedRangeConfig().lookbackHours);
+  timeRangeGranularity = computed(() => this.selectedRangeConfig().granularity);
+  timeRangeLabel = computed(() => RANGE_LABELS[this.selectedTimeRange()] ?? this.selectedTimeRange());
 
   availableRegistrars = computed(() => this.filterOptions()?.registrars ?? []);
   availableTlds = computed(() => this.filterOptions()?.tlds ?? []);

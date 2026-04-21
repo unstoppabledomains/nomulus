@@ -15,7 +15,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../../material.module';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, RANGE_KEYS } from '../registry-dash.service';
 
 interface FilterChip {
   label: string;
@@ -32,6 +32,7 @@ interface FilterChip {
 })
 export class FilterPanelComponent {
   protected dashService = inject(RegistryDashService);
+  rangeKeys = RANGE_KEYS;
 
   expanded = computed(() => this.dashService.filterPanelExpanded());
 
@@ -78,6 +79,10 @@ export class FilterPanelComponent {
 
   onRegistrarsChange(ids: string[]): void {
     this.dashService.selectedRegistrarIds.set(ids);
+  }
+
+  onTimeRangeChange(range: string): void {
+    this.dashService.selectedTimeRange.set(range);
   }
 
   clearFilters(): void {

@@ -15,6 +15,7 @@
 import { Component, computed, inject, model, OnInit, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 import { MaterialModule } from '../../../material.module';
 import { RegistryDashService } from '../../registry-dash.service';
 import { DATA_SOURCE_SCHEMAS } from '../data-source-schemas';
@@ -26,6 +27,7 @@ import {
   SavedExploreView,
 } from '../explore.models';
 import { ExploreService } from '../explore.service';
+import { SaveViewDialogComponent } from '../save-view-dialog.component';
 
 const CHART_TYPES: { value: ChartType; icon: string; label: string }[] = [
   { value: 'bar', icon: 'bar_chart', label: 'Bar' },
@@ -33,6 +35,7 @@ const CHART_TYPES: { value: ChartType; icon: string; label: string }[] = [
   { value: 'pie', icon: 'pie_chart', label: 'Pie' },
   { value: 'stacked-bar', icon: 'stacked_bar_chart', label: 'Stacked' },
   { value: 'area', icon: 'area_chart', label: 'Area' },
+  { value: 'horizontal-bar', icon: 'align_horizontal_left', label: 'Horizontal Bar' },
 ];
 
 const GRANULARITY_OPTIONS = [
@@ -50,6 +53,7 @@ const GRANULARITY_OPTIONS = [
 })
 export class ExploreBuilderComponent implements OnInit {
   private dashService = inject(RegistryDashService);
+  private dialog = inject(MatDialog);
   exploreService = inject(ExploreService);
 
   query = model.required<ExploreQuery>();
@@ -177,10 +181,17 @@ export class ExploreBuilderComponent implements OnInit {
   // --- Save / Load ---
 
   saveView(): void {
-    const name = prompt('Enter a name for this view:');
-    if (name) {
-      this.exploreService.saveRecentView(name, this.query(), this.chartType());
-    }
+    this.dialog
+      .open(SaveViewDialogComponent, {
+        width: '360px',
+        data: { title: 'Save View', label: 'View name' },
+      })
+      .afterClosed()
+      .subscribe(name => {
+        if (name) {
+          this.exploreService.saveRecentView(name, this.query(), this.chartType());
+        }
+      });
   }
 
   loadView(view: SavedExploreView): void {
@@ -194,10 +205,17 @@ export class ExploreBuilderComponent implements OnInit {
   }
 
   saveNamedView(): void {
-    const name = prompt('Enter a name for this saved view:');
-    if (name) {
-      this.exploreService.saveNamedView(name, this.query(), this.chartType());
-    }
+    this.dialog
+      .open(SaveViewDialogComponent, {
+        width: '360px',
+        data: { title: 'Save to Server', label: 'View name' },
+      })
+      .afterClosed()
+      .subscribe(name => {
+        if (name) {
+          this.exploreService.saveNamedView(name, this.query(), this.chartType());
+        }
+      });
   }
 
   deleteNamedView(view: SavedExploreView, event: Event): void {

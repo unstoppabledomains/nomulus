@@ -16,8 +16,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing.component';
-import { RegistryDashService, RevenueBillingData } from '../../registry-dash.service';
+import { RevenueBillingComponent } from './revenue-billing.component';
+import { RegistryDashService, RANGE_CONFIG, RevenueBillingData } from '../../registry-dash.service';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
 import { BackendService } from '../../../shared/services/backend.service';
@@ -47,6 +47,7 @@ describe('RevenueBillingComponent', () => {
       revenueBilling: signal<RevenueBillingData | undefined>(mockData),
       loading: signal(false),
       error: signal<string | undefined>(undefined),
+      selectedTimeRange: signal('12m'),
       selectedTlds: signal<string[]>([]),
       selectedRegistrarIds: signal<string[]>([]),
     });
@@ -84,10 +85,6 @@ describe('RevenueBillingComponent', () => {
 
   // --- Range selector tests ---
 
-  it('should default to 12m range', () => {
-    expect(component.selectedRange()).toBe('12m');
-  });
-
   it('should have 9 range options in the config', () => {
     expect(Object.keys(RANGE_CONFIG)).toEqual([
       '6h', '12h', '1d', '7d', '30d', '3m', '6m', '12m', '24m',
@@ -97,7 +94,7 @@ describe('RevenueBillingComponent', () => {
   it('should call getRevenueBilling with lookbackHours and granularity on range change', () => {
     fixture.detectChanges();
     mockDashService.getRevenueBilling.calls.reset();
-    component.onRangeChange('7d');
+    (mockDashService as any).selectedTimeRange.set('7d');
     fixture.detectChanges();
     expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(168, 'day', undefined, undefined);
   });
@@ -105,14 +102,13 @@ describe('RevenueBillingComponent', () => {
   it('should call getRevenueBilling with correct params for 6h range', () => {
     fixture.detectChanges();
     mockDashService.getRevenueBilling.calls.reset();
-    component.onRangeChange('6h');
+    (mockDashService as any).selectedTimeRange.set('6h');
     fixture.detectChanges();
     expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(6, '15min', undefined, undefined);
   });
 
   it('should call getRevenueBilling with correct params for 12m range', () => {
     fixture.detectChanges();
-    // 12m is the default, so the effect already fired with these params
     expect(mockDashService.getRevenueBilling).toHaveBeenCalledWith(8760, 'month', undefined, undefined);
   });
 

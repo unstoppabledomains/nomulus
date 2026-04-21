@@ -10,7 +10,7 @@
   }
 
   @if (dashService.overview(); as overview) {
-    <p class="time-indicator">Showing data for the last 12 months</p>
+    <p class="time-indicator">Showing data for the last {{ dashService.timeRangeLabel() }}</p>
     <div class="summary-cards">
       <mat-card appearance="outlined">
         <mat-card-content>
@@ -77,7 +77,7 @@
       <mat-card appearance="outlined" class="chart-card" *ngIf="renewalRateOptions()">
         <mat-card-content>
           <h3 class="chart-title">Renewal Rate by TLD</h3>
-          <p class="chart-description">Percentage of expiring domains that were renewed (vs. deleted/expired) per TLD over the last 12 months. The dashed line marks the 85% industry benchmark.</p>
+          <p class="chart-description">Percentage of expiring domains that were renewed (vs. deleted/expired) per TLD over the selected time period. The dashed line marks the 85% industry benchmark.</p>
           <div appLongPress (longPress)="onRenewalLongPress()">
             <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"
                  (chartClick)="onRenewalClick($event)"

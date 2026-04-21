@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, DestroyRef, computed, inject } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
-import { RegistryDashService } from '../registry-dash.service';
-import { RANGE_CONFIG } from '../financials/revenue-billing/revenue-billing.component';
+import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
@@ -51,8 +50,6 @@ export class DomainActivityComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   lastHoveredActivityByTld: any = null;
   lastHoveredDomainCounts: any = null;
-  selectedRange = signal('12m');
-  rangeKeys = Object.keys(RANGE_CONFIG);
 
   data = computed(() => this.dashService.domainActivity());
 
@@ -166,9 +163,8 @@ export class DomainActivityComponent implements OnInit {
     public dashService: RegistryDashService,
     private drillDown: DrillDownService,
   ) {
-    // Refetch when selectedRange or global filters change
     combineLatest([
-      toObservable(this.selectedRange),
+      toObservable(this.dashService.selectedTimeRange),
       toObservable(this.dashService.selectedTlds),
       toObservable(this.dashService.selectedRegistrarIds),
     ]).pipe(
@@ -186,10 +182,6 @@ export class DomainActivityComponent implements OnInit {
 
   ngOnInit() {
     // Initial fetch is handled by the observable above
-  }
-
-  onRangeChange(range: string) {
-    this.selectedRange.set(range);
   }
 
   onActivityByTldClick(event: any) {

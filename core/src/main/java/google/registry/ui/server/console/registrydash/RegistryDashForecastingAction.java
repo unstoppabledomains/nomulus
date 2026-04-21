@@ -292,9 +292,9 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
             long deletions = ((Number) row[2]).longValue();
             long total = renewals + deletions;
             BigDecimal renewalRate = total > 0
-                ? BigDecimal.valueOf(renewals)
-                    .divide(BigDecimal.valueOf(total), 3, RoundingMode.HALF_UP)
-                : BigDecimal.ONE;
+                ? BigDecimal.valueOf(renewals * 100)
+                    .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(100);
 
             Map<String, Object> entry = new HashMap<>();
             entry.put("tld", tld);
