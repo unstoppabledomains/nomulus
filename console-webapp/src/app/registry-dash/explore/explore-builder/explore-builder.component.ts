@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, computed, inject, model, OnInit, output } from '@angular/core';
+import { Component, computed, inject, model, OnInit, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MaterialModule } from '../../../material.module';
-import { RegistryDashService } from '../../registry-dash.service';
+import { RANGE_CONFIG, RANGE_KEYS, RegistryDashService } from '../../registry-dash.service';
 import { DATA_SOURCE_SCHEMAS } from '../data-source-schemas';
 import {
   ChartType,
@@ -62,6 +62,11 @@ export class ExploreBuilderComponent implements OnInit {
   readonly dataSourceKeys = Object.keys(DATA_SOURCE_SCHEMAS) as DataSourceType[];
   readonly chartTypes = CHART_TYPES;
   readonly granularityOptions = GRANULARITY_OPTIONS;
+  readonly rangeKeys = RANGE_KEYS;
+
+  selectedBucket = signal<string | null>(null);
+  startTime: string | null = null;
+  endTime: string | null = null;
 
   availableTlds = computed(() => this.dashService.availableTlds());
   availableRegistrars = computed(() => this.dashService.availableRegistrars());
@@ -79,6 +84,10 @@ export class ExploreBuilderComponent implements OnInit {
 
   ngOnInit(): void {
     this.exploreService.loadSavedViews();
+    const globalRange = this.dashService.selectedTimeRange();
+    if (globalRange && RANGE_CONFIG[globalRange]) {
+      this.onBucketChange(globalRange);
+    }
   }
 
   // --- Handlers ---
@@ -109,6 +118,29 @@ export class ExploreBuilderComponent implements OnInit {
     }));
   }
 
+  onBucketChange(bucket: string): void {
+    this.selectedBucket.set(bucket);
+    const config = RANGE_CONFIG[bucket];
+    if (!config) return;
+
+    const now = new Date();
+    const start = new Date(now.getTime() - config.lookbackHours * 3600_000);
+    this.startTime = null;
+    this.endTime = null;
+
+    this.query.update(q => ({
+      ...q,
+      filters: {
+        ...q.filters,
+        dateRange: {
+          start: this.formatDate(start),
+          end: this.formatDate(now),
+        },
+      },
+      granularity: config.granularity,
+    }));
+  }
+
   onGranularityChange(value: string): void {
     this.query.update(q => ({ ...q, granularity: value }));
   }
@@ -133,21 +165,26 @@ export class ExploreBuilderComponent implements OnInit {
 
   startDateValue = computed(() => {
     const s = this.query().filters.dateRange?.start;
-    return s ? new Date(s + 'T00:00:00') : null;
+    if (!s) return null;
+    const datePart = s.substring(0, 10);
+    return new Date(datePart + 'T00:00:00');
   });
 
   endDateValue = computed(() => {
     const e = this.query().filters.dateRange?.end;
-    return e ? new Date(e + 'T00:00:00') : null;
+    if (!e) return null;
+    const datePart = e.substring(0, 10);
+    return new Date(datePart + 'T00:00:00');
   });
 
   onDateStartChange(value: Date | null): void {
+    this.selectedBucket.set(null);
     this.query.update(q => ({
       ...q,
       filters: {
         ...q.filters,
         dateRange: {
-          start: value ? this.formatDate(value) : '',
+          start: value ? this.formatDateWithTime(value, this.startTime) : '',
           end: q.filters.dateRange?.end ?? '',
         },
       },
@@ -155,16 +192,55 @@ export class ExploreBuilderComponent implements OnInit {
   }
 
   onDateEndChange(value: Date | null): void {
+    this.selectedBucket.set(null);
     this.query.update(q => ({
       ...q,
       filters: {
         ...q.filters,
         dateRange: {
           start: q.filters.dateRange?.start ?? '',
-          end: value ? this.formatDate(value) : '',
+          end: value ? this.formatDateWithTime(value, this.endTime) : '',
         },
       },
     }));
+  }
+
+  onStartTimeChange(time: string): void {
+    this.startTime = time;
+    this.selectedBucket.set(null);
+    const currentStart = this.query().filters.dateRange?.start;
+    if (currentStart) {
+      const datePart = currentStart.substring(0, 10);
+      this.query.update(q => ({
+        ...q,
+        filters: {
+          ...q.filters,
+          dateRange: {
+            start: time ? `${datePart}T${time}` : datePart,
+            end: q.filters.dateRange?.end ?? '',
+          },
+        },
+      }));
+    }
+  }
+
+  onEndTimeChange(time: string): void {
+    this.endTime = time;
+    this.selectedBucket.set(null);
+    const currentEnd = this.query().filters.dateRange?.end;
+    if (currentEnd) {
+      const datePart = currentEnd.substring(0, 10);
+      this.query.update(q => ({
+        ...q,
+        filters: {
+          ...q.filters,
+          dateRange: {
+            start: q.filters.dateRange?.start ?? '',
+            end: time ? `${datePart}T${time}` : datePart,
+          },
+        },
+      }));
+    }
   }
 
   private formatDate(d: Date): string {
@@ -172,6 +248,11 @@ export class ExploreBuilderComponent implements OnInit {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private formatDateWithTime(d: Date, time: string | null): string {
+    const datePart = this.formatDate(d);
+    return time ? `${datePart}T${time}` : datePart;
   }
 
   // --- Save / Load ---

@@ -55,6 +55,17 @@
     </mat-button-toggle-group>
   </div>
 
+  <!-- Time Bucket Selector -->
+  <div class="builder-section" *ngIf="showDateRange()">
+    <h4>Time Range</h4>
+    <mat-button-toggle-group [value]="selectedBucket()"
+                             (change)="onBucketChange($event.value)">
+      <mat-button-toggle *ngFor="let key of rangeKeys" [value]="key">
+        {{ key }}
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
   <!-- Filters -->
   <div class="builder-section">
     <h4>Filters</h4>
@@ -85,22 +96,36 @@
 
       <!-- Date Range -->
       <ng-container *ngIf="showDateRange()">
-        <mat-form-field appearance="outline">
-          <mat-label>Start Date</mat-label>
-          <input matInput [matDatepicker]="startDatePicker"
-                 [value]="startDateValue()"
-                 (dateChange)="onDateStartChange($event.value)">
-          <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
-          <mat-datepicker #startDatePicker></mat-datepicker>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>End Date</mat-label>
-          <input matInput [matDatepicker]="endDatePicker"
-                 [value]="endDateValue()"
-                 (dateChange)="onDateEndChange($event.value)">
-          <mat-datepicker-toggle matIconSuffix [for]="endDatePicker"></mat-datepicker-toggle>
-          <mat-datepicker #endDatePicker></mat-datepicker>
-        </mat-form-field>
+        <div class="date-time-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Start Date</mat-label>
+            <input matInput [matDatepicker]="startDatePicker"
+                   [value]="startDateValue()"
+                   (dateChange)="onDateStartChange($event.value)">
+            <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+            <mat-datepicker #startDatePicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="time-field">
+            <mat-label>Start Time</mat-label>
+            <input matInput type="time" [ngModel]="startTime"
+                   (ngModelChange)="onStartTimeChange($event)">
+          </mat-form-field>
+        </div>
+        <div class="date-time-row">
+          <mat-form-field appearance="outline">
+            <mat-label>End Date</mat-label>
+            <input matInput [matDatepicker]="endDatePicker"
+                   [value]="endDateValue()"
+                   (dateChange)="onDateEndChange($event.value)">
+            <mat-datepicker-toggle matIconSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+            <mat-datepicker #endDatePicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="time-field">
+            <mat-label>End Time</mat-label>
+            <input matInput type="time" [ngModel]="endTime"
+                   (ngModelChange)="onEndTimeChange($event)">
+          </mat-form-field>
+        </div>
       </ng-container>
     </div>
   </div>
