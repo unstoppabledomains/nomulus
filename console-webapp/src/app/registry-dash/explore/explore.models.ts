@@ -20,7 +20,7 @@ export type DataSourceType =
   | 'EXPIRATION_CURVE'
   | 'PRICING_RULES';
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'stacked-bar' | 'area';
+export type ChartType = 'bar' | 'line' | 'pie' | 'stacked-bar' | 'area' | 'horizontal-bar';
 
 export interface MetricSpec {
   field: string;
