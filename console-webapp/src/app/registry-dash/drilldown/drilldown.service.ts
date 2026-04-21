@@ -14,6 +14,7 @@
 
 import { Injectable } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { BackendService } from '../../shared/services/backend.service';
 import { RegistryDashService } from '../registry-dash.service';
 import { DrillDownDialogComponent } from './drilldown-dialog.component';
 import { DrillDownDialogData } from './drilldown.models';
@@ -22,7 +23,8 @@ import { DrillDownDialogData } from './drilldown.models';
 export class DrillDownService {
   constructor(
     private dialog: MatDialog,
-    private dashService: RegistryDashService
+    private dashService: RegistryDashService,
+    private backend: BackendService,
   ) {}
 
   // --- Click-to-filter ---
@@ -179,6 +181,31 @@ export class DrillDownService {
         amount: vals.amount,
         netAmount: vals.netAmount,
       })),
+      onRowClick: (row) => {
+        const opName = String(row['operation']);
+        const pts = d.periodRevenue.filter(pt => pt.tld === cleaned && pt.operation === opName);
+        if (pts.length === 0) return null;
+        const periodSet = new Set<string>();
+        pts.forEach(pt => periodSet.add(pt.period));
+        const periods = [...periodSet].sort();
+        return {
+          title: `Revenue: .${cleaned} — ${opName}`,
+          subtitle: pts[0]?.currency ?? '',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'amount', label: 'Gross', format: 'currency' as const },
+            { key: 'netAmount', label: 'Net', format: 'currency' as const },
+          ],
+          rows: periods.map(period => {
+            const match = pts.find(pt => pt.period === period);
+            return {
+              period,
+              amount: match?.amount ?? 0,
+              netAmount: match?.netAmountToRegistry ?? 0,
+            };
+          }),
+        };
+      },
     });
   }
 
@@ -211,6 +238,31 @@ export class DrillDownService {
           amount: vals.amount,
           netAmount: vals.netAmount,
         })),
+      onRowClick: (row) => {
+        const tldName = String(row['tld']).replace(/^\./, '');
+        const pts = d.periodRevenue.filter(pt => pt.tld === tldName && pt.operation === operation);
+        if (pts.length === 0) return null;
+        const periodSet = new Set<string>();
+        pts.forEach(pt => periodSet.add(pt.period));
+        const periods = [...periodSet].sort();
+        return {
+          title: `Revenue: .${tldName} — ${operation}`,
+          subtitle: pts[0]?.currency ?? '',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'amount', label: 'Gross', format: 'currency' as const },
+            { key: 'netAmount', label: 'Net', format: 'currency' as const },
+          ],
+          rows: periods.map(period => {
+            const match = pts.find(pt => pt.period === period);
+            return {
+              period,
+              amount: match?.amount ?? 0,
+              netAmount: match?.netAmountToRegistry ?? 0,
+            };
+          }),
+        };
+      },
     });
   }
 
@@ -274,6 +326,57 @@ export class DrillDownService {
         operation: f.operation,
         defaultPrice: f.defaultPrice,
       })),
+    });
+  }
+
+  drillDownByRegistrar(registrarId: string) {
+    this.backend.getRegistryDashRegistrarDetail(registrarId).subscribe(data => {
+      if (!data || data.length === 0) {
+        this.openDialog({
+          title: `Registrar: ${registrarId}`,
+          subtitle: 'No domain data available',
+          columns: [{ key: 'info', label: 'Info' }],
+          rows: [{ info: 'No domains found for this registrar.' }],
+        });
+        return;
+      }
+      const total = data.reduce((s, d) => s + d.count, 0);
+      this.openDialog({
+        title: `TLD Breakdown: ${registrarId}`,
+        subtitle: `${total.toLocaleString()} total domains`,
+        columns: [
+          { key: 'tld', label: 'TLD' },
+          { key: 'count', label: 'Domains', format: 'number' },
+        ],
+        rows: data.map(d => ({ tld: `.${d.tld}`, count: d.count })),
+        onRowClick: (row) => {
+          const tldName = String(row['tld']).replace(/^\./, '');
+          const d = this.dashService.domainActivity();
+          if (!d) return null;
+          const points = d.activity.filter(pt => pt.tld === tldName);
+          if (points.length === 0) return null;
+          const periodSet = new Set<string>();
+          const typeSet = new Set<string>();
+          for (const pt of points) { periodSet.add(pt.period); typeSet.add(pt.type); }
+          const periods = [...periodSet].sort();
+          const types = [...typeSet].sort();
+          return {
+            title: `Activity: .${tldName}`,
+            subtitle: `${periods[0]} — ${periods[periods.length - 1]}`,
+            columns: [
+              { key: 'period', label: 'Period' },
+              ...types.map(t => ({ key: t, label: t, format: 'number' as const })),
+            ],
+            rows: periods.map(period => {
+              const r: Record<string, any> = { period };
+              for (const type of types) {
+                r[type] = points.find(pt => pt.period === period && pt.type === type)?.count ?? 0;
+              }
+              return r;
+            }),
+          };
+        },
+      });
     });
   }
 

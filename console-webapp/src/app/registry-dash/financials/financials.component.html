@@ -54,8 +54,11 @@
             <div class="chart-container">
               <h3>Registry Revenue by Operation</h3>
               <p class="chart-description">Net registry revenue by operation type — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
-              <div echarts [options]="overviewRevenueByOpOptions()!" [theme]="'ud-brand'" class="chart"
-                   (chartContextMenu)="onOverviewRevenueByOpContext($event)"></div>
+              <div appLongPress (longPress)="onOverviewRevenueByOpLongPress()">
+                <div echarts [options]="overviewRevenueByOpOptions()!" [theme]="'ud-brand'" class="chart"
+                     (chartContextMenu)="onOverviewRevenueByOpContext($event)"
+                     (chartMouseOver)="lastHoveredOverviewRevenueByOp = $event"></div>
+              </div>
             </div>
           </div>
 
@@ -86,7 +89,8 @@
             </span>
           </div>
           <div class="chart-rows">
-            <div class="bar-row" *ngFor="let row of feesByOperationChartData()"
+            <div class="bar-row" *ngFor="let row of feesByOperationChartData()" appLongPress
+                 (longPress)="onFeesByTldContext($event, row.tld)"
                  (click)="onFeesByTldClick(row.tld)"
                  (contextmenu)="onFeesByTldContext($event, row.tld)">
               <span class="bar-label">.{{ row.tld }}</span>

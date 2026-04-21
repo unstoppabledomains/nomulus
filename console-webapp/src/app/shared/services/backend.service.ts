@@ -435,6 +435,12 @@ export class BackendService {
     });
   }
 
+  updateRegistryDashSettingsSelf(settings: Record<string, any>): Observable<Record<string, any>> {
+    return this.http
+      .post<Record<string, any>>('/console-api/registry-dash/settings', settings)
+      .pipe(catchError((err) => this.errorCatcher<Record<string, any>>(err)));
+  }
+
   // --- Registry Dashboard Analytics ---
 
   getRegistryDashRevenueBilling(
@@ -490,6 +496,19 @@ export class BackendService {
     return this.http
       .get<EffectiveFeeEntry[]>('/console-api/registry-dash/effective-fees')
       .pipe(catchError((err) => this.errorCatcher<EffectiveFeeEntry[]>(err)));
+  }
+
+  getRegistryDashRegistrarDetail(
+    registrarId: string,
+    filterTlds?: string[]
+  ): Observable<{ tld: string; count: number }[]> {
+    let url = `/console-api/registry-dash/registrar-detail?registrarId=${encodeURIComponent(registrarId)}`;
+    if (filterTlds?.length) {
+      url += `&filterTlds=${filterTlds.join(',')}`;
+    }
+    return this.http
+      .get<{ tld: string; count: number }[]>(url)
+      .pipe(catchError((err) => this.errorCatcher<{ tld: string; count: number }[]>(err)));
   }
 
   postRegistryDashExplore(query: any): Observable<any> {

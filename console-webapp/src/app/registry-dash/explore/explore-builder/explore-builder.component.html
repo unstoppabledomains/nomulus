@@ -132,5 +132,20 @@
         <mat-icon class="delete-icon" (click)="deleteView(v, $event)">close</mat-icon>
       </button>
     </mat-menu>
+    <button mat-stroked-button (click)="saveNamedView()"
+            [disabled]="exploreService.savingView()">
+      <mat-icon>bookmark</mat-icon> Save to Server
+    </button>
+    <button mat-stroked-button [matMenuTriggerFor]="savedMenu"
+            [disabled]="savedViews().length === 0">
+      <mat-icon>bookmark</mat-icon> Saved Views
+    </button>
+    <mat-menu #savedMenu="matMenu">
+      <button mat-menu-item *ngFor="let v of savedViews()" (click)="loadView(v)">
+        <mat-icon>cloud_done</mat-icon>
+        <span>{{ v.name }}</span>
+        <mat-icon class="delete-icon" (click)="deleteNamedView(v, $event)">close</mat-icon>
+      </button>
+    </mat-menu>
   </div>
 </div>

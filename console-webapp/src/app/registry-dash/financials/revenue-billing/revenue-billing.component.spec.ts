@@ -19,6 +19,8 @@ import { of } from 'rxjs';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing.component';
 import { RegistryDashService, RevenueBillingData } from '../../registry-dash.service';
 import { NgxEchartsDirective } from 'ngx-echarts';
+import { LongPressDirective } from '../../drilldown/long-press.directive';
+import { BackendService } from '../../../shared/services/backend.service';
 
 describe('RevenueBillingComponent', () => {
   let component: RevenueBillingComponent;
@@ -52,10 +54,13 @@ describe('RevenueBillingComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [RevenueBillingComponent, NoopAnimationsModule],
-      providers: [{ provide: RegistryDashService, useValue: mockDashService }],
+      providers: [
+        { provide: RegistryDashService, useValue: mockDashService },
+        { provide: BackendService, useValue: jasmine.createSpyObj('BackendService', ['getRegistryDashRegistrarDetail']) },
+      ],
     })
       .overrideComponent(RevenueBillingComponent, {
-        remove: { imports: [NgxEchartsDirective], providers: [] },
+        remove: { imports: [NgxEchartsDirective, LongPressDirective], providers: [] },
       })
       .compileComponents();
 

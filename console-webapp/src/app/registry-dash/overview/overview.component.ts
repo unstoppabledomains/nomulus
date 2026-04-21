@@ -21,6 +21,7 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { RegistryDashService } from '../registry-dash.service';
 import { UD_ECHARTS_PROVIDER, withDrillDown } from '../ud-echarts';
 import { DrillDownService } from '../drilldown/drilldown.service';
+import { LongPressDirective } from '../drilldown/long-press.directive';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
 const CHART_COLORS = [
@@ -39,13 +40,15 @@ const ACTIVITY_COLORS: Record<string, string> = {
 
 @Component({
   selector: 'app-registry-dash-overview',
-  imports: [MaterialModule, CommonModule, NgxEchartsDirective, FilterPanelComponent],
+  imports: [MaterialModule, CommonModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './overview.component.html',
   styleUrls: ['./overview.component.scss'],
 })
 export class OverviewComponent {
   private destroyRef = inject(DestroyRef);
+  lastHoveredActivity: any = null;
+  lastHoveredRenewal: any = null;
   barChartData = computed(() => {
     const overview = this.dashService.overview();
     if (!overview) return [];
@@ -184,5 +187,22 @@ export class OverviewComponent {
 
   onRegistrarBarClick(registrarId: string) {
     this.drillDown.applyRegistrarFilter(registrarId);
+  }
+
+  onRegistrarBarContext(event: MouseEvent, registrarId: string) {
+    event.preventDefault();
+    this.drillDown.drillDownByRegistrar(registrarId);
+  }
+
+  onActivityLongPress() {
+    if (this.lastHoveredActivity?.name) {
+      this.drillDown.drillDownActivityByPeriod(this.lastHoveredActivity.name);
+    }
+  }
+
+  onRenewalLongPress() {
+    if (this.lastHoveredRenewal?.name) {
+      this.drillDown.drillDownRenewalByTld(this.lastHoveredRenewal.name);
+    }
   }
 }

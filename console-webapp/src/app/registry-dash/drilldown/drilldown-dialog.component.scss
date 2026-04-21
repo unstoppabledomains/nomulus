@@ -12,3 +12,35 @@
 .drilldown-table {
   width: 100%;
 }
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #9191A1;
+}
+
+.breadcrumb-link {
+  color: #0D67FE;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+}
+
+.breadcrumb-current {
+  color: #2D2D32;
+}
+
+.breadcrumb-sep {
+  font-size: 16px;
+  height: 16px;
+  width: 16px;
+}
+
+tr.clickable {
+  cursor: pointer;
+  &:hover {
+    background: rgba(13, 103, 254, 0.04);
+  }
+}

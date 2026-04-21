@@ -23,6 +23,7 @@ import { RegistryDashService } from '../registry-dash.service';
 import { RevenueBillingComponent, RANGE_CONFIG } from './revenue-billing/revenue-billing.component';
 import { DrillDownService } from '../drilldown/drilldown.service';
 import { withDrillDown } from '../ud-echarts';
+import { LongPressDirective } from '../drilldown/long-press.directive';
 import { ForecastingComponent } from './forecasting/forecasting.component';
 import { EffectiveFeesComponent } from './effective-fees/effective-fees.component';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
@@ -37,13 +38,14 @@ const OPERATION_COLORS: Record<string, string> = {
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, FilterPanelComponent],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, LongPressDirective, FilterPanelComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
 })
 export class FinancialsComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  lastHoveredOverviewRevenueByOp: any = null;
   selectedTab = signal(0);
   selectedOverviewRange = signal('12m');
   overviewRangeKeys = Object.keys(RANGE_CONFIG);
@@ -190,5 +192,11 @@ export class FinancialsComponent implements OnInit {
   onFeesByTldContext(event: MouseEvent, tld: string) {
     event.preventDefault();
     this.drillDown.drillDownFeesByTld(tld);
+  }
+
+  onOverviewRevenueByOpLongPress() {
+    if (this.lastHoveredOverviewRevenueByOp?.name) {
+      this.drillDown.drillDownRevenueByOperation(this.lastHoveredOverviewRevenueByOp.name);
+    }
   }
 }

@@ -204,6 +204,7 @@ export class RegistryDashService {
   };
 
   columnVisibility = signal<Record<string, boolean>>({ ...RegistryDashService.DEFAULT_VISIBILITY });
+  settingsCache = signal<Record<string, any>>({});
   loading = signal(false);
   error = signal<string | undefined>(undefined);
 
@@ -289,6 +290,7 @@ export class RegistryDashService {
       .getRegistryDashSettings()
       .pipe(
         tap((settings) => {
+          this.settingsCache.set(settings);
           const cv = settings?.['columnVisibility'] ?? {};
           // Merge: defaults first, then explicit settings override
           this.columnVisibility.set({ ...RegistryDashService.DEFAULT_VISIBILITY, ...cv });
@@ -309,6 +311,18 @@ export class RegistryDashService {
         } catch { /* ignore parse errors */ }
       }),
       catchError((err) => this.handleError<unknown>(err))
+    );
+  }
+
+  updateSettingsSelf(partialSettings: Record<string, any>): Observable<Record<string, any>> {
+    const merged = { ...this.settingsCache(), ...partialSettings };
+    return this.backend.updateRegistryDashSettingsSelf(merged).pipe(
+      tap((returned) => {
+        this.settingsCache.set(returned);
+        const cv = returned?.['columnVisibility'] ?? {};
+        this.columnVisibility.set({ ...RegistryDashService.DEFAULT_VISIBILITY, ...cv });
+      }),
+      catchError((err) => this.handleError<Record<string, any>>(err))
     );
   }
 

@@ -23,6 +23,7 @@ import { RegistryDashService } from '../../registry-dash.service';
 import { RANGE_CONFIG } from '../revenue-billing/revenue-billing.component';
 import { DrillDownService } from '../../drilldown/drilldown.service';
 import { withDrillDown } from '../../ud-echarts';
+import { LongPressDirective } from '../../drilldown/long-press.directive';
 
 const TLD_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -36,13 +37,15 @@ type ForecastMethod = 'none' | 'trend' | 'confidence' | 'ema' | 'seasonal';
 @Component({
   selector: 'app-forecasting',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './forecasting.component.html',
   styleUrls: ['./forecasting.component.scss'],
 })
 export class ForecastingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  lastHoveredNetGrowth: any = null;
+  lastHoveredExpiration: any = null;
   selectedRange = signal('12m');
   rangeKeys = Object.keys(RANGE_CONFIG);
   forecastMethod = signal<ForecastMethod>('trend');
@@ -309,6 +312,18 @@ export class ForecastingComponent implements OnInit {
   onNetGrowthContext(event: any) {
     event.event?.event?.preventDefault();
     if (event.name) this.drillDown.drillDownNetGrowthByPeriod(event.name);
+  }
+
+  onNetGrowthLongPress() {
+    if (this.lastHoveredNetGrowth?.name) {
+      this.drillDown.drillDownNetGrowthByPeriod(this.lastHoveredNetGrowth.name);
+    }
+  }
+
+  onExpirationLongPress() {
+    if (this.lastHoveredExpiration?.seriesName) {
+      this.drillDown.drillDownExpirationByTld(this.lastHoveredExpiration.seriesName);
+    }
   }
 
   // --- Forecasting utilities ---

@@ -20,7 +20,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
-import { DrillDownDialogData } from './drilldown.models';
+import { DrillDownDialogData, MAX_DRILL_DEPTH } from './drilldown.models';
 
 @Component({
   selector: 'app-drilldown-dialog',
@@ -31,21 +31,63 @@ import { DrillDownDialogData } from './drilldown.models';
   styleUrls: ['./drilldown-dialog.component.scss'],
 })
 export class DrillDownDialogComponent implements AfterViewInit {
+  levels: DrillDownDialogData[];
   displayedColumns: string[];
   dataSource: MatTableDataSource<Record<string, any>>;
 
   @ViewChild(MatSort) sort!: MatSort;
 
+  get currentLevel(): DrillDownDialogData {
+    return this.levels[this.levels.length - 1];
+  }
+
+  get canGoBack(): boolean {
+    return this.levels.length > 1;
+  }
+
+  get isClickable(): boolean {
+    return !!this.currentLevel.onRowClick && this.levels.length < MAX_DRILL_DEPTH;
+  }
+
   constructor(
     public dialogRef: MatDialogRef<DrillDownDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: DrillDownDialogData
   ) {
+    this.levels = [data];
     this.displayedColumns = data.columns.map(c => c.key);
     this.dataSource = new MatTableDataSource(data.rows);
   }
 
   ngAfterViewInit() {
     this.dataSource.sort = this.sort;
+  }
+
+  onRowClick(row: Record<string, any>) {
+    if (!this.currentLevel.onRowClick) return;
+    if (this.levels.length >= MAX_DRILL_DEPTH) return;
+    const nextLevel = this.currentLevel.onRowClick(row);
+    if (!nextLevel) return;
+    this.levels.push(nextLevel);
+    this.refreshTable();
+  }
+
+  goBack() {
+    if (this.levels.length <= 1) return;
+    this.levels.pop();
+    this.refreshTable();
+  }
+
+  goToLevel(index: number) {
+    if (index >= this.levels.length - 1) return;
+    this.levels.splice(index + 1);
+    this.refreshTable();
+  }
+
+  private refreshTable() {
+    const level = this.currentLevel;
+    this.displayedColumns = level.columns.map(c => c.key);
+    this.dataSource = new MatTableDataSource(level.rows);
+    setTimeout(() => { this.dataSource.sort = this.sort; });
   }
 
   formatValue(value: any, format?: 'number' | 'currency' | 'percent'): string {
