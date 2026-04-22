@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Injectable, signal } from '@angular/core';
+import { effect, Injectable, signal } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -35,7 +35,12 @@ export class ExploreService {
   constructor(
     private backend: BackendService,
     private dashService: RegistryDashService,
-  ) {}
+  ) {
+    effect(() => {
+      const settings = this.dashService.settingsCache();
+      this.savedViews.set(settings?.['savedExploreViews'] ?? []);
+    });
+  }
 
   explore(query: ExploreQuery): Observable<ExploreResult> {
     this.loading.set(true);

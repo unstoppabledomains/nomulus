@@ -24,6 +24,10 @@
     <mat-slide-toggle [checked]="autoUpdate()" (change)="autoUpdate.set($event.checked)">
       Auto-update
     </mat-slide-toggle>
+    <span class="auto-update-status" *ngIf="autoUpdate() && loading()">
+      <mat-spinner diameter="16"></mat-spinner>
+      Running...
+    </span>
   </div>
 
   <!-- Result Info -->

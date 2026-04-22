@@ -193,6 +193,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
   private final ImmutableSet<String> filterTlds;
+  private final ImmutableSet<String> filterRegistrarIds;
   private final java.time.Clock clock;
 
   @Inject
@@ -201,8 +202,9 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
       @Parameter("granularity") Optional<String> granularity,
-      @Parameter("filterTlds") ImmutableSet<String> filterTlds) {
-    this(consoleApiParams, months, lookbackHours, granularity, filterTlds,
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds,
+      @Parameter("filterRegistrarIds") ImmutableSet<String> filterRegistrarIds) {
+    this(consoleApiParams, months, lookbackHours, granularity, filterTlds, filterRegistrarIds,
         java.time.Clock.systemUTC());
   }
 
@@ -213,12 +215,14 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
       Optional<Integer> lookbackHours,
       Optional<String> granularity,
       ImmutableSet<String> filterTlds,
+      ImmutableSet<String> filterRegistrarIds,
       java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
     this.filterTlds = filterTlds;
+    this.filterRegistrarIds = filterRegistrarIds;
     this.clock = clock;
   }
 
@@ -235,6 +239,7 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> tlds =
         RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
+    ImmutableSet<String> registrarIds = filterRegistrarIds;
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("periodRevenue", List.of());
@@ -274,23 +279,24 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
         () -> {
           boolean useScoped = !tlds.isEmpty();
           String sql = buildSql(resolvedGran, !useScoped);
+          boolean hasRegistrarFilter = !registrarIds.isEmpty();
+          if (hasRegistrarFilter) {
+            sql = appendRegistrarFilter(sql);
+          }
 
           @SuppressWarnings("unchecked")
           List<Object[]> results;
-          if (!useScoped) {
-            results = tm().getEntityManager()
-                .createNativeQuery(sql)
-                .setParameter("startDate", startDate)
-                .setParameter("endDate", endDate)
-                .getResultList();
-          } else {
-            results = tm().getEntityManager()
-                .createNativeQuery(sql)
-                .setParameter("startDate", startDate)
-                .setParameter("endDate", endDate)
-                .setParameter("tlds", tlds)
-                .getResultList();
+          var query = tm().getEntityManager()
+              .createNativeQuery(sql)
+              .setParameter("startDate", startDate)
+              .setParameter("endDate", endDate);
+          if (useScoped) {
+            query.setParameter("tlds", tlds);
           }
+          if (hasRegistrarFilter) {
+            query.setParameter("registrarIds", registrarIds);
+          }
+          results = query.getResultList();
 
           List<Map<String, Object>> periodRevenue = new ArrayList<>();
           BigDecimal totalRevenue = BigDecimal.ZERO;
@@ -334,6 +340,15 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
             currency = cur;
           }
 
+          Map<String, Object> zeroTemplate = new HashMap<>();
+          zeroTemplate.put("tld", "");
+          zeroTemplate.put("operation", "");
+          zeroTemplate.put("amount", BigDecimal.ZERO);
+          zeroTemplate.put("netAmountToRegistry", BigDecimal.ZERO);
+          zeroTemplate.put("currency", currency);
+          List<Map<String, Object>> filledRevenue = TimeSeriesUtil.zeroFill(
+              startDate, endDate, resolvedGran, periodRevenue, "period", zeroTemplate);
+
           Map<String, Object> totals = new HashMap<>();
           totals.put("totalRevenue", totalRevenue);
           totals.put("totalNetAmountToRegistry", totalNetAmountToRegistry);
@@ -342,12 +357,19 @@ public class RegistryDashRevenueBillingAction extends ConsoleApiAction {
           totals.put("byOperationNetAmountToRegistry", byOperationNetAmountToRegistry);
 
           Map<String, Object> response = new HashMap<>();
-          response.put("periodRevenue", periodRevenue);
+          response.put("periodRevenue", filledRevenue);
           response.put("totals", totals);
 
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
           consoleApiParams.response().setStatus(SC_OK);
         });
+  }
+
+  private static String appendRegistrarFilter(String sql) {
+    return sql.replace(
+        "AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')",
+        "AND d.current_sponsor_registrar_id IN :registrarIds\n"
+            + "        AND b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')");
   }
 
   private static String buildSql(String granularity, boolean isAdmin) {

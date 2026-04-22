@@ -126,7 +126,8 @@ class RegistryDashRevenueBillingActionTest {
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashRevenueBillingAction action =
         new RegistryDashRevenueBillingAction(
-            params, months, lookbackHours, granularity, ImmutableSet.of(), javaClock);
+            params, months, lookbackHours, granularity,
+            ImmutableSet.of(), ImmutableSet.of(), javaClock);
     action.run();
     return new RunResult((FakeResponse) params.response());
   }

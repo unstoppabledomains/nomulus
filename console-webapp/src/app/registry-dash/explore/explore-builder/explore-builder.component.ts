@@ -81,22 +81,30 @@ export class ExploreBuilderComponent implements OnInit {
   recentViews = computed(() => this.exploreService.getRecentViews());
   savedViews = computed(() => this.exploreService.savedViews());
 
-  ngOnInit(): void {
-    this.exploreService.loadSavedViews();
-  }
+  ngOnInit(): void {}
 
   // --- Handlers ---
 
   onDataSourceChange(ds: DataSourceType): void {
     const schema = this.schemas[ds];
     const defaultMetric = schema.metrics[0];
-    this.query.update(q => ({
-      ...q,
-      dataSource: ds,
-      metrics: [{ field: defaultMetric.field, aggregation: 'sum' }],
-      dimensions: schema.dimensions.length > 0 ? [schema.dimensions[0].field] : [],
-      granularity: schema.supportsGranularity ? 'month' : undefined,
-    }));
+    const allowedFilters = new Set(schema.filters);
+    this.query.update(q => {
+      const cleaned: Record<string, any> = {};
+      for (const [key, val] of Object.entries(q.filters)) {
+        if (allowedFilters.has(key) && val != null) {
+          cleaned[key] = val;
+        }
+      }
+      return {
+        ...q,
+        dataSource: ds,
+        metrics: [{ field: defaultMetric.field, aggregation: 'sum' }],
+        dimensions: schema.dimensions.length > 0 ? [schema.dimensions[0].field] : [],
+        granularity: schema.supportsGranularity ? 'month' : undefined,
+        filters: cleaned,
+      };
+    });
   }
 
   onMetricsChange(fields: string[]): void {
