@@ -181,6 +181,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
   private final ImmutableSet<String> filterTlds;
+  private final ImmutableSet<String> filterRegistrarIds;
   private final java.time.Clock clock;
 
   @Inject
@@ -189,8 +190,9 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
       @Parameter("granularity") Optional<String> granularity,
-      @Parameter("filterTlds") ImmutableSet<String> filterTlds) {
-    this(consoleApiParams, months, lookbackHours, granularity, filterTlds,
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds,
+      @Parameter("filterRegistrarIds") ImmutableSet<String> filterRegistrarIds) {
+    this(consoleApiParams, months, lookbackHours, granularity, filterTlds, filterRegistrarIds,
         java.time.Clock.systemUTC());
   }
 
@@ -201,12 +203,14 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
       Optional<Integer> lookbackHours,
       Optional<String> granularity,
       ImmutableSet<String> filterTlds,
+      ImmutableSet<String> filterRegistrarIds,
       java.time.Clock clock) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
     this.filterTlds = filterTlds;
+    this.filterRegistrarIds = filterRegistrarIds;
     this.clock = clock;
   }
 
@@ -223,6 +227,7 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> tlds =
         RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
+    ImmutableSet<String> registrarIds = filterRegistrarIds;
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("activity", List.of());
@@ -256,24 +261,25 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
         () -> {
           boolean useScoped = !tlds.isEmpty();
           String sql = buildSql(resolvedGran, !useScoped);
+          boolean hasRegistrarFilter = !registrarIds.isEmpty();
+          if (hasRegistrarFilter) {
+            sql = appendRegistrarFilter(sql);
+          }
 
           // Activity data from DomainHistory (uses actual event time)
           @SuppressWarnings("unchecked")
           List<Object[]> activityResults;
-          if (!useScoped) {
-            activityResults = tm().getEntityManager()
-                .createNativeQuery(sql)
-                .setParameter("startDate", startDate)
-                .setParameter("endDate", endDate)
-                .getResultList();
-          } else {
-            activityResults = tm().getEntityManager()
-                .createNativeQuery(sql)
-                .setParameter("startDate", startDate)
-                .setParameter("endDate", endDate)
-                .setParameter("tlds", tlds)
-                .getResultList();
+          var activityQuery = tm().getEntityManager()
+              .createNativeQuery(sql)
+              .setParameter("startDate", startDate)
+              .setParameter("endDate", endDate);
+          if (useScoped) {
+            activityQuery.setParameter("tlds", tlds);
           }
+          if (hasRegistrarFilter) {
+            activityQuery.setParameter("registrarIds", registrarIds);
+          }
+          activityResults = activityQuery.getResultList();
 
           List<Map<String, Object>> activity = new ArrayList<>();
           for (Object[] row : activityResults) {
@@ -301,29 +307,55 @@ public class RegistryDashDomainActivityAction extends ConsoleApiAction {
           }
 
           // Current domain counts by TLD
+          String countsQuery;
+          if (hasRegistrarFilter) {
+            countsQuery = useScoped
+                ? CURRENT_COUNTS_SCOPED
+                    .replace("GROUP BY d.tld",
+                        "AND d.currentSponsorRegistrarId IN :registrarIds\n      GROUP BY d.tld")
+                : CURRENT_COUNTS_ALL
+                    .replace("GROUP BY d.tld",
+                        "AND d.currentSponsorRegistrarId IN :registrarIds\n      GROUP BY d.tld");
+          } else {
+            countsQuery = useScoped ? CURRENT_COUNTS_SCOPED : CURRENT_COUNTS_ALL;
+          }
           @SuppressWarnings("unchecked")
-          List<Object[]> countResults =
-              !useScoped
-                  ? tm().getEntityManager()
-                      .createQuery(CURRENT_COUNTS_ALL)
-                      .getResultList()
-                  : tm().getEntityManager()
-                      .createQuery(CURRENT_COUNTS_SCOPED)
-                      .setParameter("tlds", tlds)
-                      .getResultList();
+          List<Object[]> countResults;
+          var countsQ = tm().getEntityManager().createQuery(countsQuery);
+          if (useScoped) {
+            countsQ.setParameter("tlds", tlds);
+          }
+          if (hasRegistrarFilter) {
+            countsQ.setParameter("registrarIds", registrarIds);
+          }
+          countResults = countsQ.getResultList();
 
           Map<String, Long> currentCounts = new HashMap<>();
           for (Object[] row : countResults) {
             currentCounts.put((String) row[0], (Long) row[1]);
           }
 
+          Map<String, Object> zeroTemplate = new HashMap<>();
+          zeroTemplate.put("tld", "");
+          zeroTemplate.put("type", "");
+          zeroTemplate.put("count", 0L);
+          List<Map<String, Object>> filledActivity = TimeSeriesUtil.zeroFill(
+              startDate, endDate, resolvedGran, activity, "period", zeroTemplate);
+
           Map<String, Object> response = new HashMap<>();
-          response.put("activity", activity);
+          response.put("activity", filledActivity);
           response.put("currentCounts", currentCounts);
 
           consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
           consoleApiParams.response().setStatus(SC_OK);
         });
+  }
+
+  private static String appendRegistrarFilter(String sql) {
+    return sql.replace(
+        "AND dh.history_type IN (",
+        "AND d.current_sponsor_registrar_id IN :registrarIds\n"
+            + "        AND dh.history_type IN (");
   }
 
   private static String buildSql(String granularity, boolean isAdmin) {

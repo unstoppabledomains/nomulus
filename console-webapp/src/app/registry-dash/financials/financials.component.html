@@ -2,7 +2,7 @@
   <h2>Registry Financials</h2>
   <p class="subtitle">Fee schedules, revenue, and financial data (read-only)</p>
 
-  <app-filter-panel></app-filter-panel>
+  <app-filter-panel [showTimeRange]="timeRelevantTab()"></app-filter-panel>
 
   <div *ngIf="dashService.loading()" class="loading">
     <mat-spinner diameter="40"></mat-spinner>
@@ -64,7 +64,7 @@
     </mat-tab>
 
     <!-- Fees by TLD Tab -->
-    <mat-tab label="Fees by TLD">
+    <mat-tab label="Default Fees by TLD">
       <div class="tab-content">
         <p class="tab-description">
           Default billing amounts per TLD per operation, sourced from the Nomulus TLD configuration.

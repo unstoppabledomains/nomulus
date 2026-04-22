@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../../material.module';
 import { RegistryDashService, RANGE_KEYS } from '../registry-dash.service';
@@ -33,6 +33,10 @@ interface FilterChip {
 export class FilterPanelComponent {
   protected dashService = inject(RegistryDashService);
   rangeKeys = RANGE_KEYS;
+
+  showTimeRange = input(true);
+  showTldFilter = input(true);
+  showRegistrarFilter = input(true);
 
   expanded = computed(() => this.dashService.filterPanelExpanded());
 

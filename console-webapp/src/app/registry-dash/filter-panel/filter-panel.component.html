@@ -6,9 +6,11 @@
         <mat-icon class="filter-icon">filter_list</mat-icon>
         <div class="chip-area">
           <mat-chip-set>
-            <mat-chip (click)="$event.stopPropagation()">
-              {{ dashService.selectedTimeRange() }}
-            </mat-chip>
+            @if (showTimeRange()) {
+              <mat-chip (click)="$event.stopPropagation()">
+                {{ dashService.selectedTimeRange() }}
+              </mat-chip>
+            }
             @for (chip of activeChips(); track chip.value) {
               <mat-chip (removed)="removeChip(chip)" (click)="$event.stopPropagation()">
                 {{ chip.label }}
@@ -35,35 +37,39 @@
         </span>
       </div>
       <div class="filter-body">
-        <div class="time-range">
+        @if (showTimeRange()) {
           <mat-button-toggle-group [value]="dashService.selectedTimeRange()" (change)="onTimeRangeChange($event.value)">
             @for (key of rangeKeys; track key) {
               <mat-button-toggle [value]="key">{{ key }}</mat-button-toggle>
             }
           </mat-button-toggle-group>
-        </div>
+        }
 
-        <mat-form-field appearance="outline" class="filter-select">
-          <mat-label>TLDs</mat-label>
-          <mat-select multiple
-                      [value]="dashService.selectedTlds()"
-                      (selectionChange)="onTldsChange($event.value)">
-            @for (tld of filteredTldOptions(); track tld) {
-              <mat-option [value]="tld">.{{ tld }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+        @if (showTldFilter()) {
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>TLDs</mat-label>
+            <mat-select multiple
+                        [value]="dashService.selectedTlds()"
+                        (selectionChange)="onTldsChange($event.value)">
+              @for (tld of filteredTldOptions(); track tld) {
+                <mat-option [value]="tld">.{{ tld }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
 
-        <mat-form-field appearance="outline" class="filter-select">
-          <mat-label>Registrars</mat-label>
-          <mat-select multiple
-                      [value]="dashService.selectedRegistrarIds()"
-                      (selectionChange)="onRegistrarsChange($event.value)">
-            @for (reg of filteredRegistrarOptions(); track reg.registrarId) {
-              <mat-option [value]="reg.registrarId">{{ reg.registrarName || reg.registrarId }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+        @if (showRegistrarFilter()) {
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>Registrars</mat-label>
+            <mat-select multiple
+                        [value]="dashService.selectedRegistrarIds()"
+                        (selectionChange)="onRegistrarsChange($event.value)">
+              @for (reg of filteredRegistrarOptions(); track reg.registrarId) {
+                <mat-option [value]="reg.registrarId">{{ reg.registrarName || reg.registrarId }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
 
         <ng-content></ng-content>
 
