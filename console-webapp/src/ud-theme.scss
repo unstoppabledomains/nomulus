@@ -33,9 +33,12 @@
   --ud-error: #c53030;
   --ud-error-bg: #fef2f2;
   --ud-border-subtle: #e8e8ea;
-  --ud-radius-sm: 8px;
-  --ud-radius-md: 12px;
-  --ud-radius-lg: 16px;
+  --ud-radius-xs: 6px;
+  --ud-radius-sm: 12px;
+  --ud-radius-md: 16px;
+  --ud-radius-lg: 20px;
+  --ud-radius-pill: 100px;
+  --ud-border-width: 1.5px;
   --ud-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --ud-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
     0 2px 4px -2px rgba(0, 0, 0, 0.05);
@@ -69,9 +72,9 @@
   // Buttons
   --mat-filled-button-container-color: var(--ud-accent);
   --mat-filled-button-label-text-color: #ffffff;
-  --mat-filled-button-container-shape: var(--ud-radius-sm);
+  --mat-filled-button-container-shape: var(--ud-radius-pill);
   --mat-outlined-button-outline-color: var(--border);
-  --mat-outlined-button-container-shape: var(--ud-radius-sm);
+  --mat-outlined-button-container-shape: var(--ud-radius-pill);
   --mat-text-button-label-text-color: var(--ud-accent);
 
   // Form fields
@@ -154,12 +157,26 @@ mat-row:hover,
   background-color: var(--lightest-highlight) !important;
 }
 
-// Button hover refinements
+// Button styling — pill shape, bold weight, UD-branded
 .mat-mdc-raised-button,
 .mat-mdc-flat-button,
 .mdc-button--unelevated {
+  border-radius: var(--ud-radius-pill) !important;
+  padding: 0 24px;
+  font-weight: 600;
+  text-transform: none;
   transition: background-color var(--ud-transition),
     box-shadow var(--ud-transition);
+}
+
+.mat-mdc-outlined-button {
+  border-radius: var(--ud-radius-pill) !important;
+  padding: 0 24px;
+  font-weight: 600;
+  text-transform: none;
+  border-width: var(--ud-border-width);
+  transition: background-color var(--ud-transition),
+    border-color var(--ud-transition);
 }
 
 // Link transitions
@@ -195,4 +212,144 @@ div.mat-mdc-autocomplete-panel {
 .mat-mdc-option.mdc-list-item--selected {
   border-left: 3px solid var(--ud-accent);
   padding-left: 13px; // 16px default minus 3px border to keep text aligned
+}
+
+// Button toggle groups — pill container, accent fill on selected
+.mat-button-toggle-group {
+  border-radius: var(--ud-radius-pill) !important;
+  border: var(--ud-border-width) solid var(--border) !important;
+  overflow: hidden;
+
+  .mat-button-toggle {
+    border-left: none !important;
+
+    .mat-button-toggle-label-content {
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 32px;
+    }
+  }
+
+  .mat-button-toggle-checked {
+    background-color: var(--ud-accent) !important;
+    color: #ffffff !important;
+
+    .mat-icon {
+      color: #ffffff !important;
+    }
+  }
+}
+
+// Chips — pill shape, UD accent on selected
+.mat-mdc-chip {
+  border-radius: var(--ud-radius-pill) !important;
+  font-weight: 500;
+  font-size: 13px;
+  margin: 2px 4px 2px 0;
+  transition: background-color var(--ud-transition),
+    border-color var(--ud-transition);
+}
+
+.mat-mdc-chip.mat-mdc-chip-selected,
+.mat-mdc-chip-highlighted {
+  background-color: var(--ud-accent-light) !important;
+  color: var(--ud-accent) !important;
+  border: 1.5px solid var(--ud-accent) !important;
+}
+
+// Menu panels — rounded, shadowed, padded
+.mat-mdc-menu-panel {
+  border-radius: var(--ud-radius-md) !important;
+  box-shadow: var(--ud-shadow-dropdown) !important;
+  padding: 8px !important;
+}
+
+.mat-mdc-menu-item {
+  border-radius: var(--ud-radius-sm);
+  margin: 2px 0;
+  font-size: 14px;
+  transition: background-color var(--ud-transition);
+}
+
+// Dialog panels — generous rounding
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: var(--ud-radius-lg) !important;
+}
+
+// Datepicker panel
+.mat-datepicker-content {
+  border-radius: var(--ud-radius-md) !important;
+  box-shadow: var(--ud-shadow-dropdown) !important;
+}
+
+// Slide toggle — UD accent colors
+.mat-mdc-slide-toggle {
+  --mdc-switch-selected-handle-color: var(--ud-accent);
+  --mdc-switch-selected-track-color: var(--ud-accent);
+  --mdc-switch-selected-hover-handle-color: var(--ud-accent-hover);
+  --mdc-switch-selected-focus-handle-color: var(--ud-accent);
+  --mdc-switch-selected-pressed-handle-color: var(--ud-accent-active);
+}
+
+// Tooltip
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  border-radius: var(--ud-radius-sm);
+  font-size: 12px;
+}
+
+// Form field outline — rounder corners, thicker borders, compact height
+.mdc-text-field--outlined .mdc-notched-outline .mdc-notched-outline__leading {
+  border-radius: var(--ud-radius-sm) 0 0 var(--ud-radius-sm) !important;
+  border-width: var(--ud-border-width) !important;
+}
+
+.mdc-text-field--outlined .mdc-notched-outline .mdc-notched-outline__trailing {
+  border-radius: 0 var(--ud-radius-sm) var(--ud-radius-sm) 0 !important;
+  border-width: var(--ud-border-width) !important;
+}
+
+.mdc-text-field--outlined .mdc-notched-outline .mdc-notched-outline__notch {
+  border-width: var(--ud-border-width) !important;
+}
+
+// Compact form fields — reduce height, center text vertically
+.mat-mdc-form-field {
+  --mat-form-field-container-height: 40px;
+  --mdc-outlined-text-field-container-shape: var(--ud-radius-sm);
+}
+
+.mat-mdc-form-field .mat-mdc-text-field-wrapper {
+  max-height: 40px;
+  align-items: center;
+}
+
+.mat-mdc-form-field .mat-mdc-text-field-wrapper .mat-mdc-form-field-infix {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-height: unset;
+}
+
+.mat-mdc-form-field .mat-mdc-floating-label {
+  font-size: 14px;
+}
+
+// Filled form fields — rounded top corners, lighter background, subtle bottom border
+.mdc-text-field--filled {
+  background-color: var(--ud-surface-muted) !important;
+  border-radius: var(--ud-radius-sm) var(--ud-radius-sm) 0 0 !important;
+
+  .mdc-line-ripple::before {
+    border-bottom-color: var(--border) !important;
+  }
+
+  .mdc-line-ripple::after {
+    border-bottom-color: var(--ud-accent) !important;
+  }
+}
+
+.mdc-text-field--disabled {
+  background-color: var(--ud-surface-muted) !important;
+  border-radius: var(--ud-radius-sm) var(--ud-radius-sm) 0 0 !important;
+  opacity: 0.7;
 }

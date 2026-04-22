@@ -39,11 +39,11 @@
     margin-right: 16px;
 
     &--update {
-      color: #1976d2;
+      color: var(--ud-accent);
     }
 
     &--security {
-      color: #d32f2f;
+      color: var(--ud-error);
     }
   }
 

@@ -1,5 +1,5 @@
 .dialog-subtitle {
-  color: #62626A;
+  color: var(--ud-text-secondary);
   margin: 0 0 16px;
 }
 
@@ -19,17 +19,17 @@
   gap: 4px;
   margin-bottom: 12px;
   font-size: 13px;
-  color: #9191A1;
+  color: var(--ud-text-muted);
 }
 
 .breadcrumb-link {
-  color: #0D67FE;
+  color: var(--ud-accent);
   cursor: pointer;
   &:hover { text-decoration: underline; }
 }
 
 .breadcrumb-current {
-  color: #2D2D32;
+  color: var(--ud-text-primary);
 }
 
 .breadcrumb-sep {
