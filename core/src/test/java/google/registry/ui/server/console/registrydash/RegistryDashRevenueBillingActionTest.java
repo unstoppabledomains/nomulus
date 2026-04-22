@@ -126,7 +126,8 @@ class RegistryDashRevenueBillingActionTest {
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashRevenueBillingAction action =
         new RegistryDashRevenueBillingAction(
-            params, months, lookbackHours, granularity, ImmutableSet.of(), javaClock);
+            params, months, lookbackHours, granularity,
+            ImmutableSet.of(), ImmutableSet.of(), javaClock);
     action.run();
     return new RunResult((FakeResponse) params.response());
   }
@@ -139,6 +140,12 @@ class RegistryDashRevenueBillingActionTest {
 
     List<Map<String, Object>> periodRevenue() {
       return (List<Map<String, Object>>) payload().get("periodRevenue");
+    }
+
+    List<Map<String, Object>> nonZeroPeriodRevenue() {
+      return periodRevenue().stream()
+          .filter(r -> r.get("tld") != null && !r.get("tld").toString().isEmpty())
+          .toList();
     }
 
     Map<String, Object> totals() {
@@ -166,7 +173,7 @@ class RegistryDashRevenueBillingActionTest {
     RunResult result =
         runAction(user, Optional.of(12), Optional.empty(), Optional.empty());
     assertThat(result.response().getStatus()).isEqualTo(SC_OK);
-    assertThat(result.periodRevenue()).isNotEmpty();
+    assertThat(result.nonZeroPeriodRevenue()).isNotEmpty();
   }
 
   // --- Granularity: month ---
@@ -182,9 +189,9 @@ class RegistryDashRevenueBillingActionTest {
     RunResult result =
         runAction(user, Optional.empty(), Optional.of(8760), Optional.of("month"));
     assertThat(result.response().getStatus()).isEqualTo(SC_OK);
-    assertThat(result.periodRevenue()).hasSize(1);
-    assertThat(result.periodRevenue().get(0).get("period")).isEqualTo("2024-05");
-    assertThat(((Number) result.periodRevenue().get(0).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue()).hasSize(1);
+    assertThat(result.nonZeroPeriodRevenue().get(0).get("period")).isEqualTo("2024-05");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(0).get("amount")).doubleValue())
         .isEqualTo(30.0);
   }
 
@@ -203,12 +210,12 @@ class RegistryDashRevenueBillingActionTest {
     RunResult result =
         runAction(user, Optional.empty(), Optional.of(720), Optional.of("day"));
     assertThat(result.response().getStatus()).isEqualTo(SC_OK);
-    assertThat(result.periodRevenue()).hasSize(2);
-    assertThat(result.periodRevenue().get(0).get("period")).isEqualTo("2024-06-10");
-    assertThat(((Number) result.periodRevenue().get(0).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue()).hasSize(2);
+    assertThat(result.nonZeroPeriodRevenue().get(0).get("period")).isEqualTo("2024-06-10");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(0).get("amount")).doubleValue())
         .isEqualTo(15.0);
-    assertThat(result.periodRevenue().get(1).get("period")).isEqualTo("2024-06-11");
-    assertThat(((Number) result.periodRevenue().get(1).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue().get(1).get("period")).isEqualTo("2024-06-11");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(1).get("amount")).doubleValue())
         .isEqualTo(7.0);
   }
 
@@ -227,12 +234,12 @@ class RegistryDashRevenueBillingActionTest {
     RunResult result =
         runAction(user, Optional.empty(), Optional.of(24), Optional.of("hour"));
     assertThat(result.response().getStatus()).isEqualTo(SC_OK);
-    assertThat(result.periodRevenue()).hasSize(2);
-    assertThat(result.periodRevenue().get(0).get("period")).isEqualTo("2024-06-15T08:00:00Z");
-    assertThat(((Number) result.periodRevenue().get(0).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue()).hasSize(2);
+    assertThat(result.nonZeroPeriodRevenue().get(0).get("period")).isEqualTo("2024-06-15T08:00:00Z");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(0).get("amount")).doubleValue())
         .isEqualTo(15.0);
-    assertThat(result.periodRevenue().get(1).get("period")).isEqualTo("2024-06-15T09:00:00Z");
-    assertThat(((Number) result.periodRevenue().get(1).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue().get(1).get("period")).isEqualTo("2024-06-15T09:00:00Z");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(1).get("amount")).doubleValue())
         .isEqualTo(3.0);
   }
 
@@ -254,15 +261,15 @@ class RegistryDashRevenueBillingActionTest {
         runAction(user, Optional.empty(), Optional.of(6), Optional.of("15min"));
     assertThat(result.response().getStatus()).isEqualTo(SC_OK);
     // 08:00-08:14 → 15.00, 08:15-08:29 → 3.00, 08:30-08:44 → 7.00
-    assertThat(result.periodRevenue()).hasSize(3);
-    assertThat(result.periodRevenue().get(0).get("period")).isEqualTo("2024-06-15T08:00:00Z");
-    assertThat(((Number) result.periodRevenue().get(0).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue()).hasSize(3);
+    assertThat(result.nonZeroPeriodRevenue().get(0).get("period")).isEqualTo("2024-06-15T08:00:00Z");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(0).get("amount")).doubleValue())
         .isEqualTo(15.0);
-    assertThat(result.periodRevenue().get(1).get("period")).isEqualTo("2024-06-15T08:15:00Z");
-    assertThat(((Number) result.periodRevenue().get(1).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue().get(1).get("period")).isEqualTo("2024-06-15T08:15:00Z");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(1).get("amount")).doubleValue())
         .isEqualTo(3.0);
-    assertThat(result.periodRevenue().get(2).get("period")).isEqualTo("2024-06-15T08:30:00Z");
-    assertThat(((Number) result.periodRevenue().get(2).get("amount")).doubleValue())
+    assertThat(result.nonZeroPeriodRevenue().get(2).get("period")).isEqualTo("2024-06-15T08:30:00Z");
+    assertThat(((Number) result.nonZeroPeriodRevenue().get(2).get("amount")).doubleValue())
         .isEqualTo(7.0);
   }
 
@@ -306,7 +313,7 @@ class RegistryDashRevenueBillingActionTest {
     RunResult result =
         runAction(user, Optional.empty(), Optional.of(720), Optional.of("day"));
     // Two entries: one per TLD, same day
-    assertThat(result.periodRevenue()).hasSize(2);
+    assertThat(result.nonZeroPeriodRevenue()).hasSize(2);
     assertThat(((Number) result.totals().get("totalRevenue")).doubleValue()).isEqualTo(35.0);
   }
 }

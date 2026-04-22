@@ -48,6 +48,11 @@ export class FinancialsComponent implements OnInit {
   lastHoveredOverviewRevenueByOp: any = null;
   selectedTab = signal(0);
 
+  timeRelevantTab = computed(() => {
+    const tab = this.selectedTab();
+    return tab === 0 || tab === 3 || tab === 4;
+  });
+
   overviewRangeLabel = computed(() => this.dashService.timeRangeLabel());
 
   // --- Fees by TLD tab ---

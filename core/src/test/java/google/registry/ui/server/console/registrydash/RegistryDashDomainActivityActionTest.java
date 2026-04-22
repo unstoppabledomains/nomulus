@@ -119,7 +119,8 @@ class RegistryDashDomainActivityActionTest {
     when(params.request().getMethod()).thenReturn("GET");
     RegistryDashDomainActivityAction action =
         new RegistryDashDomainActivityAction(
-            params, Optional.empty(), lookbackHours, granularity, ImmutableSet.of(), javaClock);
+            params, Optional.empty(), lookbackHours, granularity,
+            ImmutableSet.of(), ImmutableSet.of(), javaClock);
     action.run();
     return new RunResult((FakeResponse) params.response());
   }

@@ -146,6 +146,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
   private final Optional<Integer> lookbackHours;
   private final Optional<String> granularity;
   private final ImmutableSet<String> filterTlds;
+  private final ImmutableSet<String> filterRegistrarIds;
 
   @Inject
   public RegistryDashForecastingAction(
@@ -153,12 +154,14 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
       @Parameter("months") Optional<Integer> months,
       @Parameter("lookbackHours") Optional<Integer> lookbackHours,
       @Parameter("granularity") Optional<String> granularity,
-      @Parameter("filterTlds") ImmutableSet<String> filterTlds) {
+      @Parameter("filterTlds") ImmutableSet<String> filterTlds,
+      @Parameter("filterRegistrarIds") ImmutableSet<String> filterRegistrarIds) {
     super(consoleApiParams);
     this.months = months;
     this.lookbackHours = lookbackHours;
     this.granularity = granularity;
     this.filterTlds = filterTlds;
+    this.filterRegistrarIds = filterRegistrarIds;
   }
 
   @Override
@@ -174,6 +177,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
             : RegistryDashAccessUtil.getMappedTlds(user.getEmailAddress());
     ImmutableSet<String> tlds =
         RegistryDashAccessUtil.applyFilter(accessTlds, filterTlds, isAdmin);
+    ImmutableSet<String> registrarIds = filterRegistrarIds;
     if (!isAdmin && tlds.isEmpty()) {
       Map<String, Object> empty = new HashMap<>();
       empty.put("expirationCurve", List.of());
@@ -204,6 +208,7 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
     tm().transact(
         () -> {
           boolean useScoped = !tlds.isEmpty();
+          boolean hasRegistrarFilter = !registrarIds.isEmpty();
 
           // Expiration curve
           ZonedDateTime endZdt = ZonedDateTime.now(ZoneOffset.UTC)
@@ -214,37 +219,45 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
           if (use15min) {
             // Native SQL for 15-minute buckets
             Instant endInstant = endZdt.toInstant();
-            if (!useScoped) {
-              expirationResults = tm().getEntityManager()
-                  .createNativeQuery(EXPIRATION_CURVE_15MIN_ALL)
-                  .setParameter("endDate", endInstant)
-                  .getResultList();
-            } else {
-              expirationResults = tm().getEntityManager()
-                  .createNativeQuery(EXPIRATION_CURVE_15MIN_SCOPED)
-                  .setParameter("endDate", endInstant)
-                  .setParameter("tlds", tlds)
-                  .getResultList();
+            String sql = useScoped ? EXPIRATION_CURVE_15MIN_SCOPED : EXPIRATION_CURVE_15MIN_ALL;
+            if (hasRegistrarFilter) {
+              sql = sql.replace(
+                  "GROUP BY exp_period",
+                  "AND d.current_sponsor_registrar_id IN :registrarIds\n      GROUP BY exp_period");
             }
+            var expQuery = tm().getEntityManager()
+                .createNativeQuery(sql)
+                .setParameter("endDate", endInstant);
+            if (useScoped) {
+              expQuery.setParameter("tlds", tlds);
+            }
+            if (hasRegistrarFilter) {
+              expQuery.setParameter("registrarIds", registrarIds);
+            }
+            expirationResults = expQuery.getResultList();
           } else {
             // JPQL for standard granularities (hour, day, month)
-            String jpqlAll = String.format(EXPIRATION_CURVE_ALL_TEMPLATE, resolvedGran);
-            String jpqlScoped = String.format(EXPIRATION_CURVE_SCOPED_TEMPLATE, resolvedGran);
+            String jpql = useScoped
+                ? String.format(EXPIRATION_CURVE_SCOPED_TEMPLATE, resolvedGran)
+                : String.format(EXPIRATION_CURVE_ALL_TEMPLATE, resolvedGran);
+            if (hasRegistrarFilter) {
+              jpql = jpql.replace(
+                  "GROUP BY exp_period",
+                  "AND d.currentSponsorRegistrarId IN :registrarIds\n      GROUP BY exp_period");
+            }
             org.joda.time.DateTime endDate =
                 org.joda.time.DateTime.now(org.joda.time.DateTimeZone.UTC)
                     .plusHours(hoursForward);
-            if (!useScoped) {
-              expirationResults = tm().getEntityManager()
-                  .createQuery(jpqlAll)
-                  .setParameter("endDate", endDate)
-                  .getResultList();
-            } else {
-              expirationResults = tm().getEntityManager()
-                  .createQuery(jpqlScoped)
-                  .setParameter("endDate", endDate)
-                  .setParameter("tlds", tlds)
-                  .getResultList();
+            var expQuery = tm().getEntityManager()
+                .createQuery(jpql)
+                .setParameter("endDate", endDate);
+            if (useScoped) {
+              expQuery.setParameter("tlds", tlds);
             }
+            if (hasRegistrarFilter) {
+              expQuery.setParameter("registrarIds", registrarIds);
+            }
+            expirationResults = expQuery.getResultList();
           }
 
           List<Map<String, Object>> expirationCurve = new ArrayList<>();
@@ -272,18 +285,23 @@ public class RegistryDashForecastingAction extends ConsoleApiAction {
 
           // Renewal rates — native SQL, always looks back 12 months
           Instant startDate = ZonedDateTime.now(ZoneOffset.UTC).minusMonths(12).toInstant();
+          String renewalSql = useScoped ? RENEWAL_RATES_NATIVE_SCOPED : RENEWAL_RATES_NATIVE_ALL;
+          if (hasRegistrarFilter) {
+            renewalSql = renewalSql.replace(
+                "GROUP BY d.tld",
+                "AND d.current_sponsor_registrar_id IN :registrarIds\n      GROUP BY d.tld");
+          }
+          var renewalQuery = tm().getEntityManager()
+              .createNativeQuery(renewalSql)
+              .setParameter("startDate", startDate);
+          if (useScoped) {
+            renewalQuery.setParameter("tlds", tlds);
+          }
+          if (hasRegistrarFilter) {
+            renewalQuery.setParameter("registrarIds", registrarIds);
+          }
           @SuppressWarnings("unchecked")
-          List<Object[]> renewalResults =
-              !useScoped
-                  ? tm().getEntityManager()
-                      .createNativeQuery(RENEWAL_RATES_NATIVE_ALL)
-                      .setParameter("startDate", startDate)
-                      .getResultList()
-                  : tm().getEntityManager()
-                      .createNativeQuery(RENEWAL_RATES_NATIVE_SCOPED)
-                      .setParameter("startDate", startDate)
-                      .setParameter("tlds", tlds)
-                      .getResultList();
+          List<Object[]> renewalResults = renewalQuery.getResultList();
 
           List<Map<String, Object>> renewalRates = new ArrayList<>();
           for (Object[] row : renewalResults) {

@@ -35,6 +35,14 @@
   align-items: center;
   gap: 16px;
   margin-bottom: 20px;
+
+  .auto-update-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ud-text-secondary);
+  }
 }
 
 .result-info {
