@@ -53,7 +53,7 @@ public class PathParameter extends ParameterConverterValidator<Path> {
         if (Files.isDirectory(file)) {
           throw new ParameterException(String.format("%s is a directory: %s", name, file));
         }
-        if (!Files.isWritable(file)) {
+        if (Files.isRegularFile(file) && !Files.isWritable(file)) {
           throw new ParameterException(String.format("%s not writable: %s", name, file));
         }
       } else {
