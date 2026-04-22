@@ -19,8 +19,9 @@ import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../../ud-echarts';
-import { RegistryDashService, RANGE_CONFIG } from '../../registry-dash.service';
+import { RegistryDashService, RANGE_CONFIG, computeDateRange } from '../../registry-dash.service';
 import { DrillDownService } from '../../drilldown/drilldown.service';
+import { ExploreService } from '../../explore/explore.service';
 import { withDrillDown } from '../../ud-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
 
@@ -147,6 +148,7 @@ export class RevenueBillingComponent implements OnInit {
   constructor(
     public dashService: RegistryDashService,
     private drillDown: DrillDownService,
+    private exploreService: ExploreService,
   ) {
     combineLatest([
       toObservable(this.dashService.selectedTimeRange),
@@ -193,5 +195,42 @@ export class RevenueBillingComponent implements OnInit {
     if (this.lastHoveredRevenueByOp?.name) {
       this.drillDown.drillDownRevenueByOperation(this.lastHoveredRevenueByOp.name);
     }
+  }
+
+  private buildFilters(): { tlds?: string[]; registrarIds?: string[] } {
+    const tlds = this.dashService.selectedTlds();
+    const regIds = this.dashService.selectedRegistrarIds();
+    return {
+      ...(tlds.length > 0 ? { tlds: [...tlds] } : {}),
+      ...(regIds.length > 0 ? { registrarIds: [...regIds] } : {}),
+    };
+  }
+
+  exploreRevenueByTld() {
+    const config = this.dashService.selectedRangeConfig();
+    this.exploreService.navigateToExplore({
+      dataSource: 'REVENUE',
+      metrics: [{ field: 'netAmountToRegistry', aggregation: 'sum' }],
+      dimensions: ['period', 'tld'],
+      granularity: config.granularity,
+      filters: {
+        ...this.buildFilters(),
+        dateRange: computeDateRange(config.lookbackHours),
+      },
+    }, 'area');
+  }
+
+  exploreRevenueByOperation() {
+    const config = this.dashService.selectedRangeConfig();
+    this.exploreService.navigateToExplore({
+      dataSource: 'REVENUE',
+      metrics: [{ field: 'netAmountToRegistry', aggregation: 'sum' }],
+      dimensions: ['operation'],
+      granularity: config.granularity,
+      filters: {
+        ...this.buildFilters(),
+        dateRange: computeDateRange(config.lookbackHours),
+      },
+    }, 'horizontal-bar');
   }
 }

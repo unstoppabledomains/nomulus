@@ -19,8 +19,9 @@ import { combineLatest, EMPTY, switchMap, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { UD_ECHARTS_PROVIDER } from '../ud-echarts';
-import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
+import { RegistryDashService, RANGE_CONFIG, computeDateRange } from '../registry-dash.service';
 import { DrillDownService } from '../drilldown/drilldown.service';
+import { ExploreService } from '../explore/explore.service';
 import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
@@ -162,6 +163,7 @@ export class DomainActivityComponent implements OnInit {
   constructor(
     public dashService: RegistryDashService,
     private drillDown: DrillDownService,
+    private exploreService: ExploreService,
   ) {
     combineLatest([
       toObservable(this.dashService.selectedTimeRange),
@@ -212,5 +214,37 @@ export class DomainActivityComponent implements OnInit {
     if (this.lastHoveredDomainCounts?.name) {
       this.drillDown.drillDownDomainCountsByTld(this.lastHoveredDomainCounts.name);
     }
+  }
+
+  private buildFilters(): { tlds?: string[]; registrarIds?: string[] } {
+    const tlds = this.dashService.selectedTlds();
+    const regIds = this.dashService.selectedRegistrarIds();
+    return {
+      ...(tlds.length > 0 ? { tlds: [...tlds] } : {}),
+      ...(regIds.length > 0 ? { registrarIds: [...regIds] } : {}),
+    };
+  }
+
+  exploreActivityByTld() {
+    const config = this.dashService.selectedRangeConfig();
+    this.exploreService.navigateToExplore({
+      dataSource: 'DOMAIN_ACTIVITY',
+      metrics: [{ field: 'count', aggregation: 'sum' }],
+      dimensions: ['tld', 'activity_type'],
+      granularity: config.granularity,
+      filters: {
+        ...this.buildFilters(),
+        dateRange: computeDateRange(config.lookbackHours),
+      },
+    }, 'bar');
+  }
+
+  exploreDomainCounts() {
+    this.exploreService.navigateToExplore({
+      dataSource: 'DOMAIN_COUNTS',
+      metrics: [{ field: 'count', aggregation: 'sum' }],
+      dimensions: ['tld'],
+      filters: this.buildFilters(),
+    }, 'horizontal-bar');
   }
 }

@@ -37,7 +37,12 @@
     @if (barChartData().length > 0) {
       <mat-card appearance="outlined" class="chart-card">
         <mat-card-content>
-          <h3 class="chart-title">Registrar Market Share</h3>
+          <div class="chart-title-row">
+            <h3 class="chart-title">Registrar Market Share</h3>
+            <button mat-icon-button class="explore-btn" (click)="exploreRegistrarMarketShare()" matTooltip="Explore this data">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          </div>
           <p class="chart-description">Number of active domains managed by each registrar. Longer bars indicate a larger share of the total domain portfolio.</p>
           <div class="h-bar-chart">
             @for (bar of barChartData(); track bar.registrarId) {
@@ -63,7 +68,12 @@
     <div class="charts-row">
       <mat-card appearance="outlined" class="chart-card" *ngIf="activityLineOptions()">
         <mat-card-content>
-          <h3 class="chart-title">Domain Activity Trend</h3>
+          <div class="chart-title-row">
+            <h3 class="chart-title">Domain Activity Trend</h3>
+            <button mat-icon-button class="explore-btn" (click)="exploreActivityTrend()" matTooltip="Explore this data">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          </div>
           <p class="chart-description">Domain registration activity over time — creates, renews, transfers, deletes, and restores aggregated across all TLDs.</p>
           <div appLongPress (longPress)="onActivityLongPress()">
             <div echarts [options]="activityLineOptions()!" [theme]="'ud-brand'" class="echart"
@@ -76,7 +86,12 @@
 
       <mat-card appearance="outlined" class="chart-card" *ngIf="renewalRateOptions()">
         <mat-card-content>
-          <h3 class="chart-title">Renewal Rate by TLD</h3>
+          <div class="chart-title-row">
+            <h3 class="chart-title">Renewal Rate by TLD</h3>
+            <button mat-icon-button class="explore-btn" (click)="exploreRenewalRate()" matTooltip="Explore this data">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          </div>
           <p class="chart-description">Percentage of expiring domains that were renewed (vs. deleted/expired) per TLD over the selected time period. The dashed line marks the 85% industry benchmark.</p>
           <div appLongPress (longPress)="onRenewalLongPress()">
             <div echarts [options]="renewalRateOptions()!" [theme]="'ud-brand'" class="echart"

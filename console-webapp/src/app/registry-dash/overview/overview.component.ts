@@ -18,9 +18,11 @@ import { combineLatest, switchMap, EMPTY, catchError } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { NgxEchartsDirective } from 'ngx-echarts';
-import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
+import { RegistryDashService, RANGE_CONFIG, computeDateRange } from '../registry-dash.service';
 import { UD_ECHARTS_PROVIDER, withDrillDown } from '../ud-echarts';
 import { DrillDownService } from '../drilldown/drilldown.service';
+import { ExploreService } from '../explore/explore.service';
+import { ExploreQuery } from '../explore/explore.models';
 import { LongPressDirective } from '../drilldown/long-press.directive';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
 
@@ -148,6 +150,7 @@ export class OverviewComponent {
   constructor(
     protected dashService: RegistryDashService,
     protected drillDown: DrillDownService,
+    private exploreService: ExploreService,
   ) {
     combineLatest([
       toObservable(this.dashService.selectedTimeRange),
@@ -205,5 +208,50 @@ export class OverviewComponent {
     if (this.lastHoveredRenewal?.name) {
       this.drillDown.drillDownRenewalByTld(this.lastHoveredRenewal.name);
     }
+  }
+
+  private buildFilters(): { tlds?: string[]; registrarIds?: string[] } {
+    const tlds = this.dashService.selectedTlds();
+    const regIds = this.dashService.selectedRegistrarIds();
+    return {
+      ...(tlds.length > 0 ? { tlds: [...tlds] } : {}),
+      ...(regIds.length > 0 ? { registrarIds: [...regIds] } : {}),
+    };
+  }
+
+  exploreRegistrarMarketShare() {
+    this.exploreService.navigateToExplore({
+      dataSource: 'DOMAIN_COUNTS',
+      metrics: [{ field: 'count', aggregation: 'sum' }],
+      dimensions: ['registrar'],
+      filters: this.buildFilters(),
+    }, 'horizontal-bar');
+  }
+
+  exploreActivityTrend() {
+    const config = this.dashService.selectedRangeConfig();
+    this.exploreService.navigateToExplore({
+      dataSource: 'DOMAIN_ACTIVITY',
+      metrics: [{ field: 'count', aggregation: 'sum' }],
+      dimensions: ['period', 'activity_type'],
+      granularity: config.granularity,
+      filters: {
+        ...this.buildFilters(),
+        dateRange: computeDateRange(config.lookbackHours),
+      },
+    }, 'line');
+  }
+
+  exploreRenewalRate() {
+    const config = this.dashService.selectedRangeConfig();
+    this.exploreService.navigateToExplore({
+      dataSource: 'RENEWAL_RATES',
+      metrics: [{ field: 'renewalRate', aggregation: 'sum' }],
+      dimensions: ['tld'],
+      filters: {
+        ...this.buildFilters(),
+        dateRange: computeDateRange(config.lookbackHours),
+      },
+    }, 'horizontal-bar');
   }
 }

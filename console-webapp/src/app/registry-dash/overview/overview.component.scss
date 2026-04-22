@@ -50,11 +50,22 @@
     margin-bottom: 1.5rem;
   }
 
+  .chart-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .chart-title {
     margin: 0 0 4px;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--ud-text-primary);
+  }
+
+  .explore-btn {
+    opacity: 0.5;
+    &:hover { opacity: 1; }
   }
 
   .chart-description {
