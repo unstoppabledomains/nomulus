@@ -313,7 +313,7 @@ div.mat-mdc-autocomplete-panel {
   border-width: var(--ud-border-width) !important;
 }
 
-// Compact form fields — reduce height
+// Compact form fields — reduce height, center text vertically
 .mat-mdc-form-field {
   --mat-form-field-container-height: 40px;
   --mdc-outlined-text-field-container-shape: var(--ud-radius-sm);
@@ -321,6 +321,13 @@ div.mat-mdc-autocomplete-panel {
 
 .mat-mdc-form-field .mat-mdc-text-field-wrapper {
   max-height: 40px;
+  align-items: center;
+}
+
+.mat-mdc-form-field .mat-mdc-text-field-wrapper .mat-mdc-form-field-infix {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-height: unset;
 }
 
 .mat-mdc-form-field .mat-mdc-floating-label {
