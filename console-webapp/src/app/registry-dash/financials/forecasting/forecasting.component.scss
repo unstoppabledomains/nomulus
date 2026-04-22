@@ -59,6 +59,17 @@
   }
 }
 
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.explore-btn {
+  opacity: 0.5;
+  &:hover { opacity: 1; }
+}
+
 .chart-container {
   background: var(--ud-surface-muted);
   border-radius: var(--ud-radius-md);

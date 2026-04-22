@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -26,16 +27,24 @@ const MAX_SAVED_VIEWS = 20;
 
 @Injectable({ providedIn: 'root' })
 export class ExploreService {
+  private router = inject(Router);
+
   result = signal<ExploreResult | undefined>(undefined);
   loading = signal(false);
   error = signal<string | undefined>(undefined);
   savedViews = signal<SavedExploreView[]>([]);
   savingView = signal(false);
+  pendingQuery = signal<{ query: ExploreQuery; chartType: ChartType } | null>(null);
 
   constructor(
     private backend: BackendService,
     private dashService: RegistryDashService,
   ) {}
+
+  navigateToExplore(query: ExploreQuery, chartType: ChartType): void {
+    this.pendingQuery.set({ query, chartType });
+    this.router.navigate(['/registry-dash/explore']);
+  }
 
   explore(query: ExploreQuery): Observable<ExploreResult> {
     this.loading.set(true);

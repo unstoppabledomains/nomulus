@@ -53,7 +53,12 @@
   <!-- Charts: full-width, net growth first -->
   <div *ngIf="data()">
     <div class="chart-container full-width" *ngIf="netGrowthOptions()">
-      <h3>Net Growth Projection</h3>
+      <div class="chart-title-row">
+        <h3>Net Growth Projection</h3>
+        <button mat-icon-button class="explore-btn" (click)="exploreNetGrowth()" matTooltip="Explore this data">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
+      </div>
       <p class="chart-description">Net domain growth per period (creates minus deletes). Dashed lines show projected values based on the selected forecast method.</p>
       <div appLongPress (longPress)="onNetGrowthLongPress()">
         <div echarts [options]="netGrowthOptions()!" [theme]="'ud-brand'" class="chart"
@@ -62,7 +67,12 @@
       </div>
     </div>
     <div class="chart-container full-width" *ngIf="expirationCurveOptions()">
-      <h3>Domain Expirations by TLD</h3>
+      <div class="chart-title-row">
+        <h3>Domain Expirations by TLD</h3>
+        <button mat-icon-button class="explore-btn" (click)="exploreExpirationCurve()" matTooltip="Explore this data">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
+      </div>
       <p class="chart-description">Upcoming domain expirations grouped by TLD. Shows when domains are due to expire and may need renewal.</p>
       <div appLongPress (longPress)="onExpirationLongPress()">
         <div echarts [options]="expirationCurveOptions()!" [theme]="'ud-brand'" class="chart"

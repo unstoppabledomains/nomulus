@@ -16,6 +16,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, WritableSignal, computed, signal } from '@angular/core';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { BackendService } from '../shared/services/backend.service';
+import { DateRange } from './explore/explore.models';
 
 export interface OverviewData {
   totalDomains: number;
@@ -202,6 +203,15 @@ export const RANGE_CONFIG: Record<string, RangeConfigEntry> = {
 };
 
 export const RANGE_KEYS = Object.keys(RANGE_CONFIG);
+
+export function computeDateRange(lookbackHours: number): DateRange {
+  const end = new Date();
+  const start = new Date(end.getTime() - lookbackHours * 3600_000);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  };
+}
 
 export const RANGE_LABELS: Record<string, string> = {
   '6h': '6 Hours', '12h': '12 Hours', '1d': '1 Day', '7d': '7 Days',

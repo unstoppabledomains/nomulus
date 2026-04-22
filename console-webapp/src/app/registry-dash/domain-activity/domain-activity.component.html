@@ -53,7 +53,12 @@
   <!-- Charts -->
   <div class="charts-row" *ngIf="data()">
     <div class="chart-container" *ngIf="activityByTldOptions()">
-      <h3>Activity Breakdown by TLD</h3>
+      <div class="chart-title-row">
+        <h3>Activity Breakdown by TLD</h3>
+        <button mat-icon-button class="explore-btn" (click)="exploreActivityByTld()" matTooltip="Explore this data">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
+      </div>
       <p class="chart-description">Total domain transactions grouped by TLD and operation type for the selected time period.</p>
       <div appLongPress (longPress)="onActivityByTldLongPress()">
         <div echarts [options]="activityByTldOptions()!" [theme]="'ud-brand'" class="chart"
@@ -63,7 +68,12 @@
       </div>
     </div>
     <div class="chart-container" *ngIf="domainCountsBarOptions()">
-      <h3>Current Domain Counts by TLD</h3>
+      <div class="chart-title-row">
+        <h3>Current Domain Counts by TLD</h3>
+        <button mat-icon-button class="explore-btn" (click)="exploreDomainCounts()" matTooltip="Explore this data">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
+      </div>
       <p class="chart-description">Current number of active (non-deleted) domains per TLD. This count is independent of the selected time period.</p>
       <div appLongPress (longPress)="onDomainCountsLongPress()">
         <div echarts [options]="domainCountsBarOptions()!" [theme]="'ud-brand'" class="chart"

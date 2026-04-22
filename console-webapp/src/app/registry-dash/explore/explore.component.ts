@@ -65,6 +65,15 @@ export class ExploreComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    const pending = this.exploreService.pendingQuery();
+    if (pending) {
+      this.query.set(pending.query);
+      this.chartType.set(pending.chartType);
+      this.exploreService.pendingQuery.set(null);
+      this.runQuery();
+      return;
+    }
+
     if (this.dashService.hasActiveFilters()) {
       const tlds = this.dashService.selectedTlds();
       const regIds = this.dashService.selectedRegistrarIds();
