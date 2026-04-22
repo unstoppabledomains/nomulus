@@ -11,7 +11,7 @@
 
   .state-badge {
     padding: 2px 8px;
-    border-radius: 12px;
+    border-radius: var(--ud-radius-pill);
     font-size: 0.85em;
     font-weight: 500;
   }

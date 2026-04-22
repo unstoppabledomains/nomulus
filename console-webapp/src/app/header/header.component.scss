@@ -24,7 +24,7 @@
     font-size: 11px;
     font-weight: 400;
     font-style: italic;
-    color: #9AA0A6;
+    color: var(--ud-text-muted);
     letter-spacing: 0.1px;
     margin-top: 1px;
     line-height: 1.2;
@@ -32,13 +32,13 @@
   &__logo-text {
     font-size: 22px;
     font-weight: 700;
-    color: #0D67FE;
+    color: var(--ud-accent);
     letter-spacing: -0.5px;
     font-family: 'Inter', 'Google Sans', sans-serif;
 
     .logo-registry {
       font-weight: 400;
-      color: #5F6368;
+      color: var(--ud-text-secondary);
     }
   }
   &__menu-btn {
@@ -58,7 +58,7 @@
     &-user-email {
       font-size: 11px;
       font-weight: 400;
-      color: #9AA0A6;
+      color: var(--ud-text-muted);
       letter-spacing: 0.1px;
       margin-right: 2px;
     }
