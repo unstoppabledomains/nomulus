@@ -4,50 +4,53 @@
 // This file is UD-specific and does not exist in upstream google/nomulus.
 // =============================================================================
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap");
 
 :root {
   // --- Override upstream CSS variables with UD brand values ---
-  --text: #62626A;
-  --primary: #0D67FE;
-  --lightest: #F0F5FF;
-  --light-highlight: #DDDDDF;
-  --lightest-highlight: #F5F9FF;
-  --secondary: #7A7A85;
-  --border: #C8C8CB;
+  --text: #62626a;
+  --primary: #0d67fe;
+  --lightest: #f0f5ff;
+  --light-highlight: #dddddf;
+  --lightest-highlight: #f5f9ff;
+  --secondary: #7a7a85;
+  --border: #c8c8cb;
 
   // --- UD-specific extended tokens ---
-  --ud-accent: #0D67FE;
-  --ud-accent-hover: #0546B7;
-  --ud-accent-active: #0A5FEA;
-  --ud-accent-light: #F0F5FF;
+  --ud-accent: #0d67fe;
+  --ud-accent-hover: #0546b7;
+  --ud-accent-active: #0a5fea;
+  --ud-accent-light: #f0f5ff;
   --ud-text-primary: #323034;
-  --ud-text-secondary: #62626A;
-  --ud-text-muted: #9191A1;
-  --ud-surface: #FFFFFF;
-  --ud-surface-muted: #F5F5F5;
-  --ud-success: #4A9B30;
+  --ud-text-secondary: #62626a;
+  --ud-text-muted: #9191a1;
+  --ud-surface: #ffffff;
+  --ud-surface-muted: #f5f5f5;
+  --ud-success: #4a9b30;
   --ud-success-bg: #f0faf0;
   --ud-warning: #d97706;
   --ud-warning-bg: #fffbeb;
   --ud-error: #c53030;
   --ud-error-bg: #fef2f2;
-  --ud-border-subtle: #E8E8EA;
-  --ud-radius-sm: 6px;
-  --ud-radius-md: 10px;
-  --ud-radius-lg: 14px;
+  --ud-border-subtle: #e8e8ea;
+  --ud-radius-sm: 8px;
+  --ud-radius-md: 12px;
+  --ud-radius-lg: 16px;
   --ud-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --ud-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --ud-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
+    0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --ud-shadow-dropdown: 0px 4px 24px rgba(0, 0, 0, 0.08),
+    0px 0px 0px 1px rgba(0, 0, 0, 0.04);
   --ud-transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
   // --- Material Component Token Overrides ---
   // Typography
-  --mat-sys-label-large-font: 'Inter', 'Google Sans', sans-serif;
-  --mat-sys-body-large-font: 'Inter', 'Google Sans Text', sans-serif;
-  --mat-sys-body-medium-font: 'Inter', 'Google Sans Text', sans-serif;
-  --mat-sys-title-large-font: 'Inter', 'Google Sans', sans-serif;
-  --mat-sys-title-medium-font: 'Inter', 'Google Sans', sans-serif;
-  --mat-sys-headline-small-font: 'Inter', 'Google Sans', sans-serif;
+  --mat-sys-label-large-font: "Inter", "Google Sans", sans-serif;
+  --mat-sys-body-large-font: "Inter", "Google Sans Text", sans-serif;
+  --mat-sys-body-medium-font: "Inter", "Google Sans Text", sans-serif;
+  --mat-sys-title-large-font: "Inter", "Google Sans", sans-serif;
+  --mat-sys-title-medium-font: "Inter", "Google Sans", sans-serif;
+  --mat-sys-headline-small-font: "Inter", "Google Sans", sans-serif;
 
   // Card
   --mat-card-elevated-container-color: var(--ud-surface);
@@ -91,12 +94,24 @@
   // Sidenav / Navigation
   --mat-sidenav-container-background-color: var(--ud-surface);
   --mat-sidenav-container-divider-color: var(--border);
-  --mat-tree-node-text-font: 'Inter', 'Google Sans Text', sans-serif;
+  --mat-tree-node-text-font: "Inter", "Google Sans Text", sans-serif;
 
   // Select / Option
   --mat-select-trigger-text-color: var(--ud-text-primary);
+  --mat-select-container-elevation-shadow: var(--ud-shadow-dropdown);
+  --mat-select-panel-background-color: var(--ud-surface);
   --mat-option-label-text-color: var(--ud-text-primary);
   --mat-option-selected-state-label-text-color: var(--ud-accent);
+  --mat-option-selected-state-layer-color: var(--ud-accent-light);
+  --mat-option-hover-state-layer-color: var(--ud-accent-light);
+  --mat-option-focus-state-layer-color: var(--ud-accent-light);
+  --mat-option-label-text-font: "Inter", "Google Sans", sans-serif;
+  --mat-option-label-text-weight: 500;
+
+  // Autocomplete
+  --mat-autocomplete-container-shape: var(--ud-radius-md);
+  --mat-autocomplete-container-elevation-shadow: var(--ud-shadow-dropdown);
+  --mat-autocomplete-background-color: var(--ud-surface);
 
   // Paginator
   --mat-paginator-container-background-color: var(--ud-surface);
@@ -114,8 +129,8 @@
 // --- Global Element Overrides ---
 
 body {
-  font-family: 'Inter', 'Google Sans', Roboto, Helvetica, Arial, sans-serif,
-    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol' !important;
+  font-family: "Inter", "Google Sans", Roboto, Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol" !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--ud-text-primary);
@@ -143,11 +158,41 @@ mat-row:hover,
 .mat-mdc-raised-button,
 .mat-mdc-flat-button,
 .mdc-button--unelevated {
-  transition: background-color var(--ud-transition), box-shadow var(--ud-transition);
+  transition: background-color var(--ud-transition),
+    box-shadow var(--ud-transition);
 }
 
 // Link transitions
 .console-app a {
   transition: color var(--ud-transition);
   color: var(--ud-accent);
+}
+
+// Dropdown panel polish — rounded corners, padding, shadow, background
+// Direct CSS ensures these work regardless of whether M3 tokens are recognized.
+div.mat-mdc-select-panel {
+  border-radius: var(--ud-radius-md) !important;
+  padding: 8px !important;
+  box-shadow: var(--ud-shadow-dropdown) !important;
+  background-color: var(--ud-surface) !important;
+}
+
+div.mat-mdc-autocomplete-panel {
+  border-radius: var(--ud-radius-md) !important;
+  padding: 8px !important;
+  box-shadow: var(--ud-shadow-dropdown) !important;
+  background-color: var(--ud-surface) !important;
+}
+
+// Option items — rounded with smooth hover transition
+.mat-mdc-option {
+  border-radius: var(--ud-radius-sm);
+  margin: 2px 0;
+  transition: background-color 0.2s ease;
+}
+
+// Selected option — left accent border to match UD site "blue border + light blue bg"
+.mat-mdc-option.mdc-list-item--selected {
+  border-left: 3px solid var(--ud-accent);
+  padding-left: 13px; // 16px default minus 3px border to keep text aligned
 }
