@@ -102,12 +102,41 @@
     width: 100%;
   }
 
-  .active-icon {
-    color: var(--ud-success);
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.125rem 0.5rem 0.125rem 0.25rem;
+    border-radius: 1rem;
+    white-space: nowrap;
   }
 
-  .inactive-icon {
+  .status-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .status-active {
+    color: var(--ud-success);
+    background: color-mix(in srgb, var(--ud-success) 10%, transparent);
+  }
+
+  .status-expired {
+    color: var(--ud-warning);
+    background: var(--ud-warning-bg);
+  }
+
+  .status-scheduled {
+    color: var(--ud-accent);
+    background: var(--ud-accent-light);
+  }
+
+  .status-inactive {
     color: var(--ud-text-muted);
+    background: color-mix(in srgb, var(--ud-text-muted) 10%, transparent);
   }
 
   .diff-discount {

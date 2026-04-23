@@ -181,11 +181,12 @@
         <td mat-cell *matCellDef="let row">{{ row.expiryDate ? (row.expiryDate | date:'short') : 'Never' }}</td>
       </ng-container>
       <ng-container matColumnDef="isActive">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
         <td mat-cell *matCellDef="let row">
-          <mat-icon [class]="row.isActive ? 'active-icon' : 'inactive-icon'">
-            {{ row.isActive ? 'check_circle' : 'cancel' }}
-          </mat-icon>
+          <span class="status-badge" [ngClass]="getRuleStatus(row).cssClass">
+            <mat-icon class="status-icon">{{ getRuleStatus(row).icon }}</mat-icon>
+            {{ getRuleStatus(row).label }}
+          </span>
         </td>
       </ng-container>
       <ng-container matColumnDef="actions">
