@@ -89,4 +89,21 @@ export const DATA_SOURCE_SCHEMAS: Record<DataSourceType, DataSourceSchema> = {
     filters: ['tlds', 'registrarIds', 'operations'],
     supportsGranularity: false,
   },
+  TRANSACTIONS: {
+    label: 'Transactions',
+    description: 'Individual billing transactions with domain, registrar, and dollar amounts',
+    metrics: [
+      { field: 'amount', label: 'Amount' },
+      { field: 'netAmountToRegistry', label: 'Net to Registry' },
+    ],
+    dimensions: [
+      { field: 'timestamp', label: 'Timestamp' },
+      { field: 'domain_name', label: 'Domain Name' },
+      { field: 'tld', label: 'TLD' },
+      { field: 'registrar', label: 'Registrar' },
+      { field: 'operation', label: 'Operation' },
+    ],
+    filters: ['tlds', 'registrarIds', 'operations', 'dateRange'],
+    supportsGranularity: false,
+  },
 };

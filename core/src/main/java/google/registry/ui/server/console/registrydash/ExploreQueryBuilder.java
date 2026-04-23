@@ -38,6 +38,7 @@ public final class ExploreQueryBuilder {
       case RENEWAL_RATES -> buildRenewalRates(desc, effectiveTlds);
       case EXPIRATION_CURVE -> buildExpirationCurve(desc, effectiveTlds);
       case PRICING_RULES -> buildPricingRules(desc, effectiveTlds);
+      case TRANSACTIONS -> buildTransactions(desc, effectiveTlds);
     };
   }
 
@@ -291,6 +292,64 @@ public final class ExploreQueryBuilder {
     }
     return assembleQuery(selectCols, "\"RegistryDashboardRegistrarPricing\" p",
         whereClauses, groupByCols, null);
+  }
+
+  private static String buildTransactions(
+      ExploreQueryDescriptor desc, ImmutableSet<String> tlds) {
+    ExploreQueryDescriptor.ExploreFilters f = desc.getFilters();
+
+    List<String> selectCols = new ArrayList<>();
+    selectCols.add("dh.history_modification_time AS timestamp");
+    selectCols.add("d.domain_name");
+    selectCols.add("d.tld");
+    selectCols.add("d.current_sponsor_registrar_id AS registrar");
+    selectCols.add("b.reason AS operation");
+    selectCols.add("b.cost_amount AS amount");
+    selectCols.add(
+        "(b.cost_amount - COALESCE(cb.rsp_retained_fee_amount, 0)) AS net_amount_to_registry");
+    selectCols.add("b.cost_currency AS currency");
+
+    String fromClause =
+        "\"BillingEvent\" b"
+            + " JOIN \"Domain\" d ON d.repo_id = b.domain_repo_id"
+            + " JOIN \"DomainHistory\" dh ON dh.history_revision_id ="
+            + " b.domain_history_revision_id"
+            + " AND dh.domain_repo_id = b.domain_repo_id"
+            + " LEFT JOIN LATERAL ("
+            + " SELECT rsp_retained_fee_amount"
+            + " FROM \"RegistryDashboardCostBasis\""
+            + " WHERE (tld = d.tld OR tld = '*')"
+            + " AND operation = b.reason"
+            + " AND effective_date <= dh.history_modification_time"
+            + " ORDER BY CASE WHEN tld = d.tld THEN 0 ELSE 1 END, effective_date DESC"
+            + " LIMIT 1"
+            + ") cb ON true";
+
+    List<String> whereClauses = new ArrayList<>();
+    whereClauses.add("b.reason IN ('CREATE', 'RENEW', 'TRANSFER', 'RESTORE')");
+    if (!tlds.isEmpty()) {
+      whereClauses.add("d.tld IN (:tlds)");
+    }
+    if (f.getDateRange() != null) {
+      whereClauses.add("dh.history_modification_time >= :startDate");
+      whereClauses.add("dh.history_modification_time <= :endDate");
+    }
+    if (!f.getOperations().isEmpty()) {
+      whereClauses.add("b.reason IN (:operations)");
+    }
+    if (!f.getRegistrarIds().isEmpty()) {
+      whereClauses.add("d.current_sponsor_registrar_id IN (:registrarIds)");
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("SELECT ").append(String.join(", ", selectCols));
+    sb.append(" FROM ").append(fromClause);
+    if (!whereClauses.isEmpty()) {
+      sb.append(" WHERE ").append(String.join(" AND ", whereClauses));
+    }
+    sb.append(" ORDER BY dh.history_modification_time DESC");
+    sb.append(" LIMIT :maxRows");
+    return sb.toString();
   }
 
   private static String resolveGranularity(String granularity) {

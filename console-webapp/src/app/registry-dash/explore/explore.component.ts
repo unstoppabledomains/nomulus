@@ -91,4 +91,30 @@ export class ExploreComponent implements OnInit {
   runQuery(): void {
     this.exploreService.explore(this.query()).subscribe();
   }
+
+  exportCsv(): void {
+    const r = this.result();
+    if (!r || r.rows.length === 0) return;
+
+    const escape = (val: unknown): string => {
+      const s = val == null ? '' : String(val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    };
+
+    const header = r.columns.map(escape).join(',');
+    const rows = r.rows.map(row => r.columns.map(col => escape(row[col])).join(','));
+    const csv = '\uFEFF' + header + '\n' + rows.join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `explore-${this.query().dataSource.toLowerCase()}-${ts}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 }

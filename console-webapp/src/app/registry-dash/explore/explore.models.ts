@@ -18,7 +18,8 @@ export type DataSourceType =
   | 'DOMAIN_COUNTS'
   | 'RENEWAL_RATES'
   | 'EXPIRATION_CURVE'
-  | 'PRICING_RULES';
+  | 'PRICING_RULES'
+  | 'TRANSACTIONS';
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'stacked-bar' | 'area' | 'horizontal-bar';
 

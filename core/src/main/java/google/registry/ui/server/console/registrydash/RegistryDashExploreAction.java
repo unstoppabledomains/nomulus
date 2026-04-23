@@ -211,6 +211,11 @@ public class RegistryDashExploreAction extends ConsoleApiAction {
 
   private static List<String> buildColumnNames(
       ExploreDataSource source, ExploreQueryDescriptor desc) {
+    if (source == ExploreDataSource.TRANSACTIONS) {
+      return List.of(
+          "timestamp", "domain_name", "tld", "registrar",
+          "operation", "amount", "net_amount_to_registry", "currency");
+    }
     List<String> cols = new ArrayList<>();
     // Dimensions first
     for (String dim : desc.getDimensions()) {

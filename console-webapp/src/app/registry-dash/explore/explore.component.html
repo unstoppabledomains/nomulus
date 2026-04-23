@@ -48,7 +48,13 @@
 
   <!-- Raw Data Table -->
   <div class="data-table-wrapper" *ngIf="result() && result()!.rows.length > 0">
-    <h3>Raw Data</h3>
+    <div class="data-table-header">
+      <h3>Raw Data</h3>
+      <button mat-stroked-button (click)="exportCsv()">
+        <mat-icon>download</mat-icon>
+        Download CSV
+      </button>
+    </div>
     <div class="table-scroll">
       <table mat-table [dataSource]="result()!.rows">
         <ng-container *ngFor="let col of tableColumns()" [matColumnDef]="col">
