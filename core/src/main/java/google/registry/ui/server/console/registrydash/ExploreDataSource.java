@@ -51,7 +51,12 @@ public enum ExploreDataSource {
   PRICING_RULES(
       ImmutableSet.of("priceAmount"),
       ImmutableSet.of("registrar", "tld", "operation"),
-      ImmutableSet.of("tlds", "registrarIds", "operations"));
+      ImmutableSet.of("tlds", "registrarIds", "operations")),
+
+  TRANSACTIONS(
+      ImmutableSet.of("amount", "netAmountToRegistry"),
+      ImmutableSet.of("timestamp", "domain_name", "tld", "registrar", "operation"),
+      ImmutableSet.of("tlds", "registrarIds", "operations", "dateRange"));
 
   private final ImmutableSet<String> allowedMetrics;
   private final ImmutableSet<String> allowedDimensions;
