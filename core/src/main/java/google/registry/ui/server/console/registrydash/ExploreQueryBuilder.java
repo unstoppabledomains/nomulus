@@ -302,7 +302,7 @@ public final class ExploreQueryBuilder {
     selectCols.add("dh.history_modification_time AS timestamp");
     selectCols.add("d.domain_name");
     selectCols.add("d.tld");
-    selectCols.add("d.current_sponsor_registrar_id AS registrar");
+    selectCols.add("b.registrar_id AS registrar");
     selectCols.add("b.reason AS operation");
     selectCols.add("b.cost_amount AS amount");
     selectCols.add(
@@ -338,7 +338,7 @@ public final class ExploreQueryBuilder {
       whereClauses.add("b.reason IN (:operations)");
     }
     if (!f.getRegistrarIds().isEmpty()) {
-      whereClauses.add("d.current_sponsor_registrar_id IN (:registrarIds)");
+      whereClauses.add("b.registrar_id IN (:registrarIds)");
     }
 
     StringBuilder sb = new StringBuilder();
