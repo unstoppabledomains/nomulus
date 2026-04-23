@@ -144,6 +144,10 @@ export class PricingComponent implements AfterViewInit {
       if (property === 'defaultPrice') {
         return item.defaultPrice ?? 0;
       }
+      if (property === 'isActive') {
+        const order: Record<string, number> = { Active: 0, Scheduled: 1, Expired: 2, Inactive: 3 };
+        return order[this.getRuleStatus(item).label] ?? 4;
+      }
       return (item as any)[property];
     };
   }
@@ -151,6 +155,20 @@ export class PricingComponent implements AfterViewInit {
   getDifference(rule: PricingRule): number | null {
     if (rule.defaultPrice == null) return null;
     return rule.priceAmount - rule.defaultPrice;
+  }
+
+  getRuleStatus(rule: PricingRule): { label: string; icon: string; cssClass: string } {
+    if (!rule.isActive) {
+      return { label: 'Inactive', icon: 'cancel', cssClass: 'status-inactive' };
+    }
+    const now = new Date();
+    if (rule.effectiveDate && new Date(rule.effectiveDate) > now) {
+      return { label: 'Scheduled', icon: 'schedule', cssClass: 'status-scheduled' };
+    }
+    if (rule.expiryDate && new Date(rule.expiryDate) <= now) {
+      return { label: 'Expired', icon: 'warning', cssClass: 'status-expired' };
+    }
+    return { label: 'Active', icon: 'check_circle', cssClass: 'status-active' };
   }
 
   getDifferenceClass(rule: PricingRule): string {
