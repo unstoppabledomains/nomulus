@@ -52,6 +52,7 @@ ext {
 
       // OkHttp 5.0 is in alpha.
       'com.squareup.okhttp3:okhttp:[4.10.0, 5.0.0)!!',
+      'com.squareup.okhttp3:mockwebserver:[4.10.0, 5.0.0)!!',
 
       // This packages has a broken versioning scheme. There are v1beta3-* and
       // v1b4-* packages that are way older than v1b3-rev2024MMDD-* that need to
