@@ -41,8 +41,8 @@
     <!-- Streaming response -->
     <div *ngIf="streaming()" class="message assistant-message streaming">
       <mat-icon class="message-icon">auto_awesome</mat-icon>
-      <div class="message-content streaming-text">
-        {{ streamedText() }}
+      <div class="message-content markdown-body">
+        <div [innerHTML]="streamedText() | markdown"></div>
         <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
       </div>
     </div>
