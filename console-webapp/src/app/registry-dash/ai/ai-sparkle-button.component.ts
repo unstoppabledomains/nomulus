@@ -45,9 +45,8 @@ export class AiSparkleButtonComponent {
     const range = this.dashService.selectedRangeConfig();
     const tlds = this.dashService.selectedTlds();
     const regIds = this.dashService.selectedRegistrarIds();
-    const savedModel = this.dashService.settingsCache()?.['aiModel'] as
-      | AiModelChoice
-      | undefined;
+    const savedModel = (this.dashService.settingsCache()?.['aiModel']
+      || localStorage.getItem('ai-model-preference')) as AiModelChoice | undefined;
 
     const data: AiAnalysisModalData = {
       title: `${prompt.label} — ${this.pageLabel()}`,

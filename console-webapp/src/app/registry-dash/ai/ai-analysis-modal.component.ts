@@ -133,6 +133,7 @@ export class AiAnalysisModalComponent implements OnInit {
 
   onModelChange(model: AiModelChoice) {
     this.selectedModel.set(model);
+    localStorage.setItem('ai-model-preference', model);
     this.dashService.updateSettingsSelf({ aiModel: model }).subscribe();
   }
 
