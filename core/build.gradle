@@ -181,6 +181,7 @@ dependencies {
   implementation deps['com.jcraft:jsch']
   implementation deps['com.zaxxer:HikariCP']
   implementation deps['com.squareup.okhttp3:okhttp']
+  testImplementation deps['com.squareup.okhttp3:mockwebserver']
   implementation deps['dnsjava:dnsjava']
   testRuntimeOnly deps['guru.nidi:graphviz-java-all-j2v8']
   testImplementation deps['io.github.classgraph:classgraph']

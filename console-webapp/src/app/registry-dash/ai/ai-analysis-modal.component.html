@@ -1,0 +1,72 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+<mat-dialog-content>
+  <!-- Context line -->
+  <div class="context-bar">
+    <span class="context-model">Model:</span>
+    <mat-button-toggle-group [value]="selectedModel()" (change)="onModelChange($event.value)">
+      <mat-button-toggle value="haiku">Haiku</mat-button-toggle>
+      <mat-button-toggle value="sonnet">Sonnet</mat-button-toggle>
+      <mat-button-toggle value="opus">Opus</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Advanced section (admin only, dev mode) -->
+  <div *ngIf="data.isAdmin" class="advanced-section">
+    <button mat-button (click)="toggleAdvanced()" class="advanced-toggle">
+      <mat-icon>{{ showAdvanced() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      Advanced
+    </button>
+    <div *ngIf="showAdvanced()" class="advanced-content">
+      <textarea
+        [(ngModel)]="editableSystemPrompt" name="systemPrompt"
+        class="system-prompt-editor"
+        placeholder="System prompt (editable in dev mode)"
+        rows="6"></textarea>
+    </div>
+  </div>
+
+  <!-- Conversation -->
+  <div class="conversation">
+    <ng-container *ngFor="let msg of conversationHistory()">
+      <div *ngIf="msg.role === 'user'" class="message user-message">
+        <mat-icon class="message-icon">person</mat-icon>
+        <div class="message-content">{{ msg.content }}</div>
+      </div>
+      <div *ngIf="msg.role === 'assistant'" class="message assistant-message">
+        <mat-icon class="message-icon">auto_awesome</mat-icon>
+        <div class="message-content markdown-body" [innerHTML]="msg.content | markdown"></div>
+      </div>
+    </ng-container>
+
+    <!-- Streaming response -->
+    <div *ngIf="streaming()" class="message assistant-message streaming">
+      <mat-icon class="message-icon">auto_awesome</mat-icon>
+      <div class="message-content markdown-body">
+        <div [innerHTML]="streamedText() | markdown"></div>
+        <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="error()" class="error-message">
+      <mat-icon>error</mat-icon>
+      {{ error() }}
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions>
+  <div class="follow-up-bar">
+    <input
+      type="text"
+      [(ngModel)]="followUpText" name="followUp"
+      (keydown)="onFollowUpKeydown($event)"
+      placeholder="Ask a follow-up question..."
+      [disabled]="streaming()"
+      class="follow-up-input" />
+    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">
+      <mat-icon>send</mat-icon>
+    </button>
+  </div>
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

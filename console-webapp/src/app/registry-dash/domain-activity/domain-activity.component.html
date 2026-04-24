@@ -55,9 +55,16 @@
     <div class="chart-container" *ngIf="activityByTldOptions()">
       <div class="chart-title-row">
         <h3>Activity Breakdown by TLD</h3>
-        <button mat-icon-button class="explore-btn" (click)="exploreActivityByTld()" matTooltip="Explore this data">
-          <mat-icon>open_in_new</mat-icon>
-        </button>
+        <div class="chart-actions">
+          <app-ai-sparkle-button
+            page="domain-activity"
+            [prompts]="aiPrompts"
+            [chartData]="data()">
+          </app-ai-sparkle-button>
+          <button mat-icon-button class="explore-btn" (click)="exploreActivityByTld()" matTooltip="Explore this data">
+            <mat-icon>open_in_new</mat-icon>
+          </button>
+        </div>
       </div>
       <p class="chart-description">Total domain transactions grouped by TLD and operation type for the selected time period.</p>
       <div appLongPress (longPress)="onActivityByTldLongPress()">
@@ -70,9 +77,16 @@
     <div class="chart-container" *ngIf="domainCountsBarOptions()">
       <div class="chart-title-row">
         <h3>Current Domain Counts by TLD</h3>
-        <button mat-icon-button class="explore-btn" (click)="exploreDomainCounts()" matTooltip="Explore this data">
-          <mat-icon>open_in_new</mat-icon>
-        </button>
+        <div class="chart-actions">
+          <app-ai-sparkle-button
+            page="domain-activity"
+            [prompts]="aiPrompts"
+            [chartData]="data()">
+          </app-ai-sparkle-button>
+          <button mat-icon-button class="explore-btn" (click)="exploreDomainCounts()" matTooltip="Explore this data">
+            <mat-icon>open_in_new</mat-icon>
+          </button>
+        </div>
       </div>
       <p class="chart-description">Current number of active (non-deleted) domains per TLD. This count is independent of the selected time period.</p>
       <div appLongPress (longPress)="onDomainCountsLongPress()">

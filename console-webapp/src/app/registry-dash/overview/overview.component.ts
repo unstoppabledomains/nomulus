@@ -25,6 +25,8 @@ import { ExploreService } from '../explore/explore.service';
 import { ExploreQuery } from '../explore/explore.models';
 import { LongPressDirective } from '../drilldown/long-press.directive';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { OVERVIEW_PROMPTS } from '../ai/ai-prompts';
 
 const CHART_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -42,13 +44,14 @@ const ACTIVITY_COLORS: Record<string, string> = {
 
 @Component({
   selector: 'app-registry-dash-overview',
-  imports: [MaterialModule, CommonModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent],
+  imports: [MaterialModule, CommonModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent, AiSparkleButtonComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './overview.component.html',
   styleUrls: ['./overview.component.scss'],
 })
 export class OverviewComponent {
   private destroyRef = inject(DestroyRef);
+  readonly aiPrompts = OVERVIEW_PROMPTS;
   lastHoveredActivity: any = null;
   lastHoveredRenewal: any = null;
   barChartData = computed(() => {

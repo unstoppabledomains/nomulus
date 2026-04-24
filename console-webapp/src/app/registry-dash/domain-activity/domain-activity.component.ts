@@ -25,6 +25,8 @@ import { ExploreService } from '../explore/explore.service';
 import { withDrillDown } from '../ud-echarts';
 import { LongPressDirective } from '../drilldown/long-press.directive';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { DOMAIN_ACTIVITY_PROMPTS } from '../ai/ai-prompts';
 
 const ACTIVITY_COLORS: Record<string, string> = {
   CREATES: '#0D67FE',
@@ -42,13 +44,14 @@ const TLD_COLORS = [
 @Component({
   selector: 'app-domain-activity',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective, FilterPanelComponent, AiSparkleButtonComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './domain-activity.component.html',
   styleUrls: ['./domain-activity.component.scss'],
 })
 export class DomainActivityComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  readonly aiPrompts = DOMAIN_ACTIVITY_PROMPTS;
   lastHoveredActivityByTld: any = null;
   lastHoveredDomainCounts: any = null;
 

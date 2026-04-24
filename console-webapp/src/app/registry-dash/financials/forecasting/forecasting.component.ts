@@ -24,6 +24,8 @@ import { DrillDownService } from '../../drilldown/drilldown.service';
 import { ExploreService } from '../../explore/explore.service';
 import { withDrillDown } from '../../ud-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
+import { AiSparkleButtonComponent } from '../../ai/ai-sparkle-button.component';
+import { FORECASTING_PROMPTS } from '../../ai/ai-prompts';
 
 const TLD_COLORS = [
   '#0D67FE', '#0546B7', '#65A1DA', '#192B55',
@@ -37,13 +39,14 @@ type ForecastMethod = 'none' | 'trend' | 'confidence' | 'ema' | 'seasonal';
 @Component({
   selector: 'app-forecasting',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective, AiSparkleButtonComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './forecasting.component.html',
   styleUrls: ['./forecasting.component.scss'],
 })
 export class ForecastingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  readonly aiPrompts = FORECASTING_PROMPTS;
   lastHoveredNetGrowth: any = null;
   lastHoveredExpiration: any = null;
   forecastMethod = signal<ForecastMethod>('trend');

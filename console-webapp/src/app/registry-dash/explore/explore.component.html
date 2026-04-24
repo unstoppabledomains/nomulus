@@ -39,6 +39,16 @@
   </div>
 
   <!-- Chart -->
+  <div class="chart-title-row" *ngIf="result() && result()!.rows.length > 0">
+    <span></span>
+    <div class="chart-actions">
+      <app-ai-sparkle-button
+        page="explore"
+        [prompts]="aiPrompts"
+        [chartData]="result()">
+      </app-ai-sparkle-button>
+    </div>
+  </div>
   <app-explore-chart
     [result]="result()"
     [chartType]="chartType()"

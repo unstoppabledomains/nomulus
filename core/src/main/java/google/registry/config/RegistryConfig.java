@@ -1449,6 +1449,30 @@ public final class RegistryConfig {
       return config.mosapi.tldThreadCount;
     }
 
+    @Provides
+    @Config("anthropicApiBaseUrl")
+    public static String provideAnthropicApiBaseUrl(RegistryConfigSettings config) {
+      return config.ai.apiBaseUrl;
+    }
+
+    @Provides
+    @Config("anthropicApiKeySecretName")
+    public static String provideAnthropicApiKeySecretName(RegistryConfigSettings config) {
+      return config.ai.apiKeySecretName;
+    }
+
+    @Provides
+    @Config("anthropicDefaultModel")
+    public static String provideAnthropicDefaultModel(RegistryConfigSettings config) {
+      return config.ai.defaultModel;
+    }
+
+    @Provides
+    @Config("anthropicRateLimitPerHour")
+    public static int provideAnthropicRateLimitPerHour(RegistryConfigSettings config) {
+      return config.ai.rateLimitPerHour;
+    }
+
     private static String formatComments(String text) {
       return Splitter.on('\n').omitEmptyStrings().trimResults().splitToList(text).stream()
           .map(s -> "# " + s)

@@ -223,6 +223,7 @@ com.ibm.icu:icu4j:73.2=compileClasspath,deploy_jar,nonprodCompileClasspath,nonpr
 com.jcraft:jsch:0.1.55=compileClasspath,deploy_jar,nonprodCompileClasspath,nonprodRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.lmax:disruptor:3.4.2=compileClasspath,deploy_jar,nonprodCompileClasspath,nonprodRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.puppycrawl.tools:checkstyle:9.3=checkstyle
+com.squareup.okhttp3:mockwebserver:4.12.0=testCompileClasspath,testRuntimeClasspath
 com.squareup.okhttp3:okhttp:4.12.0=compileClasspath,deploy_jar,nonprodCompileClasspath,nonprodRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.squareup.okio:okio-bom:3.0.0=deploy_jar,nonprodRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
 com.squareup.okio:okio-fakefilesystem-jvm:3.4.0=compileClasspath,deploy_jar,nonprodCompileClasspath,nonprodRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath

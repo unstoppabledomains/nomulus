@@ -59,6 +59,12 @@
   justify-content: space-between;
 }
 
+.chart-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .explore-btn {
   opacity: 0.5;
   &:hover { opacity: 1; }

@@ -639,3 +639,12 @@ mosapi:
   # ICANN MoSAPI Specification, Section 12.3</a>
   tldThreadCount: 4
 
+ai:
+  # Anthropic API base URL
+  apiBaseUrl: https://api.anthropic.com
+  # Secret Manager secret name for the Anthropic API key
+  apiKeySecretName: ud_rsp_anthropic_api_key
+  # Default model (haiku, sonnet, opus)
+  defaultModel: sonnet
+  # Rate limit: max requests per user per hour
+  rateLimitPerHour: 120

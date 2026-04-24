@@ -43,6 +43,7 @@ public class RegistryConfigSettings {
   public BulkPricingPackageMonitoring bulkPricingPackageMonitoring;
   public Bsa bsa;
   public MosApi mosapi;
+  public Ai ai;
 
   /** Configuration options that apply to the entire GCP project. */
   public static class GcpProject {
@@ -255,6 +256,14 @@ public class RegistryConfigSettings {
     public String orderStatusUrl;
     public String unblockableDomainsUrl;
     public String uploadUnavailableDomainsUrl;
+  }
+
+  /** Configuration for AI (Anthropic) integration. */
+  public static class Ai {
+    public String apiBaseUrl;
+    public String apiKeySecretName;
+    public String defaultModel;
+    public int rateLimitPerHour;
   }
 
   /** Configuration for Mosapi. */

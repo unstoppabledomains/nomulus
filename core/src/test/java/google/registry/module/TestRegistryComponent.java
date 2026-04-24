@@ -17,6 +17,7 @@ package google.registry.module;
 import com.google.monitoring.metrics.MetricReporter;
 import dagger.Component;
 import dagger.Lazy;
+import google.registry.ai.AnthropicModule;
 import google.registry.batch.BatchModule;
 import google.registry.bigquery.BigqueryModule;
 import google.registry.config.CloudTasksUtilsModule;
@@ -50,6 +51,7 @@ import jakarta.inject.Singleton;
 @Singleton
 @Component(
     modules = {
+      AnthropicModule.class,
       AuthModule.class,
       BatchModule.class,
       BigqueryModule.class,
