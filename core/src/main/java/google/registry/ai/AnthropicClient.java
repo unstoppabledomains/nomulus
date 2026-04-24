@@ -40,8 +40,8 @@ public class AnthropicClient {
   private static final int MAX_TOKENS = 4096;
   private static final Map<String, String> MODEL_MAP = Map.of(
       "haiku", "claude-haiku-4-5-20251001",
-      "sonnet", "claude-sonnet-4-6-20250514",
-      "opus", "claude-opus-4-6-20250514");
+      "sonnet", "claude-sonnet-4-5-20250929",
+      "opus", "claude-opus-4-6");
   private static final Gson GSON = new Gson();
 
   private final OkHttpClient httpClient;

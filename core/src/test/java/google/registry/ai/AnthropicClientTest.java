@@ -118,7 +118,7 @@ class AnthropicClientTest {
   @Test
   void testModelMapping() {
     assertThat(AnthropicClient.resolveModelId("haiku")).isEqualTo("claude-haiku-4-5-20251001");
-    assertThat(AnthropicClient.resolveModelId("sonnet")).isEqualTo("claude-sonnet-4-6-20250514");
-    assertThat(AnthropicClient.resolveModelId("opus")).isEqualTo("claude-opus-4-6-20250514");
+    assertThat(AnthropicClient.resolveModelId("sonnet")).isEqualTo("claude-sonnet-4-5-20250929");
+    assertThat(AnthropicClient.resolveModelId("opus")).isEqualTo("claude-opus-4-6");
   }
 }
