@@ -50,6 +50,8 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private static final int SC_TOO_MANY_REQUESTS = 429;
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
+  private static final Gson PLAIN_GSON = new Gson();
+
   private final Optional<JsonElement> payload;
   private final AnthropicClient anthropicClient;
   private final AiRateLimiter rateLimiter;
@@ -80,7 +82,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       return;
     }
 
-    AiAnalyzeRequest request = gson.fromJson(payload.get(), AiAnalyzeRequest.class);
+    AiAnalyzeRequest request = PLAIN_GSON.fromJson(payload.get(), AiAnalyzeRequest.class);
     if (!request.isValid()) {
       setFailedResponse("Invalid request: page and chartData are required", SC_BAD_REQUEST);
       return;
