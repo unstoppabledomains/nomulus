@@ -75,6 +75,11 @@
   font-style: italic;
 }
 
+.streaming-text {
+  white-space: pre-wrap;
+  font-family: inherit;
+}
+
 .stream-progress {
   margin-top: 8px;
 }
