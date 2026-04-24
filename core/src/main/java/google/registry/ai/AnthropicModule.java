@@ -45,6 +45,10 @@ public final class AnthropicModule {
   static String provideAnthropicApiKey(
       SecretManagerClient secretManagerClient,
       @Config("anthropicApiKeySecretName") String secretName) {
+    String envKey = System.getenv("ANTHROPIC_API_KEY");
+    if (envKey != null && !envKey.isEmpty()) {
+      return envKey;
+    }
     return secretManagerClient.getSecretData(secretName, Optional.of(LATEST_SECRET_VERSION));
   }
 
