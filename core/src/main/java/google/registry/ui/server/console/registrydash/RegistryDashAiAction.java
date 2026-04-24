@@ -118,7 +118,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
           request.conversationHistory,
           model,
           chunk -> {
-            writer.write("data: " + gson.toJson(new TextChunk(chunk)) + "\n\n");
+            writer.write("data: " + PLAIN_GSON.toJson(new TextChunk(chunk)) + "\n\n");
             writer.flush();
           });
 
