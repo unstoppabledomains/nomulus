@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Inject, computed, signal, OnInit } from '@angular/core';
+import { Component, Inject, computed, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MaterialModule } from '../../material.module';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiAnalyzeRequest, AiModelChoice, ConversationMessage } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
+import { marked } from 'marked';
+
+@Pipe({ name: 'markdown', standalone: true })
+export class MarkdownPipe implements PipeTransform {
+  constructor(private sanitizer: DomSanitizer) {}
+  transform(value: string): SafeHtml {
+    if (!value) return '';
+    const html = marked.parse(value, { async: false }) as string;
+    return this.sanitizer.bypassSecurityTrustHtml(html);
+  }
+}
 
 export interface AiAnalysisModalData {
   title: string;
@@ -36,16 +48,16 @@ export interface AiAnalysisModalData {
 @Component({
   selector: 'app-ai-analysis-modal',
   standalone: true,
-  imports: [CommonModule, MaterialModule, FormsModule],
+  imports: [CommonModule, MaterialModule, FormsModule, MarkdownPipe],
   templateUrl: './ai-analysis-modal.component.html',
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
 export class AiAnalysisModalComponent implements OnInit {
   selectedModel = signal<AiModelChoice>('sonnet');
   conversationHistory = signal<ConversationMessage[]>([]);
-  followUpInput = signal('');
+  followUpText = '';
   showAdvanced = signal(false);
-  editableSystemPrompt = signal('');
+  editableSystemPrompt = '';
 
   streaming = computed(() => this.aiService.streaming());
   streamedText = computed(() => this.aiService.streamedText());
@@ -78,7 +90,7 @@ export class AiAnalysisModalComponent implements OnInit {
       metadata: this.data.metadata,
       chartData: this.data.chartData,
       model: this.selectedModel(),
-      systemPrompt: this.showAdvanced() ? this.editableSystemPrompt() : undefined,
+      systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined,
       conversationHistory: history,
     });
 
@@ -91,7 +103,7 @@ export class AiAnalysisModalComponent implements OnInit {
   }
 
   async sendFollowUp() {
-    const input = this.followUpInput().trim();
+    const input = this.followUpText.trim();
     if (!input || this.streaming()) return;
 
     const updatedHistory: ConversationMessage[] = [
@@ -99,7 +111,7 @@ export class AiAnalysisModalComponent implements OnInit {
       { role: 'user', content: input },
     ];
     this.conversationHistory.set(updatedHistory);
-    this.followUpInput.set('');
+    this.followUpText = '';
 
     await this.aiService.analyze({
       page: this.data.page,
@@ -107,7 +119,7 @@ export class AiAnalysisModalComponent implements OnInit {
       metadata: this.data.metadata,
       chartData: this.data.chartData,
       model: this.selectedModel(),
-      systemPrompt: this.showAdvanced() ? this.editableSystemPrompt() : undefined,
+      systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined,
       conversationHistory: updatedHistory,
     });
 
@@ -133,8 +145,8 @@ export class AiAnalysisModalComponent implements OnInit {
 
   toggleAdvanced() {
     this.showAdvanced.update(v => !v);
-    if (this.showAdvanced() && !this.editableSystemPrompt()) {
-      this.editableSystemPrompt.set(this.data.systemPrompt ?? '');
+    if (this.showAdvanced() && !this.editableSystemPrompt) {
+      this.editableSystemPrompt = this.data.systemPrompt ?? '';
     }
   }
 }

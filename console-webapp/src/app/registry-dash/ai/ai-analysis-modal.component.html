@@ -18,7 +18,7 @@
     </button>
     <div *ngIf="showAdvanced()" class="advanced-content">
       <textarea
-        [(ngModel)]="editableSystemPrompt"
+        [(ngModel)]="editableSystemPrompt" name="systemPrompt"
         class="system-prompt-editor"
         placeholder="System prompt (editable in dev mode)"
         rows="6"></textarea>
@@ -34,14 +34,14 @@
       </div>
       <div *ngIf="msg.role === 'assistant'" class="message assistant-message">
         <mat-icon class="message-icon">auto_awesome</mat-icon>
-        <div class="message-content markdown-body" [innerHTML]="msg.content"></div>
+        <div class="message-content markdown-body" [innerHTML]="msg.content | markdown"></div>
       </div>
     </ng-container>
 
     <!-- Streaming response -->
     <div *ngIf="streaming()" class="message assistant-message streaming">
       <mat-icon class="message-icon">auto_awesome</mat-icon>
-      <div class="message-content markdown-body" [innerHTML]="streamedText()"></div>
+      <div class="message-content markdown-body" [innerHTML]="streamedText() | markdown"></div>
       <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
     </div>
 
@@ -57,12 +57,12 @@
   <div class="follow-up-bar">
     <input
       type="text"
-      [(ngModel)]="followUpInput"
+      [(ngModel)]="followUpText" name="followUp"
       (keydown)="onFollowUpKeydown($event)"
       placeholder="Ask a follow-up question..."
       [disabled]="streaming()"
       class="follow-up-input" />
-    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpInput()">
+    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">
       <mat-icon>send</mat-icon>
     </button>
   </div>
