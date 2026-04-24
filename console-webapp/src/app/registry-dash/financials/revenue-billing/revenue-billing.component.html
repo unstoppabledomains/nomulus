@@ -52,9 +52,16 @@
     <div class="chart-container full-width" *ngIf="revenueLineOptions()">
       <div class="chart-title-row">
         <h3>Registry Revenue by TLD</h3>
-        <button mat-icon-button class="explore-btn" (click)="exploreRevenueByTld()" matTooltip="Explore this data">
-          <mat-icon>open_in_new</mat-icon>
-        </button>
+        <div class="chart-actions">
+          <app-ai-sparkle-button
+            page="revenue-billing"
+            [prompts]="aiPrompts"
+            [chartData]="data()">
+          </app-ai-sparkle-button>
+          <button mat-icon-button class="explore-btn" (click)="exploreRevenueByTld()" matTooltip="Explore this data">
+            <mat-icon>open_in_new</mat-icon>
+          </button>
+        </div>
       </div>
       <p class="chart-description">Net registry revenue per TLD over the selected period — what the registry received after RSP fees.</p>
       <div appLongPress (longPress)="onRevenueByTldLongPress()">
@@ -67,9 +74,16 @@
     <div class="chart-container full-width" *ngIf="operationBarOptions()">
       <div class="chart-title-row">
         <h3>Registry Revenue by Operation</h3>
-        <button mat-icon-button class="explore-btn" (click)="exploreRevenueByOperation()" matTooltip="Explore this data">
-          <mat-icon>open_in_new</mat-icon>
-        </button>
+        <div class="chart-actions">
+          <app-ai-sparkle-button
+            page="revenue-billing"
+            [prompts]="aiPrompts"
+            [chartData]="data()">
+          </app-ai-sparkle-button>
+          <button mat-icon-button class="explore-btn" (click)="exploreRevenueByOperation()" matTooltip="Explore this data">
+            <mat-icon>open_in_new</mat-icon>
+          </button>
+        </div>
       </div>
       <p class="chart-description">Net registry revenue by operation type over the selected period — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
       <div appLongPress (longPress)="onRevenueByOpLongPress()">

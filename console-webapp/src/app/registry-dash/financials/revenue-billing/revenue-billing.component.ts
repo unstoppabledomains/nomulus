@@ -24,6 +24,8 @@ import { DrillDownService } from '../../drilldown/drilldown.service';
 import { ExploreService } from '../../explore/explore.service';
 import { withDrillDown } from '../../ud-echarts';
 import { LongPressDirective } from '../../drilldown/long-press.directive';
+import { AiSparkleButtonComponent } from '../../ai/ai-sparkle-button.component';
+import { REVENUE_BILLING_PROMPTS } from '../../ai/ai-prompts';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -40,13 +42,14 @@ const TLD_COLORS = [
 @Component({
   selector: 'app-revenue-billing',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, LongPressDirective, AiSparkleButtonComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './revenue-billing.component.html',
   styleUrls: ['./revenue-billing.component.scss'],
 })
 export class RevenueBillingComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
+  readonly aiPrompts = REVENUE_BILLING_PROMPTS;
   lastHoveredRevenueByTld: any = null;
   lastHoveredRevenueByOp: any = null;
 
