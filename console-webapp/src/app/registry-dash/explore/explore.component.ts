@@ -22,11 +22,13 @@ import { ExploreService } from './explore.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
 import { ExploreChartComponent } from './explore-chart/explore-chart.component';
 import { ChartType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { EXPLORE_PROMPTS } from '../ai/ai-prompts';
 
 @Component({
   selector: 'app-explore',
   standalone: true,
-  imports: [CommonModule, MaterialModule, ExploreBuilderComponent, ExploreChartComponent],
+  imports: [CommonModule, MaterialModule, ExploreBuilderComponent, ExploreChartComponent, AiSparkleButtonComponent],
   templateUrl: './explore.component.html',
   styleUrls: ['./explore.component.scss'],
 })
@@ -34,6 +36,7 @@ export class ExploreComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private dashService = inject(RegistryDashService);
   exploreService = inject(ExploreService);
+  readonly aiPrompts = EXPLORE_PROMPTS;
 
   query = signal<ExploreQuery>({ ...DEFAULT_QUERY, filters: { ...DEFAULT_QUERY.filters } });
   chartType = signal<ChartType>('bar');

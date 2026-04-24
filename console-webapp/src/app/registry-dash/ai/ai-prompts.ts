@@ -86,8 +86,54 @@ export const FORECASTING_PROMPTS: AiPromptOption[] = [
   },
 ];
 
+export const EXPLORE_PROMPTS: AiPromptOption[] = [
+  {
+    icon: 'bar_chart',
+    label: 'Summarize trends',
+    promptType: 'summarize_trends',
+    userMessage: 'Summarize the key trends visible in this data.',
+  },
+  {
+    icon: 'search',
+    label: 'Find anomalies',
+    promptType: 'find_anomalies',
+    userMessage: 'Identify any anomalies or unusual patterns in this data.',
+  },
+  {
+    icon: 'lightbulb',
+    label: 'Suggest actions',
+    promptType: 'suggest_actions',
+    userMessage: 'Based on this data, what actions would you recommend?',
+  },
+];
+
+export const OVERVIEW_PROMPTS: AiPromptOption[] = [
+  {
+    icon: 'bar_chart',
+    label: 'Summarize trends',
+    promptType: 'summarize_trends',
+    userMessage:
+      'Summarize the key trends across the registry — activity patterns, renewal health, and overall performance.',
+  },
+  {
+    icon: 'search',
+    label: 'Find anomalies',
+    promptType: 'find_anomalies',
+    userMessage: 'Identify any anomalies or concerns in the overview metrics.',
+  },
+  {
+    icon: 'lightbulb',
+    label: 'Suggest actions',
+    promptType: 'suggest_actions',
+    userMessage:
+      'Based on these overview metrics, what should the registry team focus on?',
+  },
+];
+
 export const PROMPTS_BY_PAGE: Record<string, AiPromptOption[]> = {
   'domain-activity': DOMAIN_ACTIVITY_PROMPTS,
   'revenue-billing': REVENUE_BILLING_PROMPTS,
   forecasting: FORECASTING_PROMPTS,
+  explore: EXPLORE_PROMPTS,
+  overview: OVERVIEW_PROMPTS,
 };

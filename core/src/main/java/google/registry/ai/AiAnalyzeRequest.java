@@ -41,6 +41,8 @@ public class AiAnalyzeRequest {
         && chartData != null
         && (page.equals("domain-activity")
             || page.equals("revenue-billing")
-            || page.equals("forecasting"));
+            || page.equals("forecasting")
+            || page.equals("explore")
+            || page.equals("overview"));
   }
 }

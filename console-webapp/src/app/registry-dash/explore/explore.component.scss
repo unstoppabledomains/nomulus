@@ -67,6 +67,19 @@
   }
 }
 
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.chart-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .data-table-wrapper {
   margin-top: 24px;
 
