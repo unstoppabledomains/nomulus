@@ -1,0 +1,12 @@
+<button mat-icon-button [matMenuTriggerFor]="aiMenu"
+        matTooltip="Analyze with AI"
+        class="sparkle-button">
+  <mat-icon>auto_awesome</mat-icon>
+</button>
+
+<mat-menu #aiMenu="matMenu">
+  <button mat-menu-item *ngFor="let prompt of prompts" (click)="onPromptSelect(prompt)">
+    <mat-icon>{{ prompt.icon }}</mat-icon>
+    <span>{{ prompt.label }}</span>
+  </button>
+</mat-menu>
