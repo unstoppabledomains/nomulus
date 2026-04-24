@@ -131,6 +131,7 @@ import google.registry.ui.server.console.PasswordResetVerifyAction;
 import google.registry.ui.server.console.RegistrarsAction;
 import google.registry.ui.server.console.domains.ConsoleBulkDomainAction;
 import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
+import google.registry.ui.server.console.registrydash.RegistryDashAiAction;
 import google.registry.ui.server.console.registrydash.RegistryDashExploreAction;
 import google.registry.ui.server.console.registrydash.RegistryDashCostBasisAction;
 import google.registry.ui.server.console.registrydash.RegistryDashDomainActivityAction;
@@ -349,6 +350,8 @@ interface RequestComponent {
   RegistryDashForecastingAction registryDashForecastingAction();
 
   RegistryDashSettingsAction registryDashSettingsAction();
+
+  RegistryDashAiAction registryDashAiAction();
 
   UDRegistryDashTldFeesAction udRegistryDashTldFeesAction();
 

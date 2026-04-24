@@ -35,7 +35,7 @@ public class AiRateLimiter {
 
   @Inject
   @VisibleForTesting
-  AiRateLimiter(Clock clock, @Named("aiRateLimitPerHour") int maxPerHour) {
+  public AiRateLimiter(Clock clock, @Named("aiRateLimitPerHour") int maxPerHour) {
     this.clock = clock;
     this.maxPerHour = maxPerHour;
   }

@@ -454,4 +454,11 @@ public final class ConsoleModule {
       @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload;
   }
+
+  @Provides
+  @Parameter("aiAnalyzePayload")
+  public static Optional<JsonElement> provideAiAnalyzePayload(
+      @OptionalJsonPayload Optional<JsonElement> payload) {
+    return payload;
+  }
 }
