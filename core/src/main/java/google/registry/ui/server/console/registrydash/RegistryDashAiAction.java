@@ -99,6 +99,12 @@ public class RegistryDashAiAction extends ConsoleApiAction {
 
     String systemPrompt = buildSystemPrompt(request, user);
     String model = request.model;
+    String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
+
+    logger.atInfo().log(
+        "AI analysis request: user=%s, page=%s, promptType=%s, model=%s, historySize=%d",
+        userEmail, request.page, request.promptType, resolvedModel,
+        request.conversationHistory != null ? request.conversationHistory.size() : 0);
 
     try {
       PrintWriter writer = consoleApiParams.response().getWriter();
