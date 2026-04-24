@@ -1452,25 +1452,25 @@ public final class RegistryConfig {
     @Provides
     @Config("anthropicApiBaseUrl")
     public static String provideAnthropicApiBaseUrl(RegistryConfigSettings config) {
-      return config.ai.apiBaseUrl;
+      return config.ai != null ? config.ai.apiBaseUrl : "https://api.anthropic.com";
     }
 
     @Provides
     @Config("anthropicApiKeySecretName")
     public static String provideAnthropicApiKeySecretName(RegistryConfigSettings config) {
-      return config.ai.apiKeySecretName;
+      return config.ai != null ? config.ai.apiKeySecretName : "ud_rsp_anthropic_api_key";
     }
 
     @Provides
     @Config("anthropicDefaultModel")
     public static String provideAnthropicDefaultModel(RegistryConfigSettings config) {
-      return config.ai.defaultModel;
+      return config.ai != null ? config.ai.defaultModel : "sonnet";
     }
 
     @Provides
     @Config("anthropicRateLimitPerHour")
     public static int provideAnthropicRateLimitPerHour(RegistryConfigSettings config) {
-      return config.ai.rateLimitPerHour;
+      return config.ai != null ? config.ai.rateLimitPerHour : 120;
     }
 
     private static String formatComments(String text) {
