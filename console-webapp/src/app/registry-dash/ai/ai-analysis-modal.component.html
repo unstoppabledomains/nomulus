@@ -12,16 +12,26 @@
 
   <!-- Advanced section (admin only, dev mode) -->
   <div *ngIf="data.isAdmin" class="advanced-section">
-    <button mat-button (click)="toggleAdvanced()" class="advanced-toggle">
-      <mat-icon>{{ showAdvanced() ? 'expand_less' : 'expand_more' }}</mat-icon>
-      Advanced
-    </button>
+    <div class="advanced-header">
+      <button mat-button (click)="toggleAdvanced()" class="advanced-toggle">
+        <mat-icon>{{ showAdvanced() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        Advanced
+      </button>
+      <button *ngIf="showAdvanced()" mat-button (click)="resetToDefault()"
+              class="reset-button" [disabled]="loadingPrompt()">
+        <mat-icon>restart_alt</mat-icon>
+        Reset to Default
+      </button>
+    </div>
     <div *ngIf="showAdvanced()" class="advanced-content">
+      <div class="prompt-label">System Prompt (changes apply to this session only)</div>
+      <mat-progress-bar *ngIf="loadingPrompt()" mode="indeterminate" class="prompt-loading"></mat-progress-bar>
       <textarea
-        [(ngModel)]="editableSystemPrompt" name="systemPrompt"
+        [ngModel]="editableSystemPrompt" (ngModelChange)="onSystemPromptChange($event)"
+        name="systemPrompt"
         class="system-prompt-editor"
-        placeholder="System prompt (editable in dev mode)"
-        rows="6"></textarea>
+        placeholder="Loading default system prompt..."
+        rows="12"></textarea>
     </div>
   </div>
 
@@ -64,7 +74,7 @@
       placeholder="Ask a follow-up question..."
       [disabled]="streaming()"
       class="follow-up-input" />
-    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">
+    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText.trim()">
       <mat-icon>send</mat-icon>
     </button>
   </div>

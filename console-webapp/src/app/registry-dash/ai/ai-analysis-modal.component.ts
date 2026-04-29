@@ -58,6 +58,8 @@ export class AiAnalysisModalComponent implements OnInit {
   followUpText = '';
   showAdvanced = signal(false);
   editableSystemPrompt = '';
+  defaultSystemPrompt = '';
+  loadingPrompt = signal(false);
 
   streaming = computed(() => this.aiService.streaming());
   streamedText = computed(() => this.aiService.streamedText());
@@ -144,10 +146,48 @@ export class AiAnalysisModalComponent implements OnInit {
     }
   }
 
-  toggleAdvanced() {
+  async toggleAdvanced() {
     this.showAdvanced.update(v => !v);
     if (this.showAdvanced() && !this.editableSystemPrompt) {
-      this.editableSystemPrompt = this.data.systemPrompt ?? '';
+      const storageKey = `ai-prompt-${this.data.page}-${this.data.promptType}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        this.editableSystemPrompt = saved;
+      }
+      await this.fetchDefaultPrompt();
+      if (!saved && this.defaultSystemPrompt) {
+        this.editableSystemPrompt = this.defaultSystemPrompt;
+      }
+    }
+  }
+
+  async resetToDefault() {
+    await this.fetchDefaultPrompt();
+    this.editableSystemPrompt = this.defaultSystemPrompt;
+    const storageKey = `ai-prompt-${this.data.page}-${this.data.promptType}`;
+    localStorage.removeItem(storageKey);
+  }
+
+  private async fetchDefaultPrompt() {
+    if (this.defaultSystemPrompt) return;
+    this.loadingPrompt.set(true);
+    try {
+      this.defaultSystemPrompt = await this.aiService.getDefaultPrompt(
+        this.data.page, this.data.promptType);
+    } catch {
+      // Fall back silently — editor still works with manual input
+    } finally {
+      this.loadingPrompt.set(false);
+    }
+  }
+
+  onSystemPromptChange(value: string) {
+    this.editableSystemPrompt = value;
+    const storageKey = `ai-prompt-${this.data.page}-${this.data.promptType}`;
+    if (value && value !== this.defaultSystemPrompt) {
+      localStorage.setItem(storageKey, value);
+    } else {
+      localStorage.removeItem(storageKey);
     }
   }
 }

@@ -42,7 +42,7 @@ import java.util.Optional;
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashAiAction.PATH,
-    method = Action.Method.POST,
+    method = {Action.Method.GET, Action.Method.POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
 public class RegistryDashAiAction extends ConsoleApiAction {
 
@@ -53,6 +53,8 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private static final Gson PLAIN_GSON = new Gson();
 
   private final Optional<JsonElement> payload;
+  private final Optional<String> aiPage;
+  private final Optional<String> aiPromptType;
   private final AnthropicClient anthropicClient;
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
@@ -61,13 +63,38 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   public RegistryDashAiAction(
       ConsoleApiParams consoleApiParams,
       @Parameter("aiAnalyzePayload") Optional<JsonElement> payload,
+      @Parameter("aiPage") Optional<String> aiPage,
+      @Parameter("aiPromptType") Optional<String> aiPromptType,
       AnthropicClient anthropicClient,
       AiRateLimiter rateLimiter) {
     super(consoleApiParams);
     this.payload = payload;
+    this.aiPage = aiPage;
+    this.aiPromptType = aiPromptType;
     this.anthropicClient = anthropicClient;
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
+  }
+
+  @Override
+  protected void getHandler(User user) {
+    boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
+    boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
+
+    if (isProduction || !isAdmin) {
+      consoleApiParams.response().setStatus(SC_FORBIDDEN);
+      return;
+    }
+
+    if (aiPage.isEmpty() || aiPromptType.isEmpty()) {
+      setFailedResponse("page and promptType query parameters are required", SC_BAD_REQUEST);
+      return;
+    }
+
+    String prompt = getDefaultSystemPrompt(aiPage.get(), aiPromptType.get(), null, null);
+    JsonObject result = new JsonObject();
+    result.addProperty("systemPrompt", prompt);
+    consoleApiParams.response().setPayload(PLAIN_GSON.toJson(result));
   }
 
   @Override
@@ -131,15 +158,25 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       consoleApiParams.response().setHeader("Retry-After", "30");
     } catch (IOException e) {
       logger.atWarning().withCause(e).log("Anthropic API error");
-      consoleApiParams.response().setStatus(502);
+      try {
+        PrintWriter writer = consoleApiParams.response().getWriter();
+        consoleApiParams.response().setHeader(
+            "Content-Type", "text/event-stream");
+        consoleApiParams.response().setStatus(502);
+        String detail = e.getMessage() != null ? e.getMessage() : "";
+        writer.write("data: " + PLAIN_GSON.toJson(
+            new ErrorChunk(detail)) + "\n\n");
+        writer.flush();
+      } catch (IOException ignored) {
+        consoleApiParams.response().setStatus(502);
+      }
     }
   }
 
   private String buildSystemPrompt(AiAnalyzeRequest request, User user) {
-    boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
-    if (!isProduction && isAdmin
+    if (isAdmin
         && request.systemPrompt != null && !request.systemPrompt.isEmpty()) {
       return request.systemPrompt;
     }
@@ -188,7 +225,11 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       }
     }
 
-    sb.append("\n## Data\n```json\n").append(gson.toJson(chartData)).append("\n```\n");
+    sb.append("\n## Data\n```json\n");
+    sb.append(chartData != null
+        ? gson.toJson(chartData)
+        : "[chart data will be injected at request time]");
+    sb.append("\n```\n");
     sb.append("\nProvide your analysis in clear markdown. Use specific numbers from the data. ");
     sb.append("Keep your response concise and actionable.");
 
@@ -196,4 +237,6 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   }
 
   private record TextChunk(String text) {}
+
+  private record ErrorChunk(String error) {}
 }

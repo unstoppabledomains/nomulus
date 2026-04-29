@@ -84,7 +84,8 @@ class RegistryDashAiActionTest {
     }).when(anthropicClient).streamMessage(any(), any(), any(), any());
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter);
+        params, Optional.of(json), Optional.empty(), Optional.empty(),
+        anthropicClient, rateLimiter);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
@@ -97,7 +98,8 @@ class RegistryDashAiActionTest {
   @Test
   void testBadRequest_missingPayload() {
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.empty(), anthropicClient, rateLimiter);
+        params, Optional.empty(), Optional.empty(), Optional.empty(),
+        anthropicClient, rateLimiter);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -110,7 +112,37 @@ class RegistryDashAiActionTest {
     JsonElement json = JsonParser.parseString(payload);
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter);
+        params, Optional.of(json), Optional.empty(), Optional.empty(),
+        anthropicClient, rateLimiter);
+    action.run();
+
+    assertThat(response.getStatus()).isEqualTo(400);
+  }
+
+  @Test
+  void testGetDefaultPrompt_returnsSystemPrompt() {
+    when(params.request().getMethod()).thenReturn("GET");
+
+    RegistryDashAiAction action = new RegistryDashAiAction(
+        params, Optional.empty(),
+        Optional.of("domain-activity"), Optional.of("summarize_trends"),
+        anthropicClient, rateLimiter);
+    action.run();
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    String payload = response.getPayload();
+    assertThat(payload).contains("systemPrompt");
+    assertThat(payload).contains("domain-activity");
+  }
+
+  @Test
+  void testGetDefaultPrompt_missingParams() {
+    when(params.request().getMethod()).thenReturn("GET");
+
+    RegistryDashAiAction action = new RegistryDashAiAction(
+        params, Optional.empty(),
+        Optional.empty(), Optional.empty(),
+        anthropicClient, rateLimiter);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -126,7 +158,8 @@ class RegistryDashAiActionTest {
     JsonElement json = JsonParser.parseString(payload);
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, strictLimiter);
+        params, Optional.of(json), Optional.empty(), Optional.empty(),
+        anthropicClient, strictLimiter);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);

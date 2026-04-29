@@ -40,10 +40,10 @@ import google.registry.ui.server.SendEmailUtils;
 import google.registry.ui.server.console.ConsoleEppPasswordAction.EppPasswordData;
 import google.registry.ui.server.console.ConsoleOteAction.OteCreateData;
 import google.registry.ui.server.console.ConsoleRegistryLockAction.ConsoleRegistryLockPostInput;
-import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
-import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import google.registry.ui.server.console.ConsoleUsersAction.UserData;
 import google.registry.ui.server.console.PasswordResetRequestAction.PasswordResetRequestData;
+import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
+import google.registry.ui.server.console.registrydash.RegistryDashAdminAction;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import org.joda.time.DateTime;
@@ -460,5 +460,17 @@ public final class ConsoleModule {
   public static Optional<JsonElement> provideAiAnalyzePayload(
       @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload;
+  }
+
+  @Provides
+  @Parameter("aiPage")
+  public static Optional<String> provideAiPage(HttpServletRequest req) {
+    return extractOptionalParameter(req, "page");
+  }
+
+  @Provides
+  @Parameter("aiPromptType")
+  public static Optional<String> provideAiPromptType(HttpServletRequest req) {
+    return extractOptionalParameter(req, "promptType");
   }
 }

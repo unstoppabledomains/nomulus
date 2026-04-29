@@ -102,7 +102,10 @@ public class AnthropicClient {
         throw new AnthropicRateLimitException("Anthropic API rate limited: " + response.code());
       }
       if (!response.isSuccessful()) {
-        throw new IOException("Anthropic API error: " + response.code());
+        String errorBody = response.body() != null
+            ? response.body().string() : "no response body";
+        throw new IOException(
+            "Anthropic API error: " + response.code() + " - " + errorBody);
       }
 
       try (BufferedReader reader = new BufferedReader(

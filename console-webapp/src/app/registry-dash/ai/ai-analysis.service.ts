@@ -21,6 +21,18 @@ export class AiAnalysisService {
   streamedText = signal('');
   error = signal<string | null>(null);
 
+  async getDefaultPrompt(page: string, promptType: string): Promise<string> {
+    const response = await fetch(
+      `/console-api/registry-dash/ai/analyze?page=${encodeURIComponent(page)}&promptType=${encodeURIComponent(promptType)}`,
+      { credentials: 'same-origin' },
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch default prompt: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.systemPrompt;
+  }
+
   async analyze(request: AiAnalyzeRequest): Promise<void> {
     this.streaming.set(true);
     this.streamedText.set('');
@@ -46,6 +58,17 @@ export class AiAnalysisService {
         return;
       }
       if (response.status === 502) {
+        try {
+          const body = await response.text();
+          const match = body.match(/data: (.+)/);
+          if (match) {
+            const parsed = JSON.parse(match[1]);
+            if (parsed.error) {
+              this.error.set(`API error: ${parsed.error}`);
+              return;
+            }
+          }
+        } catch { /* fall through */ }
         this.error.set('Analysis temporarily unavailable. Please try again.');
         return;
       }
