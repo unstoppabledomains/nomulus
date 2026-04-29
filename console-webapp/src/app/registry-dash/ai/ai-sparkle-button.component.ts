@@ -83,6 +83,10 @@ export class AiSparkleButtonComponent {
         return 'Data Exploration';
       case 'overview':
         return 'Overview';
+      case 'portfolio':
+        return 'Portfolio';
+      case 'pricing':
+        return 'Pricing';
     }
   }
 }

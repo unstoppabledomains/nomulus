@@ -17,10 +17,17 @@ import { MaterialModule } from '../../material.module';
 import { CommonModule } from '@angular/common';
 import { RegistryDashService } from '../registry-dash.service';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { PORTFOLIO_PROMPTS } from '../ai/ai-prompts';
 
 @Component({
   selector: 'app-registry-dash-portfolio',
-  imports: [MaterialModule, CommonModule, FilterPanelComponent],
+  imports: [
+    MaterialModule,
+    CommonModule,
+    FilterPanelComponent,
+    AiSparkleButtonComponent,
+  ],
   templateUrl: './portfolio.component.html',
   styleUrls: ['./portfolio.component.scss'],
 })
@@ -32,6 +39,8 @@ export class PortfolioComponent {
     'domainCount',
     'allowedTlds',
   ];
+
+  readonly aiPrompts = PORTFOLIO_PROMPTS;
 
   constructor(protected dashService: RegistryDashService) {
     this.dashService.getPortfolio().subscribe();

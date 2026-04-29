@@ -9,7 +9,14 @@
     <div class="error-banner">{{ dashService.error() }}</div>
   }
 
-  <h2 class="mat-headline-6">Registrar Portfolio</h2>
+  <div class="portfolio-header-row">
+    <h2 class="mat-headline-6">Registrar Portfolio</h2>
+    <app-ai-sparkle-button
+      page="portfolio"
+      [prompts]="aiPrompts"
+      [chartData]="dashService.filteredPortfolio()">
+    </app-ai-sparkle-button>
+  </div>
   <p class="subtitle">All registrars accredited to operate under this registry, their status, domain counts, and authorized TLDs.</p>
 
   @if (dashService.filteredPortfolio().length > 0) {

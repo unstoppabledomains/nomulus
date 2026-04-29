@@ -130,10 +130,64 @@ export const OVERVIEW_PROMPTS: AiPromptOption[] = [
   },
 ];
 
-export const PROMPTS_BY_PAGE: Record<string, AiPromptOption[]> = {
+export const PORTFOLIO_PROMPTS: AiPromptOption[] = [
+  {
+    icon: 'bar_chart',
+    label: 'Summarize trends',
+    promptType: 'summarize_trends',
+    userMessage:
+      'Summarize the registrar portfolio — concentration, growth among top registrars, TLD spread.',
+  },
+  {
+    icon: 'search',
+    label: 'Find anomalies',
+    promptType: 'find_anomalies',
+    userMessage:
+      'Identify portfolio anomalies — sudden concentration shifts, registrars with unusual TLD mix.',
+  },
+  {
+    icon: 'lightbulb',
+    label: 'Suggest actions',
+    promptType: 'suggest_actions',
+    userMessage:
+      'Based on this portfolio data, suggest registrar outreach or partnership opportunities.',
+  },
+];
+
+export const PRICING_PROMPTS: AiPromptOption[] = [
+  {
+    icon: 'bar_chart',
+    label: 'Summarize trends',
+    promptType: 'summarize_trends',
+    userMessage:
+      'Summarize the pricing landscape — premium spread, registrar discount distribution, TLD comparisons.',
+  },
+  {
+    icon: 'search',
+    label: 'Find anomalies',
+    promptType: 'find_anomalies',
+    userMessage:
+      'Identify pricing anomalies — outlier registrar fees, unusual premium gaps, mispriced TLDs.',
+  },
+  {
+    icon: 'lightbulb',
+    label: 'Suggest actions',
+    promptType: 'suggest_actions',
+    userMessage:
+      'Based on this pricing data, suggest pricing adjustments or registrar negotiations.',
+  },
+];
+
+/**
+ * Fallback prompt menu used only when the backend /ai/prompts endpoint is unreachable.
+ * The authoritative source of truth is `default-config.yaml` ai.prompts.menus.
+ */
+export const FALLBACK_MENU: Record<string, AiPromptOption[]> = {
   'domain-activity': DOMAIN_ACTIVITY_PROMPTS,
   'revenue-billing': REVENUE_BILLING_PROMPTS,
   forecasting: FORECASTING_PROMPTS,
   explore: EXPLORE_PROMPTS,
   overview: OVERVIEW_PROMPTS,
+  portfolio: PORTFOLIO_PROMPTS,
+  pricing: PRICING_PROMPTS,
 };
