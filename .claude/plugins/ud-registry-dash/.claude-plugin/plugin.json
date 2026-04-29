@@ -1,0 +1,10 @@
+{
+  "name": "ud-registry-dash",
+  "version": "0.1.0",
+  "description": "Repo-local plugin for the Nomulus Registry Dashboard. Provides /test-registry-dash to run the canonical UI test plan against a chosen environment, with drift detection that gates on whether the test plan has been updated to match recent dashboard code changes.",
+  "author": {
+    "name": "Unstoppable Domains SRE",
+    "email": "sre@unstoppabledomains.com"
+  },
+  "scope": "repo-local"
+}
