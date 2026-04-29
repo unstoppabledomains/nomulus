@@ -23,14 +23,27 @@ import { SnackBarModule } from '../../snackbar.module';
 import { PricingRule, RegistryDashService, SystemRegistrar } from '../registry-dash.service';
 import { UserDataService } from '../../shared/services/userData.service';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { PRICING_PROMPTS } from '../ai/ai-prompts';
 
 @Component({
   selector: 'app-registry-dash-pricing',
-  imports: [MaterialModule, CommonModule, ReactiveFormsModule, SnackBarModule, MatSortModule, FilterPanelComponent],
+  imports: [
+    MaterialModule,
+    CommonModule,
+    ReactiveFormsModule,
+    SnackBarModule,
+    MatSortModule,
+    FilterPanelComponent,
+    AiSparkleButtonComponent,
+  ],
   templateUrl: './pricing.component.html',
   styleUrls: ['./pricing.component.scss'],
 })
 export class PricingComponent implements AfterViewInit {
+
+  readonly aiPrompts = PRICING_PROMPTS;
+
   private static readonly MONEY_COLUMN_KEYS: Record<string, string> = {
     priceAmount: 'pricing.priceAmount',
     defaultPrice: 'pricing.defaultPrice',

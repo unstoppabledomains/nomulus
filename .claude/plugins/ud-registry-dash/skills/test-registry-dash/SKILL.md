@@ -9,12 +9,26 @@ Drives the canonical UI test plan for the Nomulus Registry Dashboard against a c
 
 ## Files in this skill
 
-- `test-plan.md` — the canonical 19-test plan. **Source of truth for what gets tested.**
+- `test-plan.md` — the canonical test plan. **Source of truth for what gets tested.**
 - `metadata.json` — `{ lastReviewedCommit, lastReviewedAt, lastReviewer }`. Updated only when a test-plan update is merged to master.
 - `paths.txt` — newline-separated git pathspecs to watch for drift.
 - `helpers/check-drift.sh` — prints commits and changed files since `lastReviewedCommit` for the watched paths.
+- `helpers/start-local-stack.sh` — idempotently starts test server + angular dev for `local-dev` runs. Fetches `ANTHROPIC_API_KEY` from Secret Manager.
+- `helpers/seed-test-data.sh` — seeds the testcontainers Postgres with extra rows (e.g. pricing rules) so dashboard pages have non-trivial data. Optional — most tests pass against the default Fixture.java data.
 
 ## Workflow
+
+### Phase 0 — Environment bring-up (local-dev only)
+
+If the user picks `local-dev` in Phase 2, the skill is responsible for the local stack — do **not** ask the user to run servers manually. Run `bash .claude/plugins/ud-registry-dash/skills/test-registry-dash/helpers/start-local-stack.sh`. The script:
+
+- Reuses anything already listening on `:8080` / `:4200`.
+- Starts the Java test server (`./gradlew :core:runTestServer`) if needed; waits up to 180s for cold start.
+- Starts the Angular dev server (`npm start` from `console-webapp/`) if needed; waits up to 60s.
+- Pulls `ANTHROPIC_API_KEY` from Secret Manager (`AI_TRAFFIC_ANALYZER_ANTHROPIC_API_KEY` in `unstoppable-domains` GCP project) so the AI sparkle endpoints actually call Claude.
+- Pass `--restart` to kill stale gradle daemons / ng serve processes first; useful when a previous session left zombies.
+
+If Docker isn't running, the script exits with a clear message — surface it to the user; we cannot start testcontainers without Docker.
 
 ### Phase 1 — Drift detection (always first)
 
@@ -48,12 +62,18 @@ Show the user the drift summary, then offer three options:
 
 Ask the user to pick a test environment:
 
-- **local-dev** — `http://localhost:4200/console` (requires local Angular dev server + test server with `ANTHROPIC_API_KEY`)
+- **local-dev** — `http://localhost:4200/console`. The skill will bring up the stack itself in Phase 0 — the user does **not** need to start anything manually.
 - **alpha** — `https://console.dnex-alpha.com/console`
 - **sandbox** — `https://console.dnex-sandbox.com/console` (or whatever the actual URL is — verify before navigating)
 - **production** — **REJECT.** Production is never a valid test environment.
 
 Verify the chosen environment's URL with the user before proceeding.
+
+### Phase 2b — Test data (local-dev only, optional)
+
+The default test-server `Fixture.java` data covers tests 1-6, 15: 2 TLDs (`example`, `xn--q9jyb4c`), `TheRegistrar` + `NewRegistrar` (with domains), and OTE registrars with no domains. That's enough to verify sparkle visibility, prompt menus, the streaming AI flow, and the prompts endpoint.
+
+For tests that need richer data — Test 14 (Pricing analysis) needs at least one `RegistrarPricing` row, Test 7-8 are more meaningful with multi-TLD revenue history — run `bash .claude/plugins/ud-registry-dash/skills/test-registry-dash/helpers/seed-test-data.sh` after the test server is up. The script is idempotent. If a richer dataset is available locally (e.g. `local-test-data-setup.sql` from a prior session), prefer that.
 
 ### Phase 3 — Test execution
 

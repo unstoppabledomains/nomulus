@@ -13,7 +13,14 @@
 // limitations under the License.
 
 export interface AiAnalyzeRequest {
-  page: 'domain-activity' | 'revenue-billing' | 'forecasting' | 'explore' | 'overview';
+  page:
+    | 'domain-activity'
+    | 'revenue-billing'
+    | 'forecasting'
+    | 'explore'
+    | 'overview'
+    | 'portfolio'
+    | 'pricing';
   promptType: string;
   metadata: {
     dateRange: { start: string; end: string };

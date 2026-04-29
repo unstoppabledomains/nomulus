@@ -19,10 +19,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.testing.TestLogHandler;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import google.registry.ai.AiRateLimiter;
 import google.registry.ai.AnthropicClient;
+import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.User;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.request.auth.AuthResult;
@@ -33,6 +36,7 @@ import google.registry.testing.FakeResponse;
 import google.registry.ui.server.console.ConsoleApiParams;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +88,7 @@ class RegistryDashAiActionTest {
     }).when(anthropicClient).streamMessage(any(), any(), any(), any());
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter);
+        params, Optional.of(json), anthropicClient, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
@@ -97,7 +101,7 @@ class RegistryDashAiActionTest {
   @Test
   void testBadRequest_missingPayload() {
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.empty(), anthropicClient, rateLimiter);
+        params, Optional.empty(), anthropicClient, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -110,10 +114,58 @@ class RegistryDashAiActionTest {
     JsonElement json = JsonParser.parseString(payload);
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter);
+        params, Optional.of(json), anthropicClient, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
+  }
+
+  @Test
+  void testSystemPrompt_drawnFromConfig() throws Exception {
+    RegistryConfigSettings.Prompts promptConfig = new RegistryConfigSettings.Prompts();
+    promptConfig.version = "test-v1";
+    promptConfig.basePreamble = "PREAMBLE_FROM_TEST";
+    promptConfig.responseGuidance = "GUIDANCE_FROM_TEST";
+    promptConfig.promptTypes = ImmutableMap.of("summarize_trends", "BODY_FROM_TEST");
+    promptConfig.pageHints = ImmutableMap.of("portfolio", "HINT_FROM_TEST");
+    promptConfig.menus = ImmutableMap.of();
+
+    String captured = capturedSystemPrompt(promptConfig, "portfolio", "summarize_trends");
+
+    assertThat(captured).contains("PREAMBLE_FROM_TEST");
+    assertThat(captured).contains("BODY_FROM_TEST");
+    assertThat(captured).contains("HINT_FROM_TEST");
+    assertThat(captured).contains("GUIDANCE_FROM_TEST");
+  }
+
+  @Test
+  void testRequest_logsPromptVersion() throws Exception {
+    RegistryConfigSettings.Prompts p = defaultPromptConfig();
+    p.version = "logged-version-xyz";
+
+    TestLogHandler handler = new TestLogHandler();
+    Logger logger = Logger.getLogger(RegistryDashAiAction.class.getName());
+    logger.addHandler(handler);
+    try {
+      capturedSystemPrompt(p, "domain-activity", "summarize_trends");
+      boolean found =
+          handler.getStoredLogRecords().stream()
+              .anyMatch(
+                  r -> {
+                    if (r.getParameters() != null) {
+                      for (Object param : r.getParameters()) {
+                        if ("logged-version-xyz".equals(String.valueOf(param))) {
+                          return true;
+                        }
+                      }
+                    }
+                    return r.getMessage() != null
+                        && r.getMessage().contains("logged-version-xyz");
+                  });
+      assertThat(found).isTrue();
+    } finally {
+      logger.removeHandler(handler);
+    }
   }
 
   @Test
@@ -126,9 +178,46 @@ class RegistryDashAiActionTest {
     JsonElement json = JsonParser.parseString(payload);
 
     RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, strictLimiter);
+        params, Optional.of(json), anthropicClient, strictLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);
+  }
+
+  private RegistryConfigSettings.Prompts defaultPromptConfig() {
+    RegistryConfigSettings.Prompts p = new RegistryConfigSettings.Prompts();
+    p.version = "test-v1";
+    p.basePreamble = "You are an expert domain registry analyst.";
+    p.responseGuidance = "Be concise.";
+    p.promptTypes = ImmutableMap.of(
+        "summarize_trends", "Summarize trends.",
+        "find_anomalies", "Find anomalies.",
+        "suggest_actions", "Suggest actions.",
+        "identify_risks", "Identify risks.");
+    p.pageHints = ImmutableMap.of();
+    p.menus = ImmutableMap.of();
+    return p;
+  }
+
+  private String capturedSystemPrompt(
+      RegistryConfigSettings.Prompts promptConfig, String page, String promptType)
+      throws Exception {
+    String payload = String.format(
+        "{\"page\":\"%s\",\"promptType\":\"%s\",\"chartData\":{},\"conversationHistory\":[]}",
+        page, promptType);
+    JsonElement json = JsonParser.parseString(payload);
+
+    String[] capturedPrompt = new String[1];
+    doAnswer(invocation -> {
+      capturedPrompt[0] = invocation.getArgument(0);
+      Consumer<String> onChunk = invocation.getArgument(3);
+      onChunk.accept("ok");
+      return null;
+    }).when(anthropicClient).streamMessage(any(), any(), any(), any());
+
+    RegistryDashAiAction action = new RegistryDashAiAction(
+        params, Optional.of(json), anthropicClient, rateLimiter, promptConfig);
+    action.run();
+    return capturedPrompt[0];
   }
 }

@@ -12,9 +12,16 @@
   <div class="pricing-header">
     <div class="pricing-header-row">
       <h2 class="mat-headline-6">Registrar Custom Pricing Rules</h2>
-      <button mat-raised-button color="primary" (click)="openAddForm()">
-        <mat-icon>add</mat-icon> Add Rule
-      </button>
+      <div class="pricing-header-actions">
+        <app-ai-sparkle-button
+          page="pricing"
+          [prompts]="aiPrompts"
+          [chartData]="filteredRules()">
+        </app-ai-sparkle-button>
+        <button mat-raised-button color="primary" (click)="openAddForm()">
+          <mat-icon>add</mat-icon> Add Rule
+        </button>
+      </div>
     </div>
     <p class="pricing-description">Custom pricing overrides for specific registrars. These rules take precedence over the Nomulus TLD default price. When a registrar has a pricing rule for a given TLD and operation, the custom price is charged instead of the Nomulus default. Hover over column headers for details.</p>
   </div>

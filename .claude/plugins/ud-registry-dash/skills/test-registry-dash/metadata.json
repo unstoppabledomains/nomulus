@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "513dea2c5",
+  "lastReviewedCommit": "0e786ebf24e0e0169a75c538df74807bc6b3153c",
   "lastReviewedAt": "2026-04-29",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "PR #114 (registry-dash AI feature) merged. Initial baseline."
+  "lastReviewerNote": "Tier 2: Portfolio + Pricing sparkle, AiPromptsService, GET /ai/prompts endpoint, YAML-driven prompts, promptVersion logging. Adds tests 13-17."
 }

@@ -1473,6 +1473,23 @@ public final class RegistryConfig {
       return config.ai != null ? config.ai.rateLimitPerHour : 120;
     }
 
+    @Provides
+    @Config("anthropicPromptConfig")
+    public static RegistryConfigSettings.Prompts provideAnthropicPromptConfig(
+        RegistryConfigSettings config) {
+      if (config.ai != null && config.ai.prompts != null) {
+        return config.ai.prompts;
+      }
+      RegistryConfigSettings.Prompts empty = new RegistryConfigSettings.Prompts();
+      empty.version = "unset";
+      empty.basePreamble = "";
+      empty.responseGuidance = "";
+      empty.promptTypes = ImmutableMap.of();
+      empty.pageHints = ImmutableMap.of();
+      empty.menus = ImmutableMap.of();
+      return empty;
+    }
+
     private static String formatComments(String text) {
       return Splitter.on('\n').omitEmptyStrings().trimResults().splitToList(text).stream()
           .map(s -> "# " + s)

@@ -24,6 +24,8 @@ import com.google.gson.JsonObject;
 import google.registry.ai.AiAnalyzeRequest;
 import google.registry.ai.AiRateLimiter;
 import google.registry.ai.AnthropicClient;
+import google.registry.config.RegistryConfig.Config;
+import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
@@ -56,18 +58,21 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private final AnthropicClient anthropicClient;
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
+  private final RegistryConfigSettings.Prompts promptConfig;
 
   @Inject
   public RegistryDashAiAction(
       ConsoleApiParams consoleApiParams,
       @Parameter("aiAnalyzePayload") Optional<JsonElement> payload,
       AnthropicClient anthropicClient,
-      AiRateLimiter rateLimiter) {
+      AiRateLimiter rateLimiter,
+      @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig) {
     super(consoleApiParams);
     this.payload = payload;
     this.anthropicClient = anthropicClient;
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
+    this.promptConfig = promptConfig;
   }
 
   @Override
@@ -102,8 +107,10 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
     logger.atInfo().log(
-        "AI analysis request: user=%s, page=%s, promptType=%s, model=%s, historySize=%d",
+        "AI analysis request: user=%s, page=%s, promptType=%s, model=%s,"
+            + " promptVersion=%s, historySize=%d",
         userEmail, request.page, request.promptType, resolvedModel,
+        promptConfig.version,
         request.conversationHistory != null ? request.conversationHistory.size() : 0);
 
     try {
@@ -151,31 +158,17 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private String getDefaultSystemPrompt(
       String page, String promptType, JsonElement chartData, JsonObject metadata) {
     StringBuilder sb = new StringBuilder();
-    sb.append("You are an expert domain registry analyst. ");
-    sb.append("You are analyzing data from the ").append(page)
-        .append(" page of a domain registry dashboard.\n\n");
+    sb.append(promptConfig.basePreamble).append("\n\n");
 
     sb.append("## Analysis Type\n");
-    switch (promptType) {
-      case "summarize_trends":
-        sb.append("Summarize the key trends in this data. Identify growth or decline patterns, ");
-        sb.append("compare across TLDs, and highlight the most significant changes.\n");
-        break;
-      case "find_anomalies":
-        sb.append("Identify anomalies, outliers, and unusual patterns in this data. ");
-        sb.append("Look for unexpected spikes, drops, or ratios that warrant investigation.\n");
-        break;
-      case "suggest_actions":
-        sb.append("Based on this data, suggest specific actionable recommendations. ");
-        sb.append("Focus on opportunities for growth, risk mitigation, and operational ");
-        sb.append("improvements.\n");
-        break;
-      case "identify_risks":
-        sb.append("Identify risks in this data. Look for expiration cliffs, declining ");
-        sb.append("registrars, and patterns that could lead to revenue loss.\n");
-        break;
-      default:
-        sb.append("Analyze this data and provide insights.\n");
+    sb.append(
+            promptConfig.promptTypes.getOrDefault(
+                promptType, "Analyze this data and provide insights."))
+        .append("\n");
+
+    String pageHint = promptConfig.pageHints.get(page);
+    if (pageHint != null && !pageHint.isEmpty()) {
+      sb.append("\n## Page\n").append(pageHint).append("\n");
     }
 
     sb.append("\n## Context\n");
@@ -188,9 +181,8 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       }
     }
 
-    sb.append("\n## Data\n```json\n").append(gson.toJson(chartData)).append("\n```\n");
-    sb.append("\nProvide your analysis in clear markdown. Use specific numbers from the data. ");
-    sb.append("Keep your response concise and actionable.");
+    sb.append("\n## Data\n```json\n").append(gson.toJson(chartData)).append("\n```\n\n");
+    sb.append(promptConfig.responseGuidance);
 
     return sb.toString();
   }
