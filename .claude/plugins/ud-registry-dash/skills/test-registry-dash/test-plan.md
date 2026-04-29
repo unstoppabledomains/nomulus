@@ -11,7 +11,7 @@
 
 ## Test 1: Sparkle Button Visibility
 
-**Goal:** Verify sparkle buttons appear on all 5 pages with charts.
+**Goal:** Verify sparkle buttons appear on all 7 dashboard pages.
 
 ### Steps:
 1. Navigate to **Domain Activity** (`/#/registry-dash/domain-activity`).
@@ -27,11 +27,15 @@
 11. Before running a query, verify NO sparkle icon is visible (the button is conditional on chart data existing).
 12. Configure a query (Source: Domain Activity, Metric: Count, Group By: TLD) and click "Run Query".
 13. Verify a sparkle icon appears above the rendered chart.
+14. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
+15. Verify a single sparkle icon appears in the page header row, to the right of the "Registrar Portfolio" heading.
+16. Navigate to **Pricing** (`/#/registry-dash/pricing`).
+17. Verify a single sparkle icon appears in the page header row, between the "Registrar Custom Pricing Rules" heading and the "Add Rule" button.
 
 ### Expected:
-- Sparkle icons visible on all 5 pages (after query runs on Explore).
+- Sparkle icons visible on all 7 pages (after query runs on Explore).
 - Icons are subtle (slightly transparent, opacity ~0.6) and become fully opaque on hover.
-- Each chart also has an "open in new" explore button alongside the sparkle.
+- Charts also have an "open in new" explore button alongside the sparkle (Portfolio + Pricing have only the sparkle, no explore button).
 
 ---
 
@@ -53,6 +57,8 @@
    - `warning` Identify risks (NOT "Find anomalies")
    - `lightbulb` Suggest actions
 7. Navigate to **Overview**, click sparkle. Verify the same 3 generic options as Domain Activity.
+8. Navigate to **Portfolio**, click sparkle. Verify menu shows the same 3 generic options (`bar_chart` Summarize trends, `search` Find anomalies, `lightbulb` Suggest actions).
+9. Navigate to **Pricing**, click sparkle. Verify the same 3 generic options.
 
 ### Expected:
 - Each page has 3 prompt options.
@@ -275,3 +281,111 @@
 - Each page's analysis uses that page's chart data.
 - No stale data from previous pages appears in analysis.
 - Model preference persists across all navigations.
+
+---
+
+## Test 13: Portfolio Page Analysis
+
+**Goal:** Verify AI analysis works on registrar portfolio data (Tier 2).
+
+### Steps:
+1. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
+2. Confirm the registrar table renders with at least one row (state, domain count, allowed TLDs).
+3. Click the sparkle button → "Summarize trends".
+4. Verify modal title is "Summarize trends — Portfolio".
+5. Wait for the response. Verify it discusses portfolio composition (registrar concentration, top registrars, TLD spread, total registrar count).
+6. Close the modal. Click sparkle → "Find anomalies".
+7. Verify the response discusses outlier registrars or unusual TLD allocations.
+
+### Expected:
+- Analysis references concrete registrar names and domain counts visible in the table.
+- "Summarize trends" and "Find anomalies" produce different content (no recycled response).
+- Modal renders and streams identically to other pages.
+
+---
+
+## Test 14: Pricing Page Analysis
+
+**Goal:** Verify AI analysis works on pricing data (Tier 2).
+
+### Steps:
+1. Navigate to **Pricing** (`/#/registry-dash/pricing`).
+2. Confirm the pricing rules table renders with at least one row.
+3. Click the sparkle button → "Summarize trends".
+4. Verify modal title is "Summarize trends — Pricing".
+5. Wait for the response. Verify it discusses the pricing landscape (premium spread, registrar discount distribution, TLD comparisons).
+6. Close the modal. Click sparkle → "Suggest actions".
+7. Verify the response provides pricing recommendations referencing actual registrar/TLD data.
+
+### Expected:
+- Analysis references concrete pricing values, registrar IDs, or TLD names from the table.
+- The "Add Rule" button still works and is not obscured by the sparkle icon.
+
+---
+
+## Test 15: Prompts Endpoint API Smoke
+
+**Goal:** Verify the new `GET /console-api/registry-dash/ai/prompts` endpoint serves per-page menus from backend YAML config.
+
+### Steps:
+1. From any dashboard page, open DevTools → Console.
+2. For each page (`portfolio`, `pricing`, `overview`, `domain-activity`, `revenue-billing`, `forecasting`, `explore`), run:
+   ```js
+   await fetch('/console-api/registry-dash/ai/prompts?page=portfolio', { credentials: 'include' }).then(r => r.json())
+   ```
+   (substituting the page name)
+3. Verify each response has shape `{ version: "v1", menu: [{promptType, label, icon, userMessage}, ...] }`.
+4. Verify `menu` length is 3 for every page.
+5. Verify `menu` items match the labels rendered in the UI menu (Test 2).
+6. Run the request with an unknown page and confirm 400:
+   ```js
+   await fetch('/console-api/registry-dash/ai/prompts?page=domains', { credentials: 'include' }).then(r => r.status)
+   ```
+7. Run the request with no page param and confirm 400:
+   ```js
+   await fetch('/console-api/registry-dash/ai/prompts', { credentials: 'include' }).then(r => r.status)
+   ```
+
+### Expected:
+- All 7 pages return 200 with a 3-item menu and `version: "v1"`.
+- Unknown / missing page returns 400.
+- The `userMessage` strings in the response match what gets sent when the user clicks a menu item (cross-check by triggering an analysis and inspecting the network request payload's `conversationHistory[0].content`).
+
+---
+
+## Test 16: Config-Driven System Prompt (advanced, local-dev only)
+
+**Goal:** Verify the backend system prompt is built from `default-config.yaml` `ai.prompts` instead of hardcoded Java strings.
+
+### Steps:
+1. With the local test server running, edit `core/src/main/java/google/registry/config/files/default-config.yaml` and change `ai.prompts.basePreamble` to a sentinel value, e.g. `"PREAMBLE_SMOKE_TEST"`.
+2. Restart the test server (the YAML is read at startup).
+3. From the dashboard, fire any analysis (e.g. Portfolio → "Summarize trends").
+4. In the test server log, find the line `AI analysis request: user=…, page=portfolio, …, promptVersion=v1, …`.
+5. Optionally enable FINE logging on the action class to dump the system prompt and confirm it begins with `PREAMBLE_SMOKE_TEST`.
+6. Revert the YAML change and restart.
+
+### Expected:
+- The log line includes `promptVersion=v1` (or whatever version is in the YAML).
+- The change in basePreamble influences the generated system prompt without rebuilding any Java.
+- After revert + restart, behavior returns to default.
+
+> Skip this test on alpha/sandbox unless you have ops access to edit deployed config and restart pods.
+
+---
+
+## Test 17: Cross-Page Navigation (Tier 2 update)
+
+**Goal:** Verify Portfolio + Pricing slot into the existing cross-page nav flow without regressions.
+
+### Steps:
+1. Run analysis on Portfolio → close modal.
+2. Navigate to Pricing → run analysis → close modal.
+3. Navigate to Overview → run analysis.
+4. Navigate back to Portfolio → run a new analysis.
+5. Verify each analysis references that page's data (registrar table for Portfolio, pricing rules for Pricing) and the model preference set in Test 5 still applies.
+
+### Expected:
+- All 7 pages now participate in the cross-page flow established by Test 12.
+- No data bleed between pages.
+- Model preference and conversation history are scoped per-modal (closing the modal clears history).
