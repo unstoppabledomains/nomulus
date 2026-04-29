@@ -264,6 +264,25 @@ public class RegistryConfigSettings {
     public String apiKeySecretName;
     public String defaultModel;
     public int rateLimitPerHour;
+    public Prompts prompts;
+  }
+
+  /** AI prompt content, loaded from default-config.yaml. */
+  public static class Prompts {
+    public String version;
+    public String basePreamble;
+    public String responseGuidance;
+    public Map<String, String> promptTypes;
+    public Map<String, String> pageHints;
+    public Map<String, List<MenuItem>> menus;
+  }
+
+  /** A single entry in a per-page sparkle menu. */
+  public static class MenuItem {
+    public String promptType;
+    public String label;
+    public String icon;
+    public String userMessage;
   }
 
   /** Configuration for Mosapi. */

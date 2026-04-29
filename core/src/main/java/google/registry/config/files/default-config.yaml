@@ -648,3 +648,114 @@ ai:
   defaultModel: sonnet
   # Rate limit: max requests per user per hour
   rateLimitPerHour: 120
+  # Prompt content for the AI sparkle feature. Edit here to tweak prompts without redeploying
+  # frontend code. The version field is logged on every request for observability.
+  prompts:
+    version: "v1"
+    basePreamble: "You are an expert domain registry analyst. You are analyzing data from a domain registry dashboard."
+    responseGuidance: "Provide your analysis in clear markdown. Use specific numbers from the data. Keep your response concise and actionable."
+    promptTypes:
+      summarize_trends: "Summarize the key trends in this data. Identify growth or decline patterns, compare across TLDs, and highlight the most significant changes."
+      find_anomalies: "Identify anomalies, outliers, and unusual patterns in this data. Look for unexpected spikes, drops, or ratios that warrant investigation."
+      suggest_actions: "Based on this data, suggest specific actionable recommendations. Focus on opportunities for growth, risk mitigation, and operational improvements."
+      identify_risks: "Identify risks in this data. Look for expiration cliffs, declining registrars, and patterns that could lead to revenue loss."
+    pageHints:
+      domain-activity: "You are looking at domain lifecycle activity (creates, transfers, renewals, deletes) across TLDs."
+      revenue-billing: "You are looking at billing revenue across TLDs and operations."
+      forecasting: "You are looking at renewal-rate forecasts and expiration curves."
+      overview: "You are looking at top-level registry health metrics."
+      explore: "You are looking at an ad-hoc data exploration result."
+      portfolio: "You are looking at registrar portfolio composition and concentration."
+      pricing: "You are looking at TLD pricing configuration and effective fees."
+    menus:
+      domain-activity:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize the key trends in domain activity — lifecycle patterns, growth or decline across TLDs."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify anomalies in domain activity — unexpected spikes, unusual create/delete ratios, outlier TLDs."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on this domain activity data, suggest specific actions for retention and growth."
+      revenue-billing:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize revenue trends — key drivers, growth percentages, TLD performance comparison."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify revenue anomalies — unexpected spikes or drops, declining segments, unusual patterns."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on this revenue data, suggest pricing adjustments, registrar outreach, or growth opportunities."
+      forecasting:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize renewal health — overall rates, TLD comparison, trajectory."
+        - promptType: identify_risks
+          label: "Identify risks"
+          icon: "warning"
+          userMessage: "Identify risks — expiration cliffs, declining registrars, TLDs with dropping renewal rates."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Suggest retention strategies, pricing recommendations, and proactive outreach based on this forecast data."
+      overview:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize the key trends across the registry — activity patterns, renewal health, and overall performance."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify any anomalies or concerns in the overview metrics."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on these overview metrics, what should the registry team focus on?"
+      explore:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize the key trends visible in this data."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify any anomalies or unusual patterns in this data."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on this data, what actions would you recommend?"
+      portfolio:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize the registrar portfolio — concentration, growth among top registrars, TLD spread."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify portfolio anomalies — sudden concentration shifts, registrars with unusual TLD mix."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on this portfolio data, suggest registrar outreach or partnership opportunities."
+      pricing:
+        - promptType: summarize_trends
+          label: "Summarize trends"
+          icon: "bar_chart"
+          userMessage: "Summarize the pricing landscape — premium spread, registrar discount distribution, TLD comparisons."
+        - promptType: find_anomalies
+          label: "Find anomalies"
+          icon: "search"
+          userMessage: "Identify pricing anomalies — outlier registrar fees, unusual premium gaps, mispriced TLDs."
+        - promptType: suggest_actions
+          label: "Suggest actions"
+          icon: "lightbulb"
+          userMessage: "Based on this pricing data, suggest pricing adjustments or registrar negotiations."

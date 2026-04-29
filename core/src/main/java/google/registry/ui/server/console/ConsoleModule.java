@@ -461,4 +461,10 @@ public final class ConsoleModule {
       @OptionalJsonPayload Optional<JsonElement> payload) {
     return payload;
   }
+
+  @Provides
+  @Parameter("page")
+  static Optional<String> providePage(HttpServletRequest req) {
+    return extractOptionalParameter(req, "page");
+  }
 }
