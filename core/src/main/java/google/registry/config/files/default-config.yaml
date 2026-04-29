@@ -651,7 +651,9 @@ ai:
   # Prompt content for the AI sparkle feature. Edit here to tweak prompts without redeploying
   # frontend code. The version field is logged on every request for observability.
   prompts:
-    version: "v1"
+    # Bumped 2026-04-29 to force a fresh nomulus image build for alpha-gke
+    # (prior deploy reused a cached image without the Tier 2 prompts content).
+    version: "v1.0.1"
     basePreamble: "You are an expert domain registry analyst. You are analyzing data from a domain registry dashboard."
     responseGuidance: "Provide your analysis in clear markdown. Use specific numbers from the data. Keep your response concise and actionable."
     promptTypes:
