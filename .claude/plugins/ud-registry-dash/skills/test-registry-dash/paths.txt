@@ -1,0 +1,3 @@
+console-webapp/src/app/registry-dash/
+core/src/main/java/google/registry/ai/
+core/src/main/java/google/registry/ui/server/console/registrydash/
