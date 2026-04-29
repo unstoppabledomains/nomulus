@@ -184,7 +184,7 @@ public class AnthropicClient {
             String type = event.has("type") ? event.get("type").getAsString() : "";
             switch (type) {
               case "content_block_start" -> {
-                int index = event.get("index").getAsInt();
+                int index = event.has("index") ? event.get("index").getAsInt() : 0;
                 JsonObject block = event.getAsJsonObject("content_block");
                 String blockType = block.get("type").getAsString();
                 BlockBuilder bb = new BlockBuilder(blockType);
@@ -195,7 +195,7 @@ public class AnthropicClient {
                 blocks.put(index, bb);
               }
               case "content_block_delta" -> {
-                int index = event.get("index").getAsInt();
+                int index = event.has("index") ? event.get("index").getAsInt() : 0;
                 JsonObject delta = event.getAsJsonObject("delta");
                 String dType = delta.get("type").getAsString();
                 BlockBuilder bb =
@@ -213,7 +213,7 @@ public class AnthropicClient {
                 }
               }
               case "content_block_stop" -> {
-                int index = event.get("index").getAsInt();
+                int index = event.has("index") ? event.get("index").getAsInt() : 0;
                 BlockBuilder bb = blocks.get(index);
                 if (bb != null && "tool_use".equals(bb.blockType)) {
                   JsonObject input;
