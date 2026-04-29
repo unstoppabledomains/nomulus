@@ -48,3 +48,21 @@ export interface AiPromptOption {
 }
 
 export type AiModelChoice = 'haiku' | 'sonnet' | 'opus';
+
+export type AiStreamFrame =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; tool: string; args: Record<string, unknown> }
+  | { type: 'tool_result'; tool: string; ok: boolean }
+  | { type: 'done' };
+
+export interface ToolInFlight {
+  tool: string;
+  label: string;
+}
+
+export const TOOL_LABELS: Record<string, string> = {
+  query_transfers: '🔍 Searching transfers',
+  get_pricing_rules: '💰 Looking up pricing',
+  query_registrar_activity: '📊 Checking registrar activity',
+  query_domain_details: '🔎 Looking up domain',
+};

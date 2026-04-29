@@ -17,11 +17,13 @@ package google.registry.ui.server.console.registrydash;
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.FluentLogger;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.ai.AiAnalyzeRequest;
+import google.registry.ai.AiOrchestrator;
 import google.registry.ai.AiRateLimiter;
 import google.registry.ai.AnthropicClient;
 import google.registry.config.RegistryConfig.Config;
@@ -55,7 +57,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private static final Gson PLAIN_GSON = new Gson();
 
   private final Optional<JsonElement> payload;
-  private final AnthropicClient anthropicClient;
+  private final AiOrchestrator orchestrator;
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
   private final RegistryConfigSettings.Prompts promptConfig;
@@ -64,12 +66,12 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   public RegistryDashAiAction(
       ConsoleApiParams consoleApiParams,
       @Parameter("aiAnalyzePayload") Optional<JsonElement> payload,
-      AnthropicClient anthropicClient,
+      AiOrchestrator orchestrator,
       AiRateLimiter rateLimiter,
       @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig) {
     super(consoleApiParams);
     this.payload = payload;
-    this.anthropicClient = anthropicClient;
+    this.orchestrator = orchestrator;
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
     this.promptConfig = promptConfig;
@@ -96,8 +98,9 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String userEmail = user.getEmailAddress();
     if (!rateLimiter.tryAcquire(userEmail)) {
       consoleApiParams.response().setStatus(SC_TOO_MANY_REQUESTS);
-      consoleApiParams.response().setHeader(
-          "Retry-After", String.valueOf(rateLimiter.getRetryAfterSeconds(userEmail)));
+      consoleApiParams
+          .response()
+          .setHeader("Retry-After", String.valueOf(rateLimiter.getRetryAfterSeconds(userEmail)));
       setFailedResponse("Rate limit exceeded", SC_TOO_MANY_REQUESTS);
       return;
     }
@@ -106,13 +109,6 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String model = request.model;
     String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
-    logger.atInfo().log(
-        "AI analysis request: user=%s, page=%s, promptType=%s, model=%s,"
-            + " promptVersion=%s, historySize=%d",
-        userEmail, request.page, request.promptType, resolvedModel,
-        promptConfig.version,
-        request.conversationHistory != null ? request.conversationHistory.size() : 0);
-
     try {
       PrintWriter writer = consoleApiParams.response().getWriter();
       consoleApiParams.response().setHeader("Content-Type", "text/event-stream");
@@ -120,17 +116,45 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       consoleApiParams.response().setHeader("Connection", "keep-alive");
       consoleApiParams.response().setStatus(200);
 
-      anthropicClient.streamMessage(
-          systemPrompt,
-          request.conversationHistory,
-          model,
-          chunk -> {
-            writer.write("data: " + PLAIN_GSON.toJson(new TextChunk(chunk)) + "\n\n");
-            writer.flush();
-          });
+      ImmutableList<String> toolsUsed =
+          orchestrator.run(
+              systemPrompt,
+              request.conversationHistory,
+              model,
+              user,
+              event -> {
+                JsonObject frame = new JsonObject();
+                if (event instanceof AiOrchestrator.TextEvent te) {
+                  frame.addProperty("type", "text");
+                  frame.addProperty("text", te.text());
+                } else if (event instanceof AiOrchestrator.ToolUseEvent tu) {
+                  frame.addProperty("type", "tool_use");
+                  frame.addProperty("tool", tu.tool());
+                  frame.add("args", tu.args());
+                } else if (event instanceof AiOrchestrator.ToolResultEvent tr) {
+                  frame.addProperty("type", "tool_result");
+                  frame.addProperty("tool", tr.tool());
+                  frame.addProperty("ok", tr.ok());
+                } else if (event instanceof AiOrchestrator.DoneEvent) {
+                  frame.addProperty("type", "done");
+                }
+                writer.write("data: " + PLAIN_GSON.toJson(frame) + "\n\n");
+                writer.flush();
+              });
 
       writer.write("data: [DONE]\n\n");
       writer.flush();
+
+      logger.atInfo().log(
+          "AI analysis request: user=%s, page=%s, promptType=%s, model=%s,"
+              + " promptVersion=%s, historySize=%d, toolsUsed=%s",
+          userEmail,
+          request.page,
+          request.promptType,
+          resolvedModel,
+          promptConfig.version,
+          request.conversationHistory != null ? request.conversationHistory.size() : 0,
+          toolsUsed);
 
     } catch (AnthropicClient.AnthropicRateLimitException e) {
       logger.atWarning().withCause(e).log("Anthropic rate limit hit");
@@ -146,13 +170,15 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
-    if (!isProduction && isAdmin
-        && request.systemPrompt != null && !request.systemPrompt.isEmpty()) {
+    if (!isProduction
+        && isAdmin
+        && request.systemPrompt != null
+        && !request.systemPrompt.isEmpty()) {
       return request.systemPrompt;
     }
 
-    return getDefaultSystemPrompt(request.page, request.promptType, request.chartData,
-        request.metadata);
+    return getDefaultSystemPrompt(
+        request.page, request.promptType, request.chartData, request.metadata);
   }
 
   private String getDefaultSystemPrompt(
@@ -184,8 +210,10 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     sb.append("\n## Data\n```json\n").append(gson.toJson(chartData)).append("\n```\n\n");
     sb.append(promptConfig.responseGuidance);
 
+    if (promptConfig.toolsHeader != null && !promptConfig.toolsHeader.isEmpty()) {
+      sb.append("\n\n").append(promptConfig.toolsHeader);
+    }
+
     return sb.toString();
   }
-
-  private record TextChunk(String text) {}
 }

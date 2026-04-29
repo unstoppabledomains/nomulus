@@ -19,12 +19,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.testing.TestLogHandler;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import google.registry.ai.AiOrchestrator;
 import google.registry.ai.AiRateLimiter;
-import google.registry.ai.AnthropicClient;
 import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.User;
 import google.registry.persistence.transaction.JpaTestExtensions;
@@ -57,7 +58,7 @@ class RegistryDashAiActionTest {
   final JpaTestExtensions.JpaIntegrationTestExtension jpa =
       new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
 
-  @Mock private AnthropicClient anthropicClient;
+  @Mock private AiOrchestrator orchestrator;
   private AiRateLimiter rateLimiter;
   private ConsoleApiParams params;
   private FakeResponse response;
@@ -74,21 +75,27 @@ class RegistryDashAiActionTest {
 
   @Test
   void testSuccess_streamsResponse() throws Exception {
-    String payload = "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
-        + "\"chartData\":{\"activity\":[]},\"conversationHistory\":["
-        + "{\"role\":\"user\",\"content\":\"Summarize trends\"}"
-        + "]}";
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{\"activity\":[]},\"conversationHistory\":["
+            + "{\"role\":\"user\",\"content\":\"Summarize trends\"}"
+            + "]}";
     JsonElement json = JsonParser.parseString(payload);
 
-    doAnswer(invocation -> {
-      Consumer<String> onChunk = invocation.getArgument(3);
-      onChunk.accept("Hello ");
-      onChunk.accept("world");
-      return null;
-    }).when(anthropicClient).streamMessage(any(), any(), any(), any());
+    doAnswer(
+            invocation -> {
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.TextEvent("Hello "));
+              sink.accept(new AiOrchestrator.TextEvent("world"));
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
 
-    RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter, defaultPromptConfig());
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
@@ -99,9 +106,43 @@ class RegistryDashAiActionTest {
   }
 
   @Test
+  void testToolUse_emitsToolFrames() throws Exception {
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[]}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    doAnswer(
+            invocation -> {
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              com.google.gson.JsonObject args = new com.google.gson.JsonObject();
+              args.addProperty("tld", "example");
+              sink.accept(new AiOrchestrator.ToolUseEvent("query_transfers", args));
+              sink.accept(new AiOrchestrator.ToolResultEvent("query_transfers", true));
+              sink.accept(new AiOrchestrator.TextEvent("done"));
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of("query_transfers");
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+    action.run();
+
+    String written = response.getStringWriter().toString();
+    assertThat(written).contains("\"type\":\"tool_use\"");
+    assertThat(written).contains("\"tool\":\"query_transfers\"");
+    assertThat(written).contains("\"type\":\"tool_result\"");
+    assertThat(written).contains("\"ok\":true");
+  }
+
+  @Test
   void testBadRequest_missingPayload() {
-    RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.empty(), anthropicClient, rateLimiter, defaultPromptConfig());
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.empty(), orchestrator, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -109,12 +150,14 @@ class RegistryDashAiActionTest {
 
   @Test
   void testBadRequest_invalidPage() {
-    String payload = "{\"page\":\"invalid\",\"promptType\":\"summarize_trends\","
-        + "\"chartData\":{},\"conversationHistory\":[]}";
+    String payload =
+        "{\"page\":\"invalid\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[]}";
     JsonElement json = JsonParser.parseString(payload);
 
-    RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter, defaultPromptConfig());
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -126,6 +169,7 @@ class RegistryDashAiActionTest {
     promptConfig.version = "test-v1";
     promptConfig.basePreamble = "PREAMBLE_FROM_TEST";
     promptConfig.responseGuidance = "GUIDANCE_FROM_TEST";
+    promptConfig.toolsHeader = "";
     promptConfig.promptTypes = ImmutableMap.of("summarize_trends", "BODY_FROM_TEST");
     promptConfig.pageHints = ImmutableMap.of("portfolio", "HINT_FROM_TEST");
     promptConfig.menus = ImmutableMap.of();
@@ -171,14 +215,16 @@ class RegistryDashAiActionTest {
   @Test
   void testRateLimitExceeded() {
     AiRateLimiter strictLimiter = new AiRateLimiter(clock, 0);
-    String payload = "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
-        + "\"chartData\":{\"activity\":[]},\"conversationHistory\":["
-        + "{\"role\":\"user\",\"content\":\"test\"}"
-        + "]}";
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{\"activity\":[]},\"conversationHistory\":["
+            + "{\"role\":\"user\",\"content\":\"test\"}"
+            + "]}";
     JsonElement json = JsonParser.parseString(payload);
 
-    RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, strictLimiter, defaultPromptConfig());
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, strictLimiter, defaultPromptConfig());
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);
@@ -189,11 +235,13 @@ class RegistryDashAiActionTest {
     p.version = "test-v1";
     p.basePreamble = "You are an expert domain registry analyst.";
     p.responseGuidance = "Be concise.";
-    p.promptTypes = ImmutableMap.of(
-        "summarize_trends", "Summarize trends.",
-        "find_anomalies", "Find anomalies.",
-        "suggest_actions", "Suggest actions.",
-        "identify_risks", "Identify risks.");
+    p.toolsHeader = "";
+    p.promptTypes =
+        ImmutableMap.of(
+            "summarize_trends", "Summarize trends.",
+            "find_anomalies", "Find anomalies.",
+            "suggest_actions", "Suggest actions.",
+            "identify_risks", "Identify risks.");
     p.pageHints = ImmutableMap.of();
     p.menus = ImmutableMap.of();
     return p;
@@ -202,21 +250,27 @@ class RegistryDashAiActionTest {
   private String capturedSystemPrompt(
       RegistryConfigSettings.Prompts promptConfig, String page, String promptType)
       throws Exception {
-    String payload = String.format(
-        "{\"page\":\"%s\",\"promptType\":\"%s\",\"chartData\":{},\"conversationHistory\":[]}",
-        page, promptType);
+    String payload =
+        String.format(
+            "{\"page\":\"%s\",\"promptType\":\"%s\",\"chartData\":{},\"conversationHistory\":[]}",
+            page, promptType);
     JsonElement json = JsonParser.parseString(payload);
 
     String[] capturedPrompt = new String[1];
-    doAnswer(invocation -> {
-      capturedPrompt[0] = invocation.getArgument(0);
-      Consumer<String> onChunk = invocation.getArgument(3);
-      onChunk.accept("ok");
-      return null;
-    }).when(anthropicClient).streamMessage(any(), any(), any(), any());
+    doAnswer(
+            invocation -> {
+              capturedPrompt[0] = invocation.getArgument(0);
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.TextEvent("ok"));
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
 
-    RegistryDashAiAction action = new RegistryDashAiAction(
-        params, Optional.of(json), anthropicClient, rateLimiter, promptConfig);
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, promptConfig);
     action.run();
     return capturedPrompt[0];
   }

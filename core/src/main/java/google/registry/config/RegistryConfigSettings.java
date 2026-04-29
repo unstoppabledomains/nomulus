@@ -272,6 +272,7 @@ public class RegistryConfigSettings {
     public String version;
     public String basePreamble;
     public String responseGuidance;
+    public String toolsHeader;
     public Map<String, String> promptTypes;
     public Map<String, String> pageHints;
     public Map<String, List<MenuItem>> menus;
