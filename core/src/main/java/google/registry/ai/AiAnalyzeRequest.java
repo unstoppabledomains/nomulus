@@ -14,12 +14,19 @@
 
 package google.registry.ai;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.List;
 
 /** Request payload for the AI analysis endpoint. */
 public class AiAnalyzeRequest {
+
+  /** Pages allowed to invoke AI analysis. Add new pages here AND in default-config.yaml menus. */
+  public static final ImmutableSet<String> VALID_PAGES =
+      ImmutableSet.of(
+          "domain-activity", "revenue-billing", "forecasting",
+          "explore", "overview", "portfolio", "pricing");
 
   public String page;
   public String promptType;
@@ -36,13 +43,6 @@ public class AiAnalyzeRequest {
   }
 
   public boolean isValid() {
-    return page != null
-        && promptType != null
-        && chartData != null
-        && (page.equals("domain-activity")
-            || page.equals("revenue-billing")
-            || page.equals("forecasting")
-            || page.equals("explore")
-            || page.equals("overview"));
+    return page != null && promptType != null && chartData != null && VALID_PAGES.contains(page);
   }
 }
