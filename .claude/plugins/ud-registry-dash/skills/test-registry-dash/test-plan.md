@@ -486,3 +486,22 @@
 - No more than 100 rows are sent in `chartData`.
 - The descriptor (`metadata.exploreDescriptor`) is present on the analyze request (DevTools → Network → request body) so a future backend follow-up can render it structurally.
 - No backend errors; existing sparkle button on every page still opens fresh chats independently.
+## Test 22: Tier 3 Batch 2 — get_registrar_details
+
+Goal: confirm get_registrar_details fires when the user asks about a specific registrar. Steps: open modal on Overview, ask "Tell me more about registrar TheRegistrar". Watch for the "Looking up registrar" indicator. Server log should include toolsUsed=[get_registrar_details]. Final text should cite type/state/allowedTlds.
+
+## Test 23: Tier 3 Batch 2 — get_tld_config
+
+Goal: confirm get_tld_config fires for "how is TLD X configured" questions. Steps: open modal on Overview, ask "How is the example TLD configured? Which registrars can sell on it?". Watch for the "Looking up TLD config" indicator. Final text should cite TLD state, currency, and at least one allowed registrar by name. TLDs with > 100 allowed registrars should mention truncation.
+
+## Test 24: Tier 3 Batch 2 — query_revenue_breakdown
+
+Goal: confirm query_revenue_breakdown fires for revenue drill-down questions. Steps: open modal on Financials > Registry Revenue, ask "Break down revenue for tld example over the last 6 months by operation". Repeat with "by period". Verify date ranges over 2 years are rejected by the tool, and group_by=registrar returns a tool error (not supported in v2).
+
+## Test 25: Tier 3 Batch 2 — query_renewal_rates
+
+Goal: confirm query_renewal_rates fires for renewal-trend questions. Steps: open modal on Overview, ask "What's the renewal rate for tld example over the last year?". Final text should cite a numeric renewal rate.
+
+## Test 26: Tier 3 Batch 2 — query_expiration_curve
+
+Goal: confirm query_expiration_curve fires for forward-looking expiration questions. Steps: open modal on Financials > Forecasting, ask "How many domains in tld example expire in the next 12 months, broken out by month?". Verify months_ahead outside [1, 60] is silently clamped.

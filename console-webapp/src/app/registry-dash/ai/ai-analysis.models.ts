@@ -80,4 +80,9 @@ export const TOOL_LABELS: Record<string, string> = {
   get_pricing_rules: '💰 Looking up pricing',
   query_registrar_activity: '📊 Checking registrar activity',
   query_domain_details: '🔎 Looking up domain',
+  get_registrar_details: '🏢 Looking up registrar',
+  get_tld_config: '⚙️ Looking up TLD config',
+  query_revenue_breakdown: '💵 Breaking down revenue',
+  query_renewal_rates: '🔄 Checking renewal rates',
+  query_expiration_curve: '📉 Mapping expirations',
 };
