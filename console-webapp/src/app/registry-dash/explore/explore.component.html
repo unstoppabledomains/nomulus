@@ -28,6 +28,27 @@
       <mat-spinner diameter="16"></mat-spinner>
       Running...
     </span>
+    <button
+      mat-stroked-button
+      class="add-to-ai-chat-btn"
+      [matMenuTriggerFor]="addAiMenu"
+      [disabled]="!result()">
+      <mat-icon>auto_awesome</mat-icon>
+      Add to AI Chat
+    </button>
+    <mat-menu #addAiMenu="matMenu">
+      <button mat-menu-item (click)="addToNewChat()">
+        <mat-icon>add</mat-icon>
+        <span>Start new chat</span>
+      </button>
+      <button
+        mat-menu-item
+        (click)="addToCurrentChat()"
+        [disabled]="!aiService.hasActiveConversation()">
+        <mat-icon>forum</mat-icon>
+        <span>Add to current chat</span>
+      </button>
+    </mat-menu>
   </div>
 
   <!-- Result Info -->

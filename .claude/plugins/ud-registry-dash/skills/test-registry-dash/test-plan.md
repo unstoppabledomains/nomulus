@@ -441,3 +441,48 @@
 - No data from a TLD outside the user's access scope ever appears in the modal.
 - Final text is a clear "I don't have access" rather than a stack trace.
 
+
+
+---
+
+## Test 21: Add to AI Chat from Explore
+
+**Goal:** Verify the Data Exploration page can hand a query result off to the AI chat — either as a fresh chat or appended to an existing in-session conversation.
+
+### Prerequisites:
+- Same as Test 1 (dashboard access, local dev or alpha).
+- Test data seeded so a query produces non-empty results.
+
+### Steps — happy path "Add to current chat":
+1. Navigate to **Domain Activity** (`/#/registry-dash/domain-activity`).
+2. Open the AI modal via the sparkle button, choose "Summarize trends". Wait for the initial analysis.
+3. In the follow-up box, ask one or two questions (e.g. "What about TLD `example`?"). Confirm Claude responds.
+4. Close the modal.
+5. Navigate to **Data Exploration** (`/#/registry-dash/explore`).
+6. Configure a query (Source: Domain Activity, Metric: Count, Group By: TLD) and click **Run Query**.
+7. Verify the new **Add to AI Chat** button appears next to the run controls (icon: `auto_awesome`, label: "Add to AI Chat") and is **enabled**.
+8. Click **Add to AI Chat** — menu shows two items: `add` **Start new chat** and `forum` **Add to current chat** (enabled).
+9. Click **Add to current chat**.
+10. The AI modal opens reflecting the prior conversation (the questions from step 3 and Claude's responses are visible) **plus** a new user turn that contains a one-line descriptor summary, the JSON descriptor, and the first 100 rows.
+11. Wait for Claude's response. It should reference both the prior context (Domain Activity discussion) and the new Explore data.
+
+### Steps — happy path "Start new chat":
+1. From a fresh tab/session (no prior AI conversation), navigate to **Data Exploration**.
+2. Run a query (any).
+3. Click **Add to AI Chat** — menu shows **Start new chat** enabled and **Add to current chat** **disabled** (no conversation exists).
+4. Click **Start new chat**.
+5. The AI modal opens with no prior conversation; the seed user turn is the standard explore "Summarize trends" message and Claude's response references only the Explore data.
+6. Close and reopen via the existing sparkle button on the Explore page — confirm it now resumes the conversation rather than starting a new one (the modal shows the prior turns).
+
+### Edge cases:
+- Before any query is run on the Explore page, the **Add to AI Chat** button is **disabled**.
+- "Add to current chat" menu item is **disabled** when no AI conversation exists in the session (hard-refresh the page to clear in-memory state, then return to Explore — the menu item must be greyed out).
+- Run an Explore query that returns more than 100 rows. Verify the "Add to current chat" user turn explicitly notes truncation (e.g. "100 of 4213 rows attached") and that `chartData.rows.length === 100` in the network request payload (DevTools → Network → analyze).
+- Click "Start new chat" link in the modal header while an existing conversation is in progress — confirm the modal clears the prior history.
+
+### Expected:
+- Cross-page resume works: the prior conversation survives the modal close and the page navigation.
+- Claude's response in the resumed chat references both the prior context and the new Explore data.
+- No more than 100 rows are sent in `chartData`.
+- The descriptor (`metadata.exploreDescriptor`) is present on the analyze request (DevTools → Network → request body) so a future backend follow-up can render it structurally.
+- No backend errors; existing sparkle button on every page still opens fresh chats independently.

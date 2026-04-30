@@ -15,6 +15,7 @@
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { MatDialog } from '@angular/material/dialog';
 import { catchError, debounceTime, EMPTY, filter, switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
 import { RegistryDashService } from '../registry-dash.service';
@@ -24,6 +25,12 @@ import { ExploreChartComponent } from './explore-chart/explore-chart.component';
 import { ChartType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
 import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
 import { EXPLORE_PROMPTS } from '../ai/ai-prompts';
+import { AiAnalysisService } from '../ai/ai-analysis.service';
+import {
+  AiAnalysisModalComponent,
+  AiAnalysisModalData,
+} from '../ai/ai-analysis-modal.component';
+import { EXPLORE_AI_ROW_CAP, AiModelChoice } from '../ai/ai-analysis.models';
 
 @Component({
   selector: 'app-explore',
@@ -35,7 +42,9 @@ import { EXPLORE_PROMPTS } from '../ai/ai-prompts';
 export class ExploreComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private dashService = inject(RegistryDashService);
+  private dialog = inject(MatDialog);
   exploreService = inject(ExploreService);
+  aiService = inject(AiAnalysisService);
   readonly aiPrompts = EXPLORE_PROMPTS;
 
   query = signal<ExploreQuery>({ ...DEFAULT_QUERY, filters: { ...DEFAULT_QUERY.filters } });
@@ -95,6 +104,110 @@ export class ExploreComponent implements OnInit {
     this.exploreService.explore(this.query()).subscribe();
   }
 
+  truncatedChartData() {
+    const r = this.result();
+    if (!r) return null;
+    const cap = EXPLORE_AI_ROW_CAP;
+    const slicedRows = r.rows.slice(0, cap);
+    return {
+      columns: r.columns,
+      rows: slicedRows,
+      totalRows: r.totalRows,
+      returnedRows: slicedRows.length,
+      truncated: r.rows.length > cap,
+    };
+  }
+
+  descriptorSummary(): string {
+    const q = this.query();
+    const metricStr = q.metrics
+      .map(m => `${m.field}_${m.aggregation}`)
+      .join(', ') || 'count_sum';
+    const dimsStr = q.dimensions.length > 0
+      ? `grouped by ${q.dimensions.join(', ')}`
+      : 'no grouping';
+    const range = this.dashService.selectedRangeConfig();
+    const rangeLabel = range ? `last ${range.lookbackHours}h, ${range.granularity}` : '';
+    return [q.dataSource, dimsStr, metricStr, rangeLabel]
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  private buildMetadata(): AiAnalysisModalData['metadata'] {
+    const range = this.dashService.selectedRangeConfig();
+    return {
+      dateRange: { start: '', end: '' },
+      granularity: range?.granularity,
+      filteredTlds: this.dashService.selectedTlds(),
+      filteredRegistrars: this.dashService.selectedRegistrarIds(),
+      exploreDescriptor: this.query(),
+    };
+  }
+
+  private savedAiModel(): AiModelChoice | undefined {
+    return (this.dashService.settingsCache()?.['aiModel']
+      || localStorage.getItem('ai-model-preference')) as AiModelChoice | undefined;
+  }
+
+  addToNewChat(): void {
+    const truncated = this.truncatedChartData();
+    if (!truncated) return;
+    this.aiService.resetConversation();
+
+    const data: AiAnalysisModalData = {
+      title: 'Explore Analysis — Data Exploration',
+      page: 'explore',
+      promptType: 'summarize_trends',
+      userMessage: EXPLORE_PROMPTS[0].userMessage,
+      metadata: this.buildMetadata(),
+      chartData: truncated,
+      isAdmin: false,
+      savedModel: this.savedAiModel(),
+    };
+
+    this.dialog.open(AiAnalysisModalComponent, {
+      width: '800px',
+      maxHeight: '90vh',
+      data,
+    });
+  }
+
+  addToCurrentChat(): void {
+    if (!this.aiService.hasActiveConversation()) return;
+    const truncated = this.truncatedChartData();
+    if (!truncated) return;
+
+    const userTurn =
+      `I just ran an Explore query: ${this.descriptorSummary()}.\n\n` +
+      `Descriptor: ${JSON.stringify(this.query())}\n\n` +
+      `Data (${truncated.returnedRows} of ${truncated.totalRows} rows` +
+      (truncated.truncated ? ', truncated' : '') +
+      `): ${JSON.stringify(truncated.rows)}`;
+
+    this.aiService.appendUserTurnAndAnalyze(userTurn, {
+      chartData: truncated,
+      metadata: this.buildMetadata(),
+      page: 'explore',
+      promptType: 'summarize_trends',
+    });
+
+    const data: AiAnalysisModalData = {
+      title: 'Explore Analysis — Data Exploration',
+      page: 'explore',
+      promptType: 'summarize_trends',
+      userMessage: EXPLORE_PROMPTS[0].userMessage,
+      metadata: this.buildMetadata(),
+      chartData: truncated,
+      isAdmin: false,
+      savedModel: this.savedAiModel(),
+    };
+    this.dialog.open(AiAnalysisModalComponent, {
+      width: '800px',
+      maxHeight: '90vh',
+      data,
+    });
+  }
+
   exportCsv(): void {
     const r = this.result();
     if (!r || r.rows.length === 0) return;
@@ -109,7 +222,7 @@ export class ExploreComponent implements OnInit {
 
     const header = r.columns.map(escape).join(',');
     const rows = r.rows.map(row => r.columns.map(col => escape(row[col])).join(','));
-    const csv = '\uFEFF' + header + '\n' + rows.join('\n');
+    const csv = '﻿' + header + '\n' + rows.join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
