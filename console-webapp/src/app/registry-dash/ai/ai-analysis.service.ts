@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import {
   AiAnalyzeRequest,
   AiStreamFrame,
+  ConversationMessage,
   TOOL_LABELS,
   ToolInFlight,
 } from './ai-analysis.models';
+
+type LastRequestShape = Pick<
+  AiAnalyzeRequest,
+  'page' | 'promptType' | 'metadata' | 'systemPrompt' | 'model'
+>;
 
 @Injectable({ providedIn: 'root' })
 export class AiAnalysisService {
@@ -28,12 +34,30 @@ export class AiAnalysisService {
   toolsInFlight = signal<ToolInFlight[]>([]);
   toolsUsed = signal<string[]>([]);
 
+  conversationHistory = signal<ConversationMessage[]>([]);
+  lastRequest = signal<LastRequestShape | null>(null);
+  hasActiveConversation = computed(() => this.conversationHistory().length > 0);
+
+  resetConversation(): void {
+    this.conversationHistory.set([]);
+    this.lastRequest.set(null);
+    this.streamedText.set('');
+    this.error.set(null);
+    this.toolsInFlight.set([]);
+    this.toolsUsed.set([]);
+  }
+
   async analyze(request: AiAnalyzeRequest): Promise<void> {
     this.streaming.set(true);
     this.streamedText.set('');
     this.error.set(null);
     this.toolsInFlight.set([]);
     this.toolsUsed.set([]);
+
+    // The incoming request carries the authoritative conversation up to and
+    // including the new user turn. Capture it now so the modal renders the
+    // user turn immediately while the assistant response streams in.
+    this.conversationHistory.set([...request.conversationHistory]);
 
     try {
       const response = await fetch('/console-api/registry-dash/ai/analyze', {
@@ -113,12 +137,63 @@ export class AiAnalysisService {
           }
         }
       }
+
+      if (!this.error()) {
+        this.conversationHistory.update(h => [
+          ...h,
+          { role: 'assistant', content: accumulated },
+        ]);
+        this.lastRequest.set({
+          page: request.page,
+          promptType: request.promptType,
+          metadata: request.metadata,
+          systemPrompt: request.systemPrompt,
+          model: request.model,
+        });
+      }
     } catch (e) {
       this.error.set('Response interrupted. Try again?');
     } finally {
       this.streaming.set(false);
       this.toolsInFlight.set([]);
     }
+  }
+
+  async appendUserTurnAndAnalyze(
+    content: string,
+    overrides: Partial<Omit<AiAnalyzeRequest, 'conversationHistory'>>,
+  ): Promise<void> {
+    const last = this.lastRequest();
+    const page = overrides.page ?? last?.page;
+    const promptType = overrides.promptType ?? last?.promptType;
+    if (!page || !promptType) {
+      this.error.set('Cannot continue conversation: no prior request context.');
+      return;
+    }
+
+    const metadata = overrides.metadata ?? last?.metadata ?? {
+      dateRange: { start: '', end: '' },
+      filteredTlds: [],
+      filteredRegistrars: [],
+    };
+    const systemPrompt = overrides.systemPrompt ?? last?.systemPrompt;
+    const model = overrides.model ?? last?.model;
+    const chartData = overrides.chartData;
+
+    const newHistory: ConversationMessage[] = [
+      ...this.conversationHistory(),
+      { role: 'user', content },
+    ];
+
+    await this.analyze({
+      page,
+      promptType,
+      metadata,
+      chartData,
+      model,
+      systemPrompt,
+      conversationHistory: newHistory,
+    });
   }
 }
 

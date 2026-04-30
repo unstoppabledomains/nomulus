@@ -2,6 +2,29 @@
   display: block;
 }
 
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h2 {
+    margin: 0;
+  }
+
+  .start-new-chat-btn {
+    font-size: 12px;
+    color: var(--ud-text-secondary);
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      margin-right: 2px;
+    }
+  }
+}
+
 .context-bar {
   display: flex;
   align-items: center;

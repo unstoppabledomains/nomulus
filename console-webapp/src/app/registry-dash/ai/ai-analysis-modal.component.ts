@@ -54,7 +54,7 @@ export interface AiAnalysisModalData {
 })
 export class AiAnalysisModalComponent implements OnInit {
   selectedModel = signal<AiModelChoice>('sonnet');
-  conversationHistory = signal<ConversationMessage[]>([]);
+  conversationHistory = computed(() => this.aiService.conversationHistory());
   followUpText = '';
   showAdvanced = signal(false);
   editableSystemPrompt = '';
@@ -67,7 +67,7 @@ export class AiAnalysisModalComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,
     @Inject(MAT_DIALOG_DATA) public data: AiAnalysisModalData,
-    private aiService: AiAnalysisService,
+    public aiService: AiAnalysisService,
     private dashService: RegistryDashService,
   ) {
     if (data.savedModel) {
@@ -76,14 +76,15 @@ export class AiAnalysisModalComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.sendInitialRequest();
+    if (!this.aiService.hasActiveConversation()) {
+      this.sendInitialRequest();
+    }
   }
 
   private async sendInitialRequest() {
     const history: ConversationMessage[] = [
       { role: 'user', content: this.data.userMessage },
     ];
-    this.conversationHistory.set(history);
 
     await this.aiService.analyze({
       page: this.data.page,
@@ -94,13 +95,6 @@ export class AiAnalysisModalComponent implements OnInit {
       systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined,
       conversationHistory: history,
     });
-
-    if (!this.error()) {
-      this.conversationHistory.update(h => [
-        ...h,
-        { role: 'assistant', content: this.streamedText() },
-      ]);
-    }
   }
 
   async sendFollowUp() {
@@ -111,7 +105,6 @@ export class AiAnalysisModalComponent implements OnInit {
       ...this.conversationHistory(),
       { role: 'user', content: input },
     ];
-    this.conversationHistory.set(updatedHistory);
     this.followUpText = '';
 
     await this.aiService.analyze({
@@ -123,13 +116,11 @@ export class AiAnalysisModalComponent implements OnInit {
       systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined,
       conversationHistory: updatedHistory,
     });
+  }
 
-    if (!this.error()) {
-      this.conversationHistory.update(h => [
-        ...h,
-        { role: 'assistant', content: this.streamedText() },
-      ]);
-    }
+  startNewChat() {
+    this.aiService.resetConversation();
+    this.sendInitialRequest();
   }
 
   onModelChange(model: AiModelChoice) {

@@ -22,6 +22,18 @@ export interface AiAnalyzeRequest {
     | 'portfolio'
     | 'pricing';
   promptType: string;
+  /**
+   * Free-form context bag forwarded to the backend. Well-known keys:
+   * - `dateRange` (required): `{ start: string; end: string }`.
+   * - `granularity`: optional bucket size e.g. `'DAY'`.
+   * - `filteredTlds` (required): list of TLD names currently selected.
+   * - `filteredRegistrars` (required): list of registrar IDs currently selected.
+   * - `exploreDescriptor`: optional `ExploreQuery`-shaped object describing the
+   *   query that produced `chartData` when the request originated from the
+   *   Data Exploration page. Currently inlined into the user-turn text by the
+   *   frontend; the backend ignores unknown keys.
+   * Additional keys are allowed and silently passed through.
+   */
   metadata: {
     dateRange: { start: string; end: string };
     granularity?: string;
@@ -34,6 +46,9 @@ export interface AiAnalyzeRequest {
   systemPrompt?: string;
   conversationHistory: ConversationMessage[];
 }
+
+/** Maximum number of Explore rows attached to an AI request. */
+export const EXPLORE_AI_ROW_CAP = 100;
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';

@@ -1,4 +1,16 @@
-<h2 mat-dialog-title>{{ data.title }}</h2>
+<div class="modal-title-row">
+  <h2 mat-dialog-title>{{ data.title }}</h2>
+  <button
+    mat-button
+    class="start-new-chat-btn"
+    type="button"
+    (click)="startNewChat()"
+    [disabled]="streaming()"
+    title="Discard current conversation and reseed">
+    <mat-icon>refresh</mat-icon>
+    Start new chat
+  </button>
+</div>
 <mat-dialog-content>
   <!-- Context line -->
   <div class="context-bar">
