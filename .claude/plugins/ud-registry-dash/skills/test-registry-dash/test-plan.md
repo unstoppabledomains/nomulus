@@ -389,3 +389,55 @@
 - All 7 pages now participate in the cross-page flow established by Test 12.
 - No data bleed between pages.
 - Model preference and conversation history are scoped per-modal (closing the modal clears history).
+
+---
+
+## Test 18: Tier 3 Tool Use — Indicator UX
+
+**Goal:** Verify the analysis modal shows transient tool indicators when Claude calls a tool.
+
+### Steps:
+1. Navigate to **Domain Activity** (or any page with sparkle).
+2. Click sparkle → open the analysis modal.
+3. Wait for the initial analysis to finish.
+4. In the follow-up box, type: `What specific domains transferred in the last 30 days for the example tld?` (substitute a TLD with seeded transfer data).
+5. Watch for an inline indicator below the streaming text: `🔍 Searching transfers…` (italic, slight pulse animation).
+6. The indicator should appear when the tool is in flight and disappear once the tool result arrives.
+7. The final assistant text should reference specific domain names that came from the tool.
+
+### Expected:
+- Indicator appears mid-stream and is replaced by the next text chunk.
+- Final answer contains specific domain names, not just chart-level summaries.
+- Modal does not crash or hang.
+
+---
+
+## Test 19: Tier 3 Tool Use — Server Log
+
+**Goal:** Confirm the server-side log line records `toolsUsed=` for tool-firing requests.
+
+### Steps:
+1. Tail the test server log (or Cloud Logging in alpha-gke) for `RegistryDashAiAction`.
+2. Run Test 18.
+3. Locate the corresponding `AI analysis request:` log line.
+
+### Expected:
+- The log line includes `toolsUsed=[query_transfers]` (or the relevant tool list).
+- For analyses that don't trigger any tool, `toolsUsed=[]`.
+
+---
+
+## Test 20: Tier 3 Tool Use — Permission Scope
+
+**Goal:** Tools must respect per-user TLD scope.
+
+### Steps:
+1. Log in as a non-FTE user mapped to a single registry/TLD set.
+2. Open the modal on Domain Activity.
+3. Ask `What domains transferred for tld <some-tld-the-user-cannot-see>?`.
+4. The tool should refuse (Claude will get an `is_error: true` tool_result; the assistant will say it doesn't have access).
+
+### Expected:
+- No data from a TLD outside the user's access scope ever appears in the modal.
+- Final text is a clear "I don't have access" rather than a stack trace.
+

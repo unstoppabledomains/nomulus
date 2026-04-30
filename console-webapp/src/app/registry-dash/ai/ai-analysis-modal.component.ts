@@ -62,6 +62,7 @@ export class AiAnalysisModalComponent implements OnInit {
   streaming = computed(() => this.aiService.streaming());
   streamedText = computed(() => this.aiService.streamedText());
   error = computed(() => this.aiService.error());
+  toolsInFlight = computed(() => this.aiService.toolsInFlight());
 
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,

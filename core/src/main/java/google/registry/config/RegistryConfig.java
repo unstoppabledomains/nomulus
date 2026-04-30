@@ -1484,6 +1484,7 @@ public final class RegistryConfig {
       empty.version = "unset";
       empty.basePreamble = "";
       empty.responseGuidance = "";
+      empty.toolsHeader = "";
       empty.promptTypes = ImmutableMap.of();
       empty.pageHints = ImmutableMap.of();
       empty.menus = ImmutableMap.of();

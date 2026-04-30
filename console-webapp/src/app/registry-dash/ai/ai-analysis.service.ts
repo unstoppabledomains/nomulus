@@ -13,25 +13,29 @@
 // limitations under the License.
 
 import { Injectable, signal } from '@angular/core';
-import { AiAnalyzeRequest } from './ai-analysis.models';
+import {
+  AiAnalyzeRequest,
+  AiStreamFrame,
+  TOOL_LABELS,
+  ToolInFlight,
+} from './ai-analysis.models';
 
 @Injectable({ providedIn: 'root' })
 export class AiAnalysisService {
   streaming = signal(false);
   streamedText = signal('');
   error = signal<string | null>(null);
+  toolsInFlight = signal<ToolInFlight[]>([]);
+  toolsUsed = signal<string[]>([]);
 
   async analyze(request: AiAnalyzeRequest): Promise<void> {
     this.streaming.set(true);
     this.streamedText.set('');
     this.error.set(null);
+    this.toolsInFlight.set([]);
+    this.toolsUsed.set([]);
 
     try {
-      const xsrfCookie = document.cookie
-        .split('; ')
-        .find(c => c.startsWith('X-CSRF-Token='));
-      const xsrfToken = xsrfCookie?.split('=')[1] ?? '';
-
       const response = await fetch('/console-api/registry-dash/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,11 +85,29 @@ export class AiAnalysisService {
           const data = line.substring(6).trim();
           if (data === '[DONE]') break;
           try {
-            const parsed = JSON.parse(data);
-            if (parsed.text) {
-              accumulated += parsed.text;
+            const frame = JSON.parse(data) as AiStreamFrame | { text?: string };
+
+            // Tier 1 (legacy) frames had only {text: "..."} — handle gracefully.
+            if (!('type' in frame) && 'text' in frame && frame.text) {
+              accumulated += frame.text;
               this.streamedText.set(accumulated);
+              continue;
             }
+
+            const typed = frame as AiStreamFrame;
+            if (typed.type === 'text') {
+              accumulated += typed.text;
+              this.streamedText.set(accumulated);
+            } else if (typed.type === 'tool_use') {
+              const label = TOOL_LABELS[typed.tool] ?? `🔧 Running ${typed.tool}`;
+              this.toolsInFlight.update(list => [...list, { tool: typed.tool, label }]);
+              this.toolsUsed.update(list => [...list, typed.tool]);
+            } else if (typed.type === 'tool_result') {
+              this.toolsInFlight.update(list =>
+                removeFirst(list, t => t.tool === typed.tool),
+              );
+            }
+            // 'done' is informational; the [DONE] sentinel still terminates the loop.
           } catch {
             // skip malformed chunks
           }
@@ -95,6 +117,15 @@ export class AiAnalysisService {
       this.error.set('Response interrupted. Try again?');
     } finally {
       this.streaming.set(false);
+      this.toolsInFlight.set([]);
     }
   }
+}
+
+function removeFirst<T>(list: T[], pred: (item: T) => boolean): T[] {
+  const idx = list.findIndex(pred);
+  if (idx < 0) return list;
+  const out = list.slice();
+  out.splice(idx, 1);
+  return out;
 }
