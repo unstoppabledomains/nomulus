@@ -648,17 +648,27 @@ ai:
   defaultModel: sonnet
   # Rate limit: max requests per user per hour
   rateLimitPerHour: 120
+  # Per-tool runtime knobs. Tunable without code changes.
+  tools:
+    # Hard cap on rows returned by any AI tool that wraps the Explore engine.
+    # Protects against runaway aggregations and keeps tool responses small enough
+    # for the model to consume.
+    maxRows: 500
+    # SQL statement_timeout (seconds) applied to AI-tool queries that opt in.
+    # Surfaces as a clear AiToolException on exceedance instead of falling through
+    # to the 120s HTTP gateway timeout.
+    statementTimeoutSeconds: 30
   # Prompt content for the AI sparkle feature. Edit here to tweak prompts without redeploying
   # frontend code. The version field is logged on every request for observability.
   prompts:
-    # Bumped 2026-04-29 to force a fresh nomulus image build for alpha-gke
+    # Bumped 2026-04-30 to force a fresh nomulus image build for alpha-gke
     # (prior deploy reused a cached image without the Tier 2 prompts content).
-    version: "v1.0.1"
+    version: "v1.0.2"
     basePreamble: "You are an expert domain registry analyst. You are analyzing data from a domain registry dashboard."
     responseGuidance: "Provide your analysis in clear markdown. Use specific numbers from the data. Keep your response concise and actionable."
     toolsHeader: |
       ## Tools available
-      You have tools to fetch additional registry data when the user's question needs detail beyond the snapshot above. Use a tool when you need specific domains, registrar-level data, or pricing rules. Prefer specific tools over generic ones, and always cite the data the tool returned in your response.
+      You have tools to fetch additional registry data when the user's question needs detail beyond the snapshot above. Use a tool when you need specific domains, registrar-level data, or pricing rules. Prefer specific tools (query_transfers, get_pricing_rules, query_registrar_activity, query_domain_details) over the generic run_explore_query. Use run_explore_query only when no specific tool fits. Always cite the data the tool returned in your response.
     promptTypes:
       summarize_trends: "Summarize the key trends in this data. Identify growth or decline patterns, compare across TLDs, and highlight the most significant changes."
       find_anomalies: "Identify anomalies, outliers, and unusual patterns in this data. Look for unexpected spikes, drops, or ratios that warrant investigation."

@@ -505,3 +505,56 @@ Goal: confirm query_renewal_rates fires for renewal-trend questions. Steps: open
 ## Test 26: Tier 3 Batch 2 — query_expiration_curve
 
 Goal: confirm query_expiration_curve fires for forward-looking expiration questions. Steps: open modal on Financials > Forecasting, ask "How many domains in tld example expire in the next 12 months, broken out by month?". Verify months_ahead outside [1, 60] is silently clamped.
+---
+
+## Test 27: Tier 3 Tool Use - Generic run_explore_query (positive)
+
+**Goal:** Confirm Claude reaches for `run_explore_query` for questions no specific tool answers.
+
+### Steps:
+1. Navigate to **Domain Activity** and open the analysis modal.
+2. Wait for the initial analysis to finish.
+3. Ask: `What is our average renewal price by registrar over the last quarter for tld example?` (substitute a TLD with seeded REVENUE data).
+4. Watch for an inline indicator: `🔬 Running data query` (italic, slight pulse).
+5. The final assistant text should cite per-registrar pricing/renewal data.
+6. Tail the server log for `RegistryDashAiAction` and find the matching `AI analysis request:` line.
+
+### Expected:
+- Indicator `🔬 Running data query` appears mid-stream.
+- Final answer contains per-registrar numbers, not just a generic summary.
+- Server log includes `toolsUsed=[run_explore_query]`.
+- A second log line from `RunExploreQueryTool` records the descriptor: `AI tool run_explore_query: user=... tld=example dataSource=REVENUE dimensions=[registrar] metrics=[amount] ...`.
+
+---
+
+## Test 28: Tier 3 Tool Use - Generic vs Specific Tool Selection (negative)
+
+**Goal:** Confirm Claude prefers specific tools over the generic when one applies. Otherwise the description-level tie-breaker is too weak and needs strengthening.
+
+### Steps:
+1. Navigate to **Domain Activity**.
+2. Open the analysis modal.
+3. Ask: `Show me transfers for tld example last week.` - a specific tool (`query_transfers`) covers this.
+4. Watch the indicator that appears.
+
+### Expected:
+- Indicator is `🔍 Searching transfers`, NOT `🔬 Running data query`.
+- Server log shows `toolsUsed=[query_transfers]`, not `run_explore_query`.
+- If `run_explore_query` fires here, the description's tie-breaker copy needs a stronger lead-in.
+
+---
+
+## Test 29: Tier 3 Tool Use - Statement-timeout error message
+
+**Goal:** Confirm the `statement_timeout` config knob produces a user-visible error rather than a generic gateway timeout.
+
+### Steps:
+1. Temporarily set `ai.tools.statementTimeoutSeconds: 1` in the local-stack `default-config.yaml` override.
+2. Restart the local stack.
+3. Open the analysis modal and ask a wide aggregation question that will exceed 1s (e.g. `Aggregate all REVENUE for the last year by registrar and operation`).
+4. Watch the modal response.
+
+### Expected:
+- Final text reads something like *"Query exceeded 1s - try a narrower date range or smaller scope."*
+- Server log includes the descriptor line and the SQL state 57014.
+- No generic 502/504 gateway error reaches the browser.

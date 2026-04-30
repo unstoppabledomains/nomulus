@@ -265,6 +265,13 @@ public class RegistryConfigSettings {
     public String defaultModel;
     public int rateLimitPerHour;
     public Prompts prompts;
+    public Tools tools;
+  }
+
+  /** Per-tool runtime knobs for AI tools (caps, timeouts). */
+  public static class Tools {
+    public int maxRows;
+    public int statementTimeoutSeconds;
   }
 
   /** AI prompt content, loaded from default-config.yaml. */
