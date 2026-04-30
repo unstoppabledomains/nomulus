@@ -23,7 +23,7 @@ The backend defines tools, Claude decides when to invoke them, the backend execu
 | `query_registrar_activity` | `ExploreDataSource.DOMAIN_ACTIVITY` filtered by registrar | "What did registrar Y do last month?" |
 | `query_domain_details` | `Domain` JPA entity + `DomainHistory` join | "Tell me about example.tld" |
 
-**Deferred to a follow-up PR** (`run_explore_query`, `query_revenue_breakdown`, `query_renewal_rates`, `query_expiration_curve`, etc.) — see `.context/tier3-additional-tools-prompt.md`.
+**Deferred to a follow-up PR** (`run_explore_query`, `query_revenue_breakdown`, `query_renewal_rates`, `query_expiration_curve`, etc.) — see `.context/tier3-followup-specific-tools-prompt.md`.
 
 ## Architecture
 
