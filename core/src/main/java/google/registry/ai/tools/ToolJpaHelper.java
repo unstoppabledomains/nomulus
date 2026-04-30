@@ -103,22 +103,22 @@ final class ToolJpaHelper {
         () -> {
           Query query = tm().getEntityManager().createNativeQuery(sql);
           query.setParameter("maxRows", maxRows);
-          if (!effectiveTlds.isEmpty()) {
+          if (!effectiveTlds.isEmpty() && sql.contains(":tlds")) {
             query.setParameter("tlds", effectiveTlds);
           }
-          if (fStart != null) {
+          if (fStart != null && sql.contains(":startDate")) {
             query.setParameter("startDate", fStart);
           }
-          if (fEnd != null) {
+          if (fEnd != null && sql.contains(":endDate")) {
             query.setParameter("endDate", fEnd);
           }
-          if (!filters.getOperations().isEmpty()) {
+          if (!filters.getOperations().isEmpty() && sql.contains(":operations")) {
             query.setParameter("operations", filters.getOperations());
           }
-          if (!filters.getRegistrarIds().isEmpty()) {
+          if (!filters.getRegistrarIds().isEmpty() && sql.contains(":registrarIds")) {
             query.setParameter("registrarIds", filters.getRegistrarIds());
           }
-          if (!filters.getActivityTypes().isEmpty()) {
+          if (!filters.getActivityTypes().isEmpty() && sql.contains(":activityTypes")) {
             query.setParameter("activityTypes", filters.getActivityTypes());
           }
 

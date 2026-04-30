@@ -33,10 +33,23 @@ public class AiToolRegistry {
       QueryTransfersTool queryTransfers,
       GetPricingRulesTool getPricingRules,
       QueryRegistrarActivityTool queryRegistrarActivity,
-      QueryDomainDetailsTool queryDomainDetails) {
+      QueryDomainDetailsTool queryDomainDetails,
+      GetRegistrarDetailsTool getRegistrarDetails,
+      GetTldConfigTool getTldConfig,
+      QueryRevenueBreakdownTool queryRevenueBreakdown,
+      QueryRenewalRatesTool queryRenewalRates,
+      QueryExpirationCurveTool queryExpirationCurve) {
     this(
         ImmutableList.of(
-            queryTransfers, getPricingRules, queryRegistrarActivity, queryDomainDetails));
+            queryTransfers,
+            getPricingRules,
+            queryRegistrarActivity,
+            queryDomainDetails,
+            getRegistrarDetails,
+            getTldConfig,
+            queryRevenueBreakdown,
+            queryRenewalRates,
+            queryExpirationCurve));
   }
 
   /** Test-friendly constructor. */
