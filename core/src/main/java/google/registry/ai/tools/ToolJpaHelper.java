@@ -16,6 +16,7 @@ package google.registry.ai.tools;
 
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -73,7 +74,7 @@ final class ToolJpaHelper {
 
   /**
    * Runs an Explore-engine query and returns the rows as a JSON array of {@code {column: value}}
-   * objects.
+   * objects. No statement-timeout applied.
    */
   static JsonObject runExplore(
       ExploreDataSource source,
@@ -82,7 +83,29 @@ final class ToolJpaHelper {
       List<String> columns,
       int maxRows)
       throws AiToolException {
-    source.validate(desc);
+    return runExplore(source, desc, effectiveTlds, columns, maxRows, 0);
+  }
+
+  /**
+   * Runs an Explore-engine query with an optional SQL {@code statement_timeout}. When {@code
+   * statementTimeoutSeconds > 0}, the timeout is applied via {@code SET LOCAL statement_timeout}
+   * inside the same transaction; on exceedance the underlying {@code PSQLException} is converted to
+   * a user-visible {@link AiToolException}. When {@code statementTimeoutSeconds <= 0}, no timeout
+   * is applied (existing behavior).
+   */
+  static JsonObject runExplore(
+      ExploreDataSource source,
+      ExploreQueryDescriptor desc,
+      ImmutableSet<String> effectiveTlds,
+      List<String> columns,
+      int maxRows,
+      int statementTimeoutSeconds)
+      throws AiToolException {
+    try {
+      source.validate(desc);
+    } catch (IllegalArgumentException e) {
+      throw new AiToolException(e.getMessage());
+    }
     String sql = ExploreQueryBuilder.build(source, desc, effectiveTlds);
 
     ExploreQueryDescriptor.ExploreFilters filters = desc.getFilters();
@@ -99,51 +122,84 @@ final class ToolJpaHelper {
     final Instant fStart = startDate;
     final Instant fEnd = endDate;
 
-    return tm().transact(
-        () -> {
-          Query query = tm().getEntityManager().createNativeQuery(sql);
-          query.setParameter("maxRows", maxRows);
-          if (!effectiveTlds.isEmpty() && sql.contains(":tlds")) {
-            query.setParameter("tlds", effectiveTlds);
-          }
-          if (fStart != null && sql.contains(":startDate")) {
-            query.setParameter("startDate", fStart);
-          }
-          if (fEnd != null && sql.contains(":endDate")) {
-            query.setParameter("endDate", fEnd);
-          }
-          if (!filters.getOperations().isEmpty() && sql.contains(":operations")) {
-            query.setParameter("operations", filters.getOperations());
-          }
-          if (!filters.getRegistrarIds().isEmpty() && sql.contains(":registrarIds")) {
-            query.setParameter("registrarIds", filters.getRegistrarIds());
-          }
-          if (!filters.getActivityTypes().isEmpty() && sql.contains(":activityTypes")) {
-            query.setParameter("activityTypes", filters.getActivityTypes());
-          }
-
-          @SuppressWarnings("unchecked")
-          List<Object> raw = query.getResultList();
-
-          JsonArray rows = new JsonArray();
-          for (Object r : raw) {
-            JsonObject rowObj = new JsonObject();
-            if (r instanceof Object[] arr) {
-              for (int i = 0; i < arr.length && i < columns.size(); i++) {
-                addNormalized(rowObj, columns.get(i), arr[i]);
-              }
-            } else if (!columns.isEmpty()) {
-              addNormalized(rowObj, columns.get(0), r);
+    try {
+      return tm().transact(
+          () -> {
+            if (statementTimeoutSeconds > 0) {
+              tm().getEntityManager()
+                  .createNativeQuery(
+                      "SET LOCAL statement_timeout = " + (statementTimeoutSeconds * 1000L))
+                  .executeUpdate();
             }
-            rows.add(rowObj);
-          }
+            Query query = tm().getEntityManager().createNativeQuery(sql);
+            query.setParameter("maxRows", maxRows);
+            if (!effectiveTlds.isEmpty() && sql.contains(":tlds")) {
+              query.setParameter("tlds", effectiveTlds);
+            }
+            if (fStart != null && sql.contains(":startDate")) {
+              query.setParameter("startDate", fStart);
+            }
+            if (fEnd != null && sql.contains(":endDate")) {
+              query.setParameter("endDate", fEnd);
+            }
+            if (!filters.getOperations().isEmpty() && sql.contains(":operations")) {
+              query.setParameter("operations", filters.getOperations());
+            }
+            if (!filters.getRegistrarIds().isEmpty() && sql.contains(":registrarIds")) {
+              query.setParameter("registrarIds", filters.getRegistrarIds());
+            }
+            if (!filters.getActivityTypes().isEmpty() && sql.contains(":activityTypes")) {
+              query.setParameter("activityTypes", filters.getActivityTypes());
+            }
 
-          JsonObject out = new JsonObject();
-          out.add("rows", rows);
-          out.addProperty("rowCount", rows.size());
-          out.addProperty("truncated", rows.size() >= maxRows);
-          return out;
-        });
+            @SuppressWarnings("unchecked")
+            List<Object> raw = query.getResultList();
+
+            JsonArray rows = new JsonArray();
+            for (Object r : raw) {
+              JsonObject rowObj = new JsonObject();
+              if (r instanceof Object[] arr) {
+                for (int i = 0; i < arr.length && i < columns.size(); i++) {
+                  addNormalized(rowObj, columns.get(i), arr[i]);
+                }
+              } else if (!columns.isEmpty()) {
+                addNormalized(rowObj, columns.get(0), r);
+              }
+              rows.add(rowObj);
+            }
+
+            JsonObject out = new JsonObject();
+            out.add("rows", rows);
+            out.addProperty("rowCount", rows.size());
+            out.addProperty("truncated", rows.size() >= maxRows);
+            return out;
+          });
+    } catch (RuntimeException e) {
+      if (isStatementTimeout(e)) {
+        throw new AiToolException(
+            "Query exceeded "
+                + statementTimeoutSeconds
+                + "s — try a narrower date range or smaller scope.");
+      }
+      throw e;
+    }
+  }
+
+  /** Returns true if {@code e}'s cause chain contains a Postgres statement-timeout cancellation. */
+  private static boolean isStatementTimeout(Throwable e) {
+    Throwable cur = e;
+    while (cur != null) {
+      String msg = cur.getMessage();
+      if (msg != null && Ascii.toLowerCase(msg).contains("statement timeout")) {
+        return true;
+      }
+      // PostgreSQL SQLSTATE 57014 = query_canceled (the code statement_timeout uses).
+      if (cur instanceof java.sql.SQLException sqlEx && "57014".equals(sqlEx.getSQLState())) {
+        return true;
+      }
+      cur = cur.getCause();
+    }
+    return false;
   }
 
   private static void addNormalized(JsonObject obj, String key, Object val) {

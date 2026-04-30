@@ -1474,6 +1474,26 @@ public final class RegistryConfig {
     }
 
     @Provides
+    @Config("aiToolsMaxRows")
+    public static int provideAiToolsMaxRows(RegistryConfigSettings config) {
+      if (config.ai != null && config.ai.tools != null && config.ai.tools.maxRows > 0) {
+        return config.ai.tools.maxRows;
+      }
+      return 500;
+    }
+
+    @Provides
+    @Config("aiToolsStatementTimeoutSeconds")
+    public static int provideAiToolsStatementTimeoutSeconds(RegistryConfigSettings config) {
+      if (config.ai != null
+          && config.ai.tools != null
+          && config.ai.tools.statementTimeoutSeconds > 0) {
+        return config.ai.tools.statementTimeoutSeconds;
+      }
+      return 30;
+    }
+
+    @Provides
     @Config("anthropicPromptConfig")
     public static RegistryConfigSettings.Prompts provideAnthropicPromptConfig(
         RegistryConfigSettings config) {

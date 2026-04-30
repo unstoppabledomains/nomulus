@@ -38,7 +38,8 @@ public class AiToolRegistry {
       GetTldConfigTool getTldConfig,
       QueryRevenueBreakdownTool queryRevenueBreakdown,
       QueryRenewalRatesTool queryRenewalRates,
-      QueryExpirationCurveTool queryExpirationCurve) {
+      QueryExpirationCurveTool queryExpirationCurve,
+      RunExploreQueryTool runExploreQuery) {
     this(
         ImmutableList.of(
             queryTransfers,
@@ -49,7 +50,8 @@ public class AiToolRegistry {
             getTldConfig,
             queryRevenueBreakdown,
             queryRenewalRates,
-            queryExpirationCurve));
+            queryExpirationCurve,
+            runExploreQuery));
   }
 
   /** Test-friendly constructor. */
