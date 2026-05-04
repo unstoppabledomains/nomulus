@@ -95,7 +95,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
@@ -128,7 +128,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
     action.run();
 
     String written = response.getStringWriter().toString();
@@ -142,7 +142,7 @@ class RegistryDashAiActionTest {
   void testBadRequest_missingPayload() {
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.empty(), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.empty(), orchestrator, rateLimiter, defaultPromptConfig(), clock);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -157,7 +157,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -213,6 +213,69 @@ class RegistryDashAiActionTest {
   }
 
   @Test
+  void testSystemPrompt_includesTodayHeader() throws Exception {
+    String captured =
+        capturedSystemPrompt(defaultPromptConfig(), "domain-activity", "summarize_trends");
+    assertThat(captured).startsWith("Today is 2026-01-01 (UTC).");
+  }
+
+  @Test
+  void testSystemPrompt_omitsEmptyDateRange() throws Exception {
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[],"
+            + "\"metadata\":{\"dateRange\":{\"start\":\"\",\"end\":\"\"}}}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    String[] capturedPrompt = new String[1];
+    doAnswer(
+            invocation -> {
+              capturedPrompt[0] = invocation.getArgument(0);
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
+    action.run();
+
+    assertThat(capturedPrompt[0]).doesNotContain("Date range:");
+  }
+
+  @Test
+  void testSystemPrompt_includesPopulatedDateRange() throws Exception {
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[],"
+            + "\"metadata\":{\"dateRange\":{\"start\":\"2025-05-04\",\"end\":\"2026-05-04\"}}}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    String[] capturedPrompt = new String[1];
+    doAnswer(
+            invocation -> {
+              capturedPrompt[0] = invocation.getArgument(0);
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
+    action.run();
+
+    assertThat(capturedPrompt[0]).contains("Date range:");
+    assertThat(capturedPrompt[0]).contains("2025-05-04");
+    assertThat(capturedPrompt[0]).contains("2026-05-04");
+  }
+
+  @Test
   void testRateLimitExceeded() {
     AiRateLimiter strictLimiter = new AiRateLimiter(clock, 0);
     String payload =
@@ -224,7 +287,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, strictLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, strictLimiter, defaultPromptConfig(), clock);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);
@@ -270,7 +333,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, promptConfig);
+            params, Optional.of(json), orchestrator, rateLimiter, promptConfig, clock);
     action.run();
     return capturedPrompt[0];
   }

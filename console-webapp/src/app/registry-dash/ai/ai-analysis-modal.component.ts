@@ -53,6 +53,7 @@ export interface AiAnalysisModalData {
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
 export class AiAnalysisModalComponent implements OnInit {
+  static readonly SYSTEM_PROMPT_DRAFT_KEY = 'ai-system-prompt-draft';
   selectedModel = signal<AiModelChoice>('sonnet');
   conversationHistory = computed(() => this.aiService.conversationHistory());
   followUpText = '';
@@ -73,11 +74,29 @@ export class AiAnalysisModalComponent implements OnInit {
     if (data.savedModel) {
       this.selectedModel.set(data.savedModel);
     }
+    if (data.isAdmin) {
+      const saved = localStorage.getItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY);
+      if (saved) {
+        this.editableSystemPrompt = saved;
+        this.showAdvanced.set(true);
+      }
+    }
   }
 
   ngOnInit() {
     if (!this.aiService.hasActiveConversation()) {
       this.sendInitialRequest();
+    }
+  }
+
+  onSystemPromptChange(value: string) {
+    this.editableSystemPrompt = value;
+    if (this.data.isAdmin) {
+      if (value) {
+        localStorage.setItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY, value);
+      } else {
+        localStorage.removeItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY);
+      }
     }
   }
 

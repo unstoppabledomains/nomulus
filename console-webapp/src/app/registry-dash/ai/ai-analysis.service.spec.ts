@@ -34,7 +34,6 @@ function baseRequest(): AiAnalyzeRequest {
     page: 'explore',
     promptType: 'summarize_trends',
     metadata: {
-      dateRange: { start: '', end: '' },
       filteredTlds: [],
       filteredRegistrars: [],
     },
@@ -122,6 +121,35 @@ describe('AiAnalysisService', () => {
     await service.appendUserTurnAndAnalyze('hi', { chartData: {} });
     expect(service.error()).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('analyze never sends empty-string dateRange to backend', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+    await service.analyze(req);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    if (body.metadata.dateRange) {
+      expect(body.metadata.dateRange.start).not.toBe('');
+      expect(body.metadata.dateRange.end).not.toBe('');
+    }
+  });
+
+  it('appendUserTurnAndAnalyze fallback metadata omits dateRange', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"first"}\n\n', 'data: [DONE]\n\n']),
+    );
+    await service.appendUserTurnAndAnalyze('q', {
+      page: 'explore',
+      promptType: 'summarize_trends',
+      chartData: {},
+    });
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    expect(body.metadata.dateRange).toBeUndefined();
   });
 
   it('resetConversation clears state', async () => {

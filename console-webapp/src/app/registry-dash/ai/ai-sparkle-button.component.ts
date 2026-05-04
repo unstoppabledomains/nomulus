@@ -21,7 +21,7 @@ import {
   AiAnalysisModalData,
 } from './ai-analysis-modal.component';
 import { AiPromptOption, AiAnalyzeRequest, AiModelChoice } from './ai-analysis.models';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, computeDateRange } from '../registry-dash.service';
 
 @Component({
   selector: 'app-ai-sparkle-button',
@@ -48,13 +48,14 @@ export class AiSparkleButtonComponent {
     const savedModel = (this.dashService.settingsCache()?.['aiModel']
       || localStorage.getItem('ai-model-preference')) as AiModelChoice | undefined;
 
+    const dateRange = range ? computeDateRange(range.lookbackHours) : undefined;
     const data: AiAnalysisModalData = {
       title: `${prompt.label} — ${this.pageLabel()}`,
       page: this.page,
       promptType: prompt.promptType,
       userMessage: prompt.userMessage,
       metadata: {
-        dateRange: { start: '', end: '' },
+        ...(dateRange ? { dateRange } : {}),
         granularity: range?.granularity,
         filteredTlds: tlds,
         filteredRegistrars: regIds,

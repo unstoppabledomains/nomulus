@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { catchError, debounceTime, EMPTY, filter, switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, computeDateRange } from '../registry-dash.service';
 import { ExploreService } from './explore.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
 import { ExploreChartComponent } from './explore-chart/explore-chart.component';
@@ -135,8 +135,9 @@ export class ExploreComponent implements OnInit {
 
   private buildMetadata(): AiAnalysisModalData['metadata'] {
     const range = this.dashService.selectedRangeConfig();
+    const dateRange = range ? computeDateRange(range.lookbackHours) : undefined;
     return {
-      dateRange: { start: '', end: '' },
+      ...(dateRange ? { dateRange } : {}),
       granularity: range?.granularity,
       filteredTlds: this.dashService.selectedTlds(),
       filteredRegistrars: this.dashService.selectedRegistrarIds(),
