@@ -122,7 +122,8 @@ class RegistryDashAiActionTest {
     String openQuote = "“";
     String closeQuote = "”";
     String emoji = "🚀"; // rocket
-    String multibyteText = "Anomaly " + openQuote + "spike" + closeQuote + " " + emDash + " " + emoji;
+    String multibyteText =
+        "Anomaly " + openQuote + "spike" + closeQuote + " " + emDash + " " + emoji;
 
     doAnswer(
             invocation -> {
