@@ -110,11 +110,15 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
     try {
-      PrintWriter writer = consoleApiParams.response().getWriter();
-      consoleApiParams.response().setHeader("Content-Type", "text/event-stream");
+      // Set Content-Type (with charset) before getWriter(): the writer's encoding is fixed at the
+      // moment getWriter() is called. Without this, Jetty defaults the writer to ISO-8859-1 and
+      // any non-Latin-1 characters from Anthropic (em-dash, smart quotes, emoji) get substituted
+      // with '?' on the way out.
+      consoleApiParams.response().setHeader("Content-Type", "text/event-stream; charset=utf-8");
       consoleApiParams.response().setHeader("Cache-Control", "no-cache");
       consoleApiParams.response().setHeader("Connection", "keep-alive");
       consoleApiParams.response().setStatus(200);
+      PrintWriter writer = consoleApiParams.response().getWriter();
 
       ImmutableList<String> toolsUsed =
           orchestrator.run(
