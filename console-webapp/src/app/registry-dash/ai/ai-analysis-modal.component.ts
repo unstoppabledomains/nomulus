@@ -76,6 +76,11 @@ export class AiAnalysisModalComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Clear any leftover transient state (e.g. an "interrupted" error from a
+    // prior session) so a freshly opened modal never renders stale errors.
+    // Conversation history is preserved here so a continued session can resume;
+    // full reset on close lives in the sparkle button's afterClosed handler.
+    this.aiService.resetTransientState();
     if (!this.aiService.hasActiveConversation()) {
       this.sendInitialRequest();
     }

@@ -38,16 +38,29 @@ export class AiAnalysisService {
   lastRequest = signal<LastRequestShape | null>(null);
   hasActiveConversation = computed(() => this.conversationHistory().length > 0);
 
-  resetConversation(): void {
-    this.conversationHistory.set([]);
-    this.lastRequest.set(null);
+  private abortController: AbortController | null = null;
+
+  resetTransientState(): void {
+    this.streaming.set(false);
     this.streamedText.set('');
     this.error.set(null);
     this.toolsInFlight.set([]);
     this.toolsUsed.set([]);
   }
 
+  resetConversation(): void {
+    this.abortController?.abort();
+    this.abortController = null;
+    this.conversationHistory.set([]);
+    this.lastRequest.set(null);
+    this.resetTransientState();
+  }
+
   async analyze(request: AiAnalyzeRequest): Promise<void> {
+    this.abortController?.abort();
+    const controller = new AbortController();
+    this.abortController = controller;
+
     this.streaming.set(true);
     this.streamedText.set('');
     this.error.set(null);
@@ -65,6 +78,7 @@ export class AiAnalysisService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
         credentials: 'same-origin',
+        signal: controller.signal,
       });
 
       if (response.status === 429) {
@@ -97,6 +111,11 @@ export class AiAnalysisService {
       let accumulated = '';
 
       while (true) {
+        // Defensive abort check: if the response is fully buffered before
+        // abort, reader.read() may resolve with cached chunks before the
+        // abort propagates — without this break, those chunks would still
+        // dispatch to the (now-stale) toolsUsed/streamedText signals.
+        if (controller.signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -152,10 +171,20 @@ export class AiAnalysisService {
         });
       }
     } catch (e) {
-      this.error.set('Response interrupted. Try again?');
+      // Aborted requests (modal close, reset, replaced by a newer request) are
+      // expected; don't surface them as user-visible interruptions.
+      if (!controller.signal.aborted) {
+        this.error.set('Response interrupted. Try again?');
+      }
     } finally {
-      this.streaming.set(false);
-      this.toolsInFlight.set([]);
+      // Only clear streaming UI state if this controller is still the active
+      // one — otherwise an aborted older call would clobber the newer call's
+      // freshly-set streaming/toolsInFlight when its finally runs.
+      if (this.abortController === controller) {
+        this.streaming.set(false);
+        this.toolsInFlight.set([]);
+        this.abortController = null;
+      }
     }
   }
 
