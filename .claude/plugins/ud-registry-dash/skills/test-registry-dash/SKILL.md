@@ -92,6 +92,23 @@ Print a summary table with one row per test: ✅ Passed / ⚠️ Partial / ❌ F
 
 If any new bugs are discovered, offer to log them as Linear tickets in the RSP project, Registry Dashboard milestone, with `bug` label.
 
+## Streaming endpoints
+
+The AI sparkle flow uses Server-Sent Events on `/console-api/registry-dash/ai/analyze`. The Angular client owns the response body and reads it with a single `ReadableStream` reader. Do NOT install fetch/XHR interceptors that call `response.clone()` (or otherwise tee the underlying stream) on this endpoint during a test run — `clone()` produces two parallel readers racing the same stream, and the client-side reader will throw mid-stream. The modal's catch path then renders "Response interrupted. Try again?" even though the server completed the SSE response cleanly.
+
+Safe ways to inspect a streaming response during a sweep:
+
+- Pass-through capture: if you must observe the bytes from JS, return a new `Response` whose body is a single `ReadableStream` you control, read each chunk once, forward it to the original consumer, and accumulate a copy for inspection. (`Response.body` is read-only on an existing response, so the interceptor must construct a replacement, not mutate in place.) One reader, no `clone()`, no `tee()`.
+- Out-of-band observation (preferred): Chrome DevTools (Network tab → EventStream / Response), the browser network log via Chrome MCP, or the test server logs. None of these touch the in-page response object, so they cannot perturb the stream.
+
+If the modal shows "Response interrupted. Try again?" during a `/test-registry-dash` run, assume tooling first, not the app. Before logging it as a bug:
+
+1. Check the Network tab / Chrome MCP network log — did `/console-api/registry-dash/ai/analyze` return 200 with a complete event stream?
+2. Check the test server logs — did the handler finish without error?
+3. Confirm no interceptor in the current session is calling `response.clone()` / `body.tee()` on `/console-api/registry-dash/ai/analyze`.
+
+Only if all three confirm a real failure is this an app bug worth filing.
+
 ## Constraints
 
 - Do not modify `metadata.json` outside of an open PR. Local edits to it are not authoritative.
