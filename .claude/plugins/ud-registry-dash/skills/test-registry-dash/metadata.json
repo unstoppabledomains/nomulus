@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "a48599093f87a473044394165d23935f9b6d7689",
-  "lastReviewedAt": "2026-05-04",
+  "lastReviewedCommit": "efc68696c013a3d13fa07368b9b2378dbe9f1323",
+  "lastReviewedAt": "2026-05-05",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "SRE-1958 (this PR) merged on top of master. Adds typed ToolResult envelope (OK / EMPTY_FOR_RANGE / INVALID_ARGS / OUT_OF_RANGE / PERMISSION_DENIED / INTERNAL_ERROR) for all 10 AI tools, modal status chips for non-OK statuses (status field on streamed tool_result SSE frame), query_registrar_activity registrarIds SQL filter fix, and assertTldAccess-before-OUT_OF_RANGE security ordering fix. Tests 65-67 cover this. Prior context: PR #134 SRE-1956 (modal interaction UX bundle: auto-scroll, queue, resize, input UX) on top of PR #133 SRE-1957 (Ask anything cold-start + universal sparkle on Financials sub-tabs), PR #132 SRE-1959 (dynamic Anthropic model catalog + complexity routing), PR #130 (admin AI prompt UX + date awareness + dateRange fix). Test ownership: PR #132 owns 38-41; PRs #130 + #134 own 42-62; PR #133 owns 63-64; this PR owns 65-67. Tests 1-2 also updated for SRE-1957 universal coverage."
+  "lastReviewerNote": "SRE-1958 (this PR) merged on top of master. Adds typed ToolResult envelope (OK / EMPTY_FOR_RANGE / INVALID_ARGS / OUT_OF_RANGE / PERMISSION_DENIED / INTERNAL_ERROR) for all 10 AI tools, modal status chips for non-OK statuses (status field on streamed tool_result SSE frame), query_registrar_activity registrarIds SQL filter fix, and assertTldAccess-before-OUT_OF_RANGE security ordering fix. Tests 65-67 cover this. Prior context: PR #134 SRE-1956 (modal interaction UX bundle), PR #133 SRE-1957 (Ask anything + universal sparkle), PR #132 SRE-1959 (dynamic Anthropic model catalog + complexity routing), PR #130 (admin AI prompt UX + date awareness). Test ownership: PR #132 owns 38-41; PRs #130 + #134 own 42-62; PR #133 owns 63-64; this PR owns 65-67."
 }

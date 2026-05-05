@@ -41,22 +41,16 @@ If Docker isn't running, the script exits with a clear message — surface it to
 
 Show the user the drift summary, then offer three options:
 
-**a) Recommended: Update the test plan in a new worktree, PR to master.**
-- Ask the user: "What branch should the test-plan update branch off?"
-  - Default suggestion: `master` (clean baseline, use when not actively developing)
-  - Alternative: current branch (use when feature work is what's driving the test update)
-- Use the `superpowers:using-git-worktrees` skill to create the worktree.
-- Inside the worktree: read the diff for watched paths, propose updates to `test-plan.md`, propose updates to `metadata.json` (advance `lastReviewedCommit` to current HEAD, set `lastReviewer` to the git user).
-- Commit and open a PR against `master`. Title prefix `chore(registry-dash):`.
-- After PR is opened: stop. Tell the user "merge the PR, then re-run /test-registry-dash on a clean branch."
+**a) Update the test plan now.** Ask the user where to make the update:
+- **In the current branch** — bundle the test-plan update into the active feature branch. Use this when the drifting commits are part of the work the user is currently developing/reviewing; the test-plan changes ride along in the same PR.
+- **In a separate branch / worktree** — create a new branch (or use the `superpowers:using-git-worktrees` skill) off `master`, commit the test-plan update there, and open a standalone `chore(registry-dash):` PR against `master`. Use this when the drifting commits already merged and the user just needs to bump the metadata.
+- **Defer — handle separately later** — record the drift in the report and proceed to Phase 2 with a warning. Use this when the user wants to deal with the test-plan update on their own time.
 
-**b) Skip the update — proceed anyway.**
-- Require the user to type the **exact** phrase `proceed-without-test-updates` in their next message. Anything else (even close paraphrases) means abort.
-- If they type it correctly: log a warning into the test report ("⚠️ Tests run against drifted code; results may not reflect the current code state."), and continue to Phase 2.
-- This path exists for emergencies. Discourage it.
+In either of the first two paths, read the diff for watched paths, propose updates to `test-plan.md`, propose updates to `metadata.json` (advance `lastReviewedCommit` to current HEAD, set `lastReviewer` to the git user). Commit; if a standalone PR, open it against `master` with title prefix `chore(registry-dash):`. Then continue to Phase 2 (or stop, depending on how disruptive the test-plan changes were — ask the user).
 
-**c) Cancel.**
-- Stop and exit cleanly.
+**b) Skip the update — proceed anyway.** Confirm with the user (a normal yes/confirm is enough; no verbatim phrase). On confirmation: log a warning into the test report ("⚠️ Tests run against drifted code; results may not reflect the current code state."), and continue to Phase 2.
+
+**c) Cancel.** Stop and exit cleanly.
 
 ### Phase 2 — Environment selection
 
@@ -75,10 +69,41 @@ The default test-server `Fixture.java` data covers tests 1-6, 15: 2 TLDs (`examp
 
 For tests that need richer data — Test 14 (Pricing analysis) needs at least one `RegistrarPricing` row, Test 7-8 are more meaningful with multi-TLD revenue history — run `bash .claude/plugins/ud-registry-dash/skills/test-registry-dash/helpers/seed-test-data.sh` after the test server is up. The script is idempotent. If a richer dataset is available locally (e.g. `local-test-data-setup.sql` from a prior session), prefer that.
 
+### Phase 2c — Tier filter
+
+Each test in `test-plan.md` is tagged `**Tier:** smoke` or `**Tier:** full`. By default, the skill runs all tests. If invoked with `--tier=smoke`, run only smoke-tagged tests; with `--tier=full`, run only full-tagged tests; with no flag (or `--tier=all`), run everything.
+
+Smoke tier targets ~15–25 min on alpha and covers DOM-only checks (sparkle visibility, prompt menus, API smoke endpoints, admin-panel render, modal chrome / resize / localStorage). Full tier includes AI streaming, tool use, conversation, queue, and is the canonical pre-release sweep (~2–3 hours on alpha).
+
+When the skill is invoked, parse any `--tier=<value>` argument from the user's message before Phase 3. Carry the resolved tier filter into Phase 3 and apply it when reading `test-plan.md`.
+
+### Phase 2d — Capability detection
+
+Before kicking off Phase 3, probe the chosen environment for capabilities that gate certain tests. Currently:
+
+- **admin-page**: navigate to `/#/registry-dash/admin` and check whether the URL stays on `admin` or redirects to `/overview` (the route guard rejects non-admin users by silently redirecting). Equivalent JS check from any registry-dash page:
+
+  ```js
+  (async () => {
+    const before = location.hash;
+    location.hash = '#/registry-dash/admin';
+    await new Promise(r => setTimeout(r, 1500));
+    const ok = location.hash.includes('/admin');
+    if (!ok) location.hash = before;
+    return ok;
+  })()
+  ```
+
+  Returns `true` if the admin page is visible to this user, `false` otherwise.
+
+When a capability check fails, mark every test tagged `**Requires:** <capability>` in the test plan as `🚫 Skipped — <capability> unavailable in this environment`. This is distinct from `⏭️ Skipped` (out-of-tier) and from `❌ Failed`.
+
+Add new capabilities by repeating the same pattern: tag tests with `**Requires:** <name>`, and add a probe + skip rule here.
+
 ### Phase 3 — Test execution
 
 1. Read `test-plan.md`.
-2. Use `TaskCreate` to create one task per numbered test in the plan.
+2. Use `TaskCreate` to create one task per numbered test in the plan **whose `**Tier:**` line matches the active tier filter AND whose `**Requires:**` capabilities are all available** (per Phase 2d). Tests outside the active tier are skipped silently — do not create tasks for them and do not list them as `⏭️ Skipped` in the report; the tier filter is the explicit user choice. Tests skipped by capability are not surfaced as TaskCreate items either, but they DO appear in the Phase 4 report under a `🚫 Skipped (env)` row so the user knows what was deferred.
 3. Open Chrome MCP, navigate to the chosen environment, log in if needed (the user's session should already be valid).
 4. Execute each test in sequence. For each:
    - Mark `in_progress` via `TaskUpdate`.
@@ -88,7 +113,7 @@ For tests that need richer data — Test 14 (Pricing analysis) needs at least on
 
 ### Phase 4 — Reporting
 
-Print a summary table with one row per test: ✅ Passed / ⚠️ Partial / ❌ Failed / ⏭️ Skipped. For any non-pass, include a one-line root cause and a file path or URL pointer.
+Print a summary table with one row per test using one of these states: ✅ Passed / ⚠️ Partial / ❌ Failed / ⏭️ Skipped (out-of-tier) / 🚫 Skipped (env-gated). For any non-pass, include a one-line root cause and a file path or URL pointer.
 
 If any new bugs are discovered, offer to log them as Linear tickets in the RSP project, Registry Dashboard milestone, with `bug` label.
 
@@ -113,7 +138,6 @@ Only if all three confirm a real failure is this an app bug worth filing.
 
 - Do not modify `metadata.json` outside of an open PR. Local edits to it are not authoritative.
 - Do not run tests against production under any circumstance.
-- The override phrase `proceed-without-test-updates` must match **verbatim**. Do not accept paraphrases or partial matches.
 - Browser automation requires Chrome MCP tools (`mcp__claude-in-chrome__*`); load them via ToolSearch before driving the browser.
 
 ## When NOT to use
