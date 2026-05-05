@@ -448,8 +448,6 @@
 - No data from a TLD outside the user's access scope ever appears in the modal.
 - Final text is a clear "I don't have access" rather than a stack trace.
 
-
-
 ---
 
 ## Test 21: Add to AI Chat from Explore
@@ -752,7 +750,105 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 - (Optional sanity) Repeat against an environment that does NOT have PR #128 — e.g. a stale alpha pre-deploy — and confirm the same prompt produces `?` substitutions there. This is the regression baseline.
 ---
 
-## Test 38: Ask-anything cold-start entry (SRE-1957)
+## Test 38: Dynamic Model Catalog — chat modal reads from server
+
+**Goal:** Verify the chat modal's model selector is driven by the live `AnthropicModelCatalog` served at `GET /console-api/registry-dash/ai/analyze`.
+
+### Steps:
+1. Open the analysis modal via any sparkle.
+2. With DevTools - Network open, capture the request to `GET /console-api/registry-dash/ai/analyze` issued on modal open.
+3. Response: `{ catalog: { opus: [...], sonnet: [...], haiku: [...] }, fetchedAt: "<ISO-8601>" }`. Each entry has `id` (e.g. `claude-sonnet-4-5-20250929`) and optional `displayName` / `createdAt`.
+4. Verify the model toggle group renders a tab for every family that has at least one entry — and only those.
+5. Click each visible tab; selection persists to localStorage + per-user settings.
+
+### Edge cases:
+- Family with no entries: tab in the chat modal must be hidden (not greyed out, not present).
+- Stale saved selection: if the saved family is no longer in the catalog, modal falls back to the first available family.
+
+### Expected:
+- Tabs match the families present in the GET response.
+- POST `/console-api/registry-dash/ai/analyze` still sends family shorthand (`haiku`/`sonnet`/`opus`) in `request.model` — server-side resolution unchanged.
+
+---
+
+## Test 39: Admin AI Models panel
+
+**Goal:** Verify the admin page renders the live model catalog and the fetched-at timestamp.
+
+### Prerequisites:
+- Logged in as an FTE/admin user (admin GET requires `MANAGE_COST_BASIS`).
+
+### Steps:
+1. Navigate to **Admin** (`/#/registry-dash/admin`).
+2. Verify a card titled **AI Models** appears near the top (above "My View").
+3. Subtitle: "Top 3 GA models per family fetched from Anthropic. Auto-refreshed lazily on read; click below to force-refresh now." followed by `Fetched: <ISO-8601>`.
+4. Body shows three columns labeled **Opus**, **Sonnet**, **Haiku**, each listing up to 3 entries. Each entry shows the model id in monospace; if `displayName` is present, it renders below in a smaller, muted style.
+5. **Refresh now** button below the grid is enabled by default.
+
+### Expected:
+- Catalog matches `GET /console-api/registry-dash/admin` (`aiModelCatalog` + `aiModelCatalogFetchedAt`).
+- Empty families render as italic "none".
+
+---
+
+## Test 40: Force-refresh AI model catalog
+
+**Goal:** Verify the **Refresh now** button re-fetches `/v1/models` from Anthropic and updates `fetchedAt`.
+
+### Steps:
+1. On the **Admin** page, note the current `Fetched:` value.
+2. Click **Refresh now**. Button label briefly changes to "Refreshing…" and is disabled in flight.
+3. Network tab shows a POST to `/console-api/registry-dash/admin` with body `{"action":"refreshAiModels"}` returning 200 with the new catalog payload.
+4. Within ~1-2 seconds the button returns to "Refresh now" and `Fetched:` advances.
+5. Open the chat modal — selector reflects any net-new model in the appropriate family.
+
+### Edge cases:
+- Anthropic 5xx: catalog falls back to a hardcoded seed and the admin request still returns 200; `fetchedAt` advances. Server log: `Anthropic model catalog refresh failed; falling back to seed.`.
+
+### Expected:
+- `Fetched:` timestamp strictly increases across clicks.
+- Other app instances/tabs pick up the change at their own next TTL expiry (not immediately) — cache is per-instance.
+
+---
+
+## Test 41: Complexity-based routing for background turns
+
+**Goal:** Confirm `AiOrchestrator` runs turn 0 on the user-selected model and routes post-tool synthesis turns to a cheaper model based on the max complexity of tools just executed.
+
+### Prerequisites:
+- Local-dev or alpha (so server logs are accessible).
+- `ai.complexityRoutingEnabled: true` (default).
+
+### Steps:
+1. On **Pricing**, open the AI modal.
+2. Pick **Opus** in the model selector.
+3. Ask: `What are our pricing rules for tld example?` — exercises `get_pricing_rules` (EASY).
+4. Tail the server log for `AiOrchestrator` lines.
+5. Repeat MEDIUM: on **Financials > Registry Revenue**, ask `Break down revenue for tld example over the last 6 months by operation` (`query_revenue_breakdown`, MEDIUM).
+6. Repeat COMPLEX on **Domain Activity**: ask `What is our average renewal price by registrar over the last quarter for tld example?` (`run_explore_query`, COMPLEX).
+
+### Expected (per server log):
+- Two `AI turn=...` log lines from `AiOrchestrator` per request:
+  - `turn=0` always logs `model=claude-opus-...` (user-selected) regardless of tool.
+  - `turn=1` model depends on prior turn's max complexity:
+    - EASY -> `model=claude-haiku-...`
+    - MEDIUM -> `model=claude-sonnet-...`
+    - COMPLEX -> `model=claude-opus-...` (no downgrade)
+- Each turn includes `inputTokens=N, outputTokens=N`.
+- The `RegistryDashAiAction` summary line logs `modelShorthand=opus` (user's selection), unchanged by routing.
+
+### Rollback verification:
+- Set `ai.complexityRoutingEnabled: false` in the local-stack config override and restart.
+- Repeat step 3. Both turn 0 and turn 1 should log `model=claude-opus-...`. Set the flag back to `true` afterwards.
+
+### Tools complexity reference (as of this PR):
+- **EASY** — `get_pricing_rules`, `get_tld_config`, `get_registrar_details`.
+- **MEDIUM** (default) — `query_transfers`, `query_registrar_activity`, `query_domain_details`, `query_revenue_breakdown`, `query_renewal_rates`, `query_expiration_curve`.
+- **COMPLEX** — `run_explore_query`.
+
+---
+
+## Test 42: Ask-anything cold-start entry (SRE-1957)
 
 **Goal:** Verify the new "Ask anything…" entry opens an idle modal with no auto-fired request, and that submitting the first turn from the follow-up input fires `/console-api/registry-dash/ai/analyze` with `promptType: "ask_anything"`, the same chart-context payload a preset would have sent, and a single-message `conversationHistory` containing the user's typed text.
 
@@ -765,7 +861,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 3. Click the sparkle button on the first chart. The menu opens with four entries; the last entry is `chat` Ask anything…
 4. Click "Ask anything…". The modal opens.
 5. Confirm the modal is **idle** — no streaming progress bar, no assistant-bubble being built, no `Response interrupted` error. The conversation area is empty. The follow-up input at the bottom is enabled with placeholder "Ask anything about this chart…" (note: NOT "Ask a follow-up question…").
-6. Confirm DevTools → Network shows **no** request to `/console-api/registry-dash/ai/analyze` was fired on modal open.
+6. Confirm DevTools → Network shows **no** POST request to `/console-api/registry-dash/ai/analyze` was fired on modal open. (A `GET /console-api/registry-dash/ai/analyze` for the model catalog — Test 38 — is expected and not a regression.)
 7. Type `What changed last week?` into the follow-up input and press Enter (or click the send button).
 8. Confirm a single POST to `/console-api/registry-dash/ai/analyze` fires.
 9. Inspect the request body:
@@ -778,13 +874,13 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 12. Click **Start new chat** in the modal header. Confirm the modal returns to the idle cold-start state — no auto-fired request, follow-up input ready to type — because the original entry was cold-start (empty seed).
 
 ### Expected:
-- Step 6: zero `analyze` requests on modal open for the cold-start path. Preset path (regression check) still fires immediately on open.
+- Step 6: zero POST `analyze` requests on modal open for the cold-start path. Preset path (regression check) still fires immediately on open.
 - Step 9: payload shape and chart-context fields are identical to a preset request — only `promptType` and the seed user turn differ.
 - Step 12: Start new chat does not silently send an empty-prompt request for cold-start entries.
 
 ---
 
-## Test 39: Universal sparkle coverage on Financials sub-tabs (SRE-1957 drift guard)
+## Test 43: Universal sparkle coverage on Financials sub-tabs (SRE-1957 drift guard)
 
 **Goal:** Lock in SRE-1957's universal-coverage promise so future refactors don't silently strip the new ✨ buttons. Each Financials sub-tab is asserted independently with the page-type and prompt menu it should report at the analyze endpoint.
 
@@ -801,7 +897,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 7. Close the modal.
 8. Switch to **Financials → Effective Fees**. Click the sparkle next to "Effective Fees by Registrar" → click "Summarize trends".
 9. Inspect the request: `page` is `pricing`, `promptType` is `summarize_trends`. `chartData` is the filtered effective-fees row list.
-10. For each of the three sparkles above, also click "Ask anything…" and confirm it opens the cold-start modal (no auto-fired request) — these sparkles use the same shared component so the behavior must be uniform.
+10. For each of the three sparkles above, also click "Ask anything…" and confirm it opens the cold-start modal (no auto-fired POST `analyze` request) — these sparkles use the same shared component so the behavior must be uniform.
 
 ### Expected:
 - All three SRE-1957 sparkles fire requests with the page types declared above.

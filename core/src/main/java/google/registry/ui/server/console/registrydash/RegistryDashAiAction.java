@@ -28,6 +28,7 @@ import google.registry.ai.AiAnalyzeRequest;
 import google.registry.ai.AiOrchestrator;
 import google.registry.ai.AiRateLimiter;
 import google.registry.ai.AnthropicClient;
+import google.registry.ai.AnthropicModelCatalog;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.ConsolePermission;
@@ -44,13 +45,15 @@ import google.registry.util.RegistryEnvironment;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.joda.time.DateTimeZone;
 
 @Action(
     service = Service.CONSOLE,
     path = RegistryDashAiAction.PATH,
-    method = Action.Method.POST,
+    method = {Action.Method.GET, Action.Method.POST},
     auth = Auth.AUTH_PUBLIC_LOGGED_IN)
 public class RegistryDashAiAction extends ConsoleApiAction {
 
@@ -65,6 +68,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
   private final RegistryConfigSettings.Prompts promptConfig;
+  private final AnthropicModelCatalog modelCatalog;
   private final Clock clock;
 
   @Inject
@@ -74,6 +78,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       AiOrchestrator orchestrator,
       AiRateLimiter rateLimiter,
       @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig,
+      AnthropicModelCatalog modelCatalog,
       Clock clock) {
     super(consoleApiParams);
     this.payload = payload;
@@ -81,7 +86,21 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
     this.promptConfig = promptConfig;
+    this.modelCatalog = modelCatalog;
     this.clock = clock;
+  }
+
+  @Override
+  protected void getHandler(User user) {
+    if (!user.getUserRoles().hasGlobalPermission(ConsolePermission.VIEW_DASHBOARD_OVERVIEW)) {
+      consoleApiParams.response().setStatus(SC_FORBIDDEN);
+      return;
+    }
+    Map<String, Object> response = new HashMap<>();
+    response.put("catalog", modelCatalog.currentCatalog());
+    response.put("fetchedAt", modelCatalog.lastFetchedAt().toString());
+    consoleApiParams.response().setPayload(gson.toJson(response));
+    consoleApiParams.response().setStatus(200);
   }
 
   @Override
@@ -114,7 +133,6 @@ public class RegistryDashAiAction extends ConsoleApiAction {
 
     String systemPrompt = buildSystemPrompt(request, user);
     String model = request.model;
-    String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
     try {
       // Set Content-Type (with charset) before getWriter(): the writer's encoding is fixed at the
@@ -160,12 +178,12 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       writer.flush();
 
       logger.atInfo().log(
-          "AI analysis request: user=%s, page=%s, promptType=%s, model=%s,"
+          "AI analysis request: user=%s, page=%s, promptType=%s, modelShorthand=%s,"
               + " promptVersion=%s, historySize=%d, toolsUsed=%s",
           userEmail,
           request.page,
           request.promptType,
-          resolvedModel,
+          model,
           promptConfig.version,
           request.conversationHistory != null ? request.conversationHistory.size() : 0,
           toolsUsed);

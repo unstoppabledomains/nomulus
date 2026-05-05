@@ -53,38 +53,33 @@ public class AnthropicClient {
 
   private static final String ANTHROPIC_VERSION = "2023-06-01";
   private static final int MAX_TOKENS = 4096;
-  private static final Map<String, String> MODEL_MAP =
-      Map.of(
-          "haiku", "claude-haiku-4-5-20251001",
-          "sonnet", "claude-sonnet-4-5-20250929",
-          "opus", "claude-opus-4-6");
   private static final Gson GSON = new Gson();
 
   private final OkHttpClient httpClient;
   private final String baseUrl;
   private final String apiKey;
-  private final String defaultModel;
 
   @Inject
   public AnthropicClient(
       @Named("anthropicHttpClient") OkHttpClient httpClient,
       @Named("anthropicApiBaseUrl") String baseUrl,
-      @Named("anthropicApiKey") String apiKey,
-      @Named("anthropicDefaultModel") String defaultModel) {
+      @Named("anthropicApiKey") String apiKey) {
     this.httpClient = httpClient;
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     this.apiKey = apiKey;
-    this.defaultModel = defaultModel;
   }
 
   /**
    * Streams plain text deltas (no tools). Equivalent to {@link #streamMessageWithTools} called
    * with an empty tool list and a callback that only consumes {@link TextDelta}.
+   *
+   * @param model fully-qualified Anthropic model id (e.g. {@code claude-sonnet-4-5-20250929}).
+   *     Resolve shorthand via {@link AnthropicModelCatalog#resolveModelId} before calling.
    */
   public void streamMessage(
       String systemPrompt,
       List<AiAnalyzeRequest.ConversationMessage> conversationHistory,
-      String modelOverride,
+      String model,
       Consumer<String> onChunk)
       throws IOException {
     JsonArray messages = new JsonArray();
@@ -99,7 +94,7 @@ public class AnthropicClient {
     streamMessageInternal(
         systemPrompt,
         messages,
-        modelOverride,
+        model,
         new JsonArray(),
         event -> {
           if (event instanceof TextDelta td) {
@@ -112,26 +107,26 @@ public class AnthropicClient {
    * Tool-use-aware streaming. Caller supplies the full conversation as a {@link JsonArray} of
    * Anthropic message objects (so the orchestrator can append assistant tool_use blocks and user
    * tool_result blocks across turns).
+   *
+   * @param model fully-qualified Anthropic model id; see {@link #streamMessage}.
    */
   public StreamResult streamMessageWithTools(
       String systemPrompt,
       JsonArray messages,
-      String modelOverride,
+      String model,
       JsonArray tools,
       Consumer<StreamEvent> sink)
       throws IOException {
-    return streamMessageInternal(systemPrompt, messages, modelOverride, tools, sink);
+    return streamMessageInternal(systemPrompt, messages, model, tools, sink);
   }
 
   private StreamResult streamMessageInternal(
       String systemPrompt,
       JsonArray messages,
-      String modelOverride,
+      String model,
       JsonArray tools,
       Consumer<StreamEvent> sink)
       throws IOException {
-    String model = resolveModelId(modelOverride != null ? modelOverride : defaultModel);
-
     JsonObject body = new JsonObject();
     body.addProperty("model", model);
     body.addProperty("max_tokens", MAX_TOKENS);
@@ -166,6 +161,8 @@ public class AnthropicClient {
       // arrive as input_json_delta accumulations).
       Map<Integer, BlockBuilder> blocks = new HashMap<>();
       String stopReason = null;
+      int inputTokens = 0;
+      int outputTokens = 0;
 
       try (BufferedReader reader =
           new BufferedReader(
@@ -228,6 +225,20 @@ public class AnthropicClient {
                   sink.accept(new ToolUseBlock(bb.toolUseId, bb.toolName, input));
                 }
               }
+              case "message_start" -> {
+                if (event.has("message") && event.get("message").isJsonObject()) {
+                  JsonObject msg = event.getAsJsonObject("message");
+                  if (msg.has("usage") && msg.get("usage").isJsonObject()) {
+                    JsonObject usage = msg.getAsJsonObject("usage");
+                    if (usage.has("input_tokens") && !usage.get("input_tokens").isJsonNull()) {
+                      inputTokens = usage.get("input_tokens").getAsInt();
+                    }
+                    if (usage.has("output_tokens") && !usage.get("output_tokens").isJsonNull()) {
+                      outputTokens = usage.get("output_tokens").getAsInt();
+                    }
+                  }
+                }
+              }
               case "message_delta" -> {
                 if (event.has("delta")) {
                   JsonObject d = event.getAsJsonObject("delta");
@@ -235,10 +246,16 @@ public class AnthropicClient {
                     stopReason = d.get("stop_reason").getAsString();
                   }
                 }
+                if (event.has("usage") && event.get("usage").isJsonObject()) {
+                  JsonObject usage = event.getAsJsonObject("usage");
+                  if (usage.has("output_tokens") && !usage.get("output_tokens").isJsonNull()) {
+                    outputTokens = usage.get("output_tokens").getAsInt();
+                  }
+                }
               }
               case "message_stop" -> sink.accept(new MessageStop(stopReason));
               default -> {
-                // ignore (ping, message_start, etc.)
+                // ignore (ping, etc.)
               }
             }
           } catch (Exception e) {
@@ -246,12 +263,8 @@ public class AnthropicClient {
           }
         }
       }
-      return new StreamResult(stopReason, blocks);
+      return new StreamResult(stopReason, blocks, inputTokens, outputTokens);
     }
-  }
-
-  public static String resolveModelId(String shortName) {
-    return MODEL_MAP.getOrDefault(shortName, MODEL_MAP.get("sonnet"));
   }
 
   // -- Stream events (tagged union) -------------------------------------------------------------
@@ -266,7 +279,8 @@ public class AnthropicClient {
   public record MessageStop(String stopReason) implements StreamEvent {}
 
   /** Result handed back from a single Anthropic call. */
-  public record StreamResult(String stopReason, Map<Integer, BlockBuilder> blocks) {
+  public record StreamResult(
+      String stopReason, Map<Integer, BlockBuilder> blocks, int inputTokens, int outputTokens) {
 
     /**
      * Reconstructs the assistant turn's content blocks for appending to the conversation history

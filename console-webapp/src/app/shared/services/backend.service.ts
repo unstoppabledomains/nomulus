@@ -34,6 +34,7 @@ import {
   EffectiveFeeEntry,
   FilterOptionsData,
 } from 'src/app/registry-dash/registry-dash.service';
+import { AiModelCatalogResponse } from 'src/app/registry-dash/ai/ai-analysis.models';
 import { User } from 'src/app/users/users.service';
 import {
   Registrar,
@@ -417,6 +418,12 @@ export class BackendService {
 
   postRegistryDashAdmin(payload: unknown): Observable<unknown> {
     return this.http.post('/console-api/registry-dash/admin', payload);
+  }
+
+  getRegistryDashAiCatalog(): Observable<AiModelCatalogResponse> {
+    return this.http
+      .get<AiModelCatalogResponse>('/console-api/registry-dash/ai/analyze')
+      .pipe(catchError((err) => this.errorCatcher<AiModelCatalogResponse>(err)));
   }
 
   // --- Registry Dashboard Settings ---

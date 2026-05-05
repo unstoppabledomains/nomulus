@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "61ad2fdeeda4a0866e5f4186a24ea03869efcc94",
+  "lastReviewedCommit": "448d3213bdeb366687cf734a8e315ae0da0fd3d9",
   "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "SRE-1957 entry-point coverage: \"Ask anything\u2026\" cold-start entry on every preset menu, sparkle buttons added on Financials Overview / Default Fees by TLD / Effective Fees sub-tabs. Updates Test 1 (visibility on new Financials sub-tabs), Test 2 (4-item menu with cold-start last), and adds Test 38 (cold-start request payload) and Test 39 (universal coverage drift guard)."
+  "lastReviewerNote": "SRE-1957 entry-point coverage (\"Ask anything\u2026\" cold-start + universal sparkle on Financials sub-tabs) merged with SRE-1959 dynamic Anthropic model catalog (admin panel + force-refresh + complexity-based routing). Adds Tests 38\u201341 (SRE-1959) and Tests 42\u201343 (SRE-1957). Updates Test 1 (visibility on new Financials sub-tabs) and Test 2 (4-item menu with cold-start last)."
 }
