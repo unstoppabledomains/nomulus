@@ -125,17 +125,20 @@ public class QueryTransfersTool implements AiTool {
     } catch (Exception e) {
       return ToolResult.invalidArgs("Invalid date: " + e.getMessage());
     }
-    if (parsedStart.isAfter(now)) {
-      return ToolResult.outOfRange(
-          "requested " + startDate + ".." + endDate + "; latest data: " + now);
-    }
-
+    // Permission check must run BEFORE OUT_OF_RANGE so an unmapped user cannot probe
+    // whether a TLD exists by sending a future date and observing OUT_OF_RANGE vs
+    // PERMISSION_DENIED. See SRE-1958 PR review.
     try {
       ToolJpaHelper.assertTldAccess(user, tld);
     } catch (AiToolException e) {
       return ToolResult.permissionDenied(e.getMessage());
     }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
+
+    if (parsedStart.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
 
     ExploreQueryDescriptor desc =
         ToolJpaHelper.descriptor(

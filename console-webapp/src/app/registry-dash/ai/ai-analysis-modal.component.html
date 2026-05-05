@@ -61,7 +61,10 @@
                [class.tool-status-chip--error]="chip.tone === 'error'"
                [matTooltip]="t.diagnostic || ''"
                [attr.data-tool]="t.tool"
-               [attr.data-status]="t.status">
+               [attr.data-status]="t.status"
+               tabindex="0"
+               role="status"
+               [attr.aria-label]="t.label + ' — ' + chip.text + (t.diagnostic ? ': ' + t.diagnostic : '')">
             {{ t.label }} — {{ chip.text }}
           </div>
         </ng-container>

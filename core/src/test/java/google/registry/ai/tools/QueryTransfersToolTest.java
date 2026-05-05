@@ -109,6 +109,23 @@ class QueryTransfersToolTest extends AiToolTestBase {
     assertThat(result.diagnostic()).contains("2027-03");
   }
 
+  /**
+   * Regression test (SRE-1958 review): the permission check must run BEFORE the
+   * future-date OUT_OF_RANGE fast path, so an unmapped user cannot probe whether a TLD
+   * exists by sending a future date and observing OUT_OF_RANGE vs PERMISSION_DENIED.
+   */
+  @Test
+  void execute_unauthorizedTldFutureRange_returnsPermissionDeniedNotOutOfRange() {
+    createTld("other-tld");
+    User user = createRoUser("ro@example.com");
+    mapUserToTld("ro@example.com", "other-tld");
+    JsonObject argsJson = baseArgs();
+    argsJson.addProperty("start_date", "2027-03-01");
+    argsJson.addProperty("end_date", "2027-03-31");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
+  }
+
   @Test
   void execute_emptyForRange_returnsEmptyStatusWithDiagnostic() {
     User user = createFteUser("admin@example.com");

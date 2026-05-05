@@ -109,6 +109,17 @@ public class QueryRegistrarActivityTool implements AiTool {
     String startDate = optionalString(args, "start_date");
     String endDate = optionalString(args, "end_date");
 
+    // Permission check must run BEFORE OUT_OF_RANGE so an unmapped user cannot probe
+    // whether a TLD exists by sending a future date. See SRE-1958 PR review.
+    if (tld != null) {
+      try {
+        ToolJpaHelper.assertTldAccess(user, tld);
+      } catch (AiToolException e) {
+        return ToolResult.permissionDenied(e.getMessage());
+      }
+    }
+    ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
+
     Instant now = clock.instant();
     if (startDate != null) {
       try {
@@ -129,15 +140,6 @@ public class QueryRegistrarActivityTool implements AiTool {
         return ToolResult.invalidArgs("Invalid end_date: " + e.getMessage());
       }
     }
-
-    if (tld != null) {
-      try {
-        ToolJpaHelper.assertTldAccess(user, tld);
-      } catch (AiToolException e) {
-        return ToolResult.permissionDenied(e.getMessage());
-      }
-    }
-    ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     List<String> dimensions = new ArrayList<>();
     dimensions.add("period");

@@ -140,9 +140,12 @@ public class QueryExpirationCurveTool implements AiTool {
     if (rowCount > 0) {
       return ToolResult.ok(payload);
     }
+    // Scope the diagnostic probe to the requested TLD so a non-admin who hits an
+    // EMPTY_FOR_RANGE path doesn't see registry-wide min/max (cross-tenant leak).
+    // SRE-1958 PR review.
     Optional<ToolJpaHelper.DataExtent> extent =
         ToolJpaHelper.probeDataExtent(
-            "Domain", "registration_expiration_time", null, ImmutableSet.of());
+            "Domain", "registration_expiration_time", "tld", ImmutableSet.of(tld));
     StringBuilder diag =
         new StringBuilder("no expiring domains for tld=").append(tld);
     diag.append(" between ").append(today).append(" and ").append(endDate);

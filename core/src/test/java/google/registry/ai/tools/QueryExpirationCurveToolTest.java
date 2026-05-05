@@ -17,6 +17,7 @@ package google.registry.ai.tools;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
+import static google.registry.testing.DatabaseHelper.persistActiveDomain;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
 
@@ -125,6 +126,32 @@ class QueryExpirationCurveToolTest {
     // Above max: 120 → clamped to 60.
     ToolResult high = tool.executeWithStatus(args("tld", 120), user);
     assertThat(high.status()).isAnyOf(ToolResult.Status.OK, ToolResult.Status.EMPTY_FOR_RANGE);
+  }
+
+  /**
+   * SRE-1958 review fix: when the requested TLD has no expiring domains in range, the
+   * EMPTY_FOR_RANGE diagnostic must be scoped to that TLD and NOT leak the registry-wide
+   * min/max from other tenants' Domain rows.
+   */
+  @Test
+  void execute_emptyForRange_diagnosticIsTldScoped() {
+    User user = createFteUser("admin@example.com");
+    // Create a second TLD with a Domain that has a recognisable expiration time. If the
+    // probe is unscoped, the diagnostic will contain its expiration extent. If scoped to
+    // "tld", the probe will return Optional.empty() and the diagnostic will be terse.
+    createTld("other-tld");
+    persistNewRegistrar("registrar2");
+    allowRegistrarAccess("registrar2", "other-tld");
+    persistActiveDomain(
+        "leak.other-tld",
+        DateTime.parse("2020-01-01T00:00:00Z"),
+        DateTime.parse("2099-12-31T00:00:00Z"));
+
+    ToolResult result = tool.executeWithStatus(args("tld", 12), user);
+
+    assertStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    // The unscoped probe would have surfaced the 2099 expiration from the other tenant.
+    assertThat(result.diagnostic()).doesNotContain("2099");
   }
 
   @Test

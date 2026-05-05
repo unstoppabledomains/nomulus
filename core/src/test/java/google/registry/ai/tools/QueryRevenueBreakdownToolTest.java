@@ -189,4 +189,19 @@ class QueryRevenueBreakdownToolTest {
 
     assertStatus(result, ToolResult.Status.OUT_OF_RANGE);
   }
+
+  /**
+   * Regression test (SRE-1958 review): permission check must run BEFORE the future-date
+   * OUT_OF_RANGE fast path, so an unmapped user cannot probe TLD existence by sending a
+   * future date and observing OUT_OF_RANGE vs PERMISSION_DENIED.
+   */
+  @Test
+  void execute_unauthorizedTldFutureRange_returnsPermissionDeniedNotOutOfRange() {
+    User user = createNonAdminUser("stranger@example.com");
+
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2027-01-01", "2027-03-31", "operation"), user);
+
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+  }
 }
