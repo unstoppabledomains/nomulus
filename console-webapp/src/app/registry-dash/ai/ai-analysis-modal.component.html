@@ -30,9 +30,11 @@
     </button>
     <div *ngIf="showAdvanced()" class="advanced-content">
       <textarea
-        [(ngModel)]="editableSystemPrompt" name="systemPrompt"
+        [ngModel]="editableSystemPrompt"
+        (ngModelChange)="onSystemPromptChange($event)"
+        name="systemPrompt"
         class="system-prompt-editor"
-        placeholder="System prompt (editable in dev mode)"
+        placeholder="System prompt (editable in dev mode; saved drafts persist across reloads for FTE)"
         rows="6"></textarea>
     </div>
   </div>

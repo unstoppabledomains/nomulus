@@ -22,7 +22,8 @@ import {
 } from './ai-analysis-modal.component';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiPromptOption, AiAnalyzeRequest, AiModelChoice } from './ai-analysis.models';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, computeDateRange } from '../registry-dash.service';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({
   selector: 'app-ai-sparkle-button',
@@ -35,13 +36,25 @@ export class AiSparkleButtonComponent {
   @Input({ required: true }) page!: AiAnalyzeRequest['page'];
   @Input({ required: true }) prompts!: AiPromptOption[];
   @Input({ required: true }) chartData!: any;
-  @Input() isAdmin = false;
+  /** Optional override; defaults to UserDataService.userData()?.isAdmin. */
+  @Input() isAdmin?: boolean;
+  /**
+   * Whether the host page has a time-range filter that meaningfully scopes
+   * `chartData`. Pages without a time filter (Pricing, Portfolio) should
+   * pass false so we don't fabricate a date range from the global default.
+   */
+  @Input() includeDateRange = true;
 
   constructor(
     private dialog: MatDialog,
     private dashService: RegistryDashService,
     private aiService: AiAnalysisService,
+    private userDataService: UserDataService,
   ) {}
+
+  private resolvedIsAdmin(): boolean {
+    return this.isAdmin ?? this.userDataService.userData()?.isAdmin ?? false;
+  }
 
   onPromptSelect(prompt: AiPromptOption) {
     const range = this.dashService.selectedRangeConfig();
@@ -56,19 +69,21 @@ export class AiSparkleButtonComponent {
     // skipped by hasActiveConversation()).
     this.aiService.resetConversation();
 
+    const dateRange =
+      this.includeDateRange && range ? computeDateRange(range.lookbackHours) : undefined;
     const data: AiAnalysisModalData = {
       title: `${prompt.label} — ${this.pageLabel()}`,
       page: this.page,
       promptType: prompt.promptType,
       userMessage: prompt.userMessage,
       metadata: {
-        dateRange: { start: '', end: '' },
+        ...(dateRange ? { dateRange } : {}),
         granularity: range?.granularity,
         filteredTlds: tlds,
         filteredRegistrars: regIds,
       },
       chartData: this.chartData,
-      isAdmin: this.isAdmin,
+      isAdmin: this.resolvedIsAdmin(),
       savedModel,
     };
 

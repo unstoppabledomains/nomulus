@@ -24,7 +24,9 @@ export interface AiAnalyzeRequest {
   promptType: string;
   /**
    * Free-form context bag forwarded to the backend. Well-known keys:
-   * - `dateRange` (required): `{ start: string; end: string }`.
+   * - `dateRange`: optional `{ start: string; end: string }`. Omit (or leave
+   *   undefined) when no time filter applies — empty strings are NOT sent,
+   *   since they actively mislead the model.
    * - `granularity`: optional bucket size e.g. `'DAY'`.
    * - `filteredTlds` (required): list of TLD names currently selected.
    * - `filteredRegistrars` (required): list of registrar IDs currently selected.
@@ -35,7 +37,7 @@ export interface AiAnalyzeRequest {
    * Additional keys are allowed and silently passed through.
    */
   metadata: {
-    dateRange: { start: string; end: string };
+    dateRange?: { start: string; end: string };
     granularity?: string;
     filteredTlds: string[];
     filteredRegistrars: string[];

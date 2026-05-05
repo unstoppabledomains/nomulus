@@ -19,12 +19,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 import { ExploreComponent } from './explore.component';
 import { ExploreService } from './explore.service';
-import { ExploreResult } from './explore.models';
+import { ExploreResult, DEFAULT_QUERY } from './explore.models';
 import { RegistryDashService } from '../registry-dash.service';
 import { AiAnalysisService } from '../ai/ai-analysis.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
 import { ExploreChartComponent } from './explore-chart/explore-chart.component';
 import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({ selector: 'app-explore-builder', standalone: true, template: '' })
 class StubExploreBuilderComponent {
@@ -54,6 +55,7 @@ describe('ExploreComponent', () => {
   let exploreServiceStub: any;
   let dashServiceStub: any;
   let aiServiceStub: any;
+  let userDataServiceStub: any;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
 
   const sampleResult: ExploreResult = {
@@ -89,6 +91,12 @@ describe('ExploreComponent', () => {
       appendUserTurnAndAnalyze: jasmine.createSpy('appendUserTurnAndAnalyze')
         .and.returnValue(Promise.resolve()),
     };
+    userDataServiceStub = {
+      userData: signal<{ isAdmin: boolean; globalRole: string } | undefined>({
+        isAdmin: true,
+        globalRole: 'FTE',
+      }),
+    };
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
 
     await TestBed.configureTestingModule({
@@ -97,6 +105,7 @@ describe('ExploreComponent', () => {
         { provide: ExploreService, useValue: exploreServiceStub },
         { provide: RegistryDashService, useValue: dashServiceStub },
         { provide: AiAnalysisService, useValue: aiServiceStub },
+        { provide: UserDataService, useValue: userDataServiceStub },
         { provide: MatDialog, useValue: dialogSpy },
       ],
     })
@@ -156,6 +165,45 @@ describe('ExploreComponent', () => {
     expect(data.metadata.exploreDescriptor).toBeTruthy();
     expect(data.metadata.exploreDescriptor.dataSource).toBe('DOMAIN_ACTIVITY');
     expect(data.chartData.rows.length).toBe(2);
+    expect(data.isAdmin).toBeTrue();
+  });
+
+  it('addToNewChat passes isAdmin=false when user is not admin', () => {
+    userDataServiceStub.userData.set({ isAdmin: false, globalRole: 'NONE' });
+    exploreServiceStub.result.set(sampleResult);
+    fixture.detectChanges();
+    component.addToNewChat();
+    const data = dialogSpy.open.calls.first().args[1]!.data as any;
+    expect(data.isAdmin).toBeFalse();
+  });
+
+  it('addToNewChat omits dateRange when the data source is not time-based', () => {
+    component.query.set({
+      ...DEFAULT_QUERY,
+      filters: { ...DEFAULT_QUERY.filters },
+      dataSource: 'PRICING_RULES',
+    });
+    exploreServiceStub.result.set(sampleResult);
+    fixture.detectChanges();
+    component.addToNewChat();
+    const data = dialogSpy.open.calls.first().args[1]!.data as any;
+    expect(data.metadata.dateRange).toBeUndefined();
+    expect(data.metadata.granularity).toBeUndefined();
+  });
+
+  it('addToNewChat populates dateRange when the data source is time-based', () => {
+    component.query.set({
+      ...DEFAULT_QUERY,
+      filters: { ...DEFAULT_QUERY.filters },
+      dataSource: 'DOMAIN_ACTIVITY',
+    });
+    exploreServiceStub.result.set(sampleResult);
+    fixture.detectChanges();
+    component.addToNewChat();
+    const data = dialogSpy.open.calls.first().args[1]!.data as any;
+    expect(data.metadata.dateRange?.start).toBeTruthy();
+    expect(data.metadata.dateRange?.end).toBeTruthy();
+    expect(data.metadata.granularity).toBe('day');
   });
 
   it('addToCurrentChat is a no-op when there is no active conversation', () => {

@@ -16,9 +16,11 @@ package google.registry.ui.server.console.registrydash;
 
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.FluentLogger;
+import com.google.common.net.MediaType;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -37,11 +39,13 @@ import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
+import google.registry.util.Clock;
 import google.registry.util.RegistryEnvironment;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Optional;
+import org.joda.time.DateTimeZone;
 
 @Action(
     service = Service.CONSOLE,
@@ -61,6 +65,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
   private final RegistryConfigSettings.Prompts promptConfig;
+  private final Clock clock;
 
   @Inject
   public RegistryDashAiAction(
@@ -68,13 +73,15 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       @Parameter("aiAnalyzePayload") Optional<JsonElement> payload,
       AiOrchestrator orchestrator,
       AiRateLimiter rateLimiter,
-      @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig) {
+      @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig,
+      Clock clock) {
     super(consoleApiParams);
     this.payload = payload;
     this.orchestrator = orchestrator;
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
     this.promptConfig = promptConfig;
+    this.clock = clock;
   }
 
   @Override
@@ -110,11 +117,18 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
     try {
-      PrintWriter writer = consoleApiParams.response().getWriter();
-      consoleApiParams.response().setHeader("Content-Type", "text/event-stream");
+      // Set Content-Type (with charset) before getWriter(): the writer's encoding is fixed at the
+      // moment getWriter() is called. Without this, Jetty defaults the writer to ISO-8859-1 and
+      // any non-Latin-1 characters from Anthropic (em-dash, smart quotes, emoji) get substituted
+      // with '?' on the way out. setContentType() is the canonical Jakarta Servlet API for both
+      // header and writer encoding (vs. setHeader, which is container-dependent).
+      consoleApiParams
+          .response()
+          .setContentType(MediaType.create("text", "event-stream").withCharset(UTF_8));
       consoleApiParams.response().setHeader("Cache-Control", "no-cache");
       consoleApiParams.response().setHeader("Connection", "keep-alive");
       consoleApiParams.response().setStatus(200);
+      PrintWriter writer = consoleApiParams.response().getWriter();
 
       ImmutableList<String> toolsUsed =
           orchestrator.run(
@@ -170,15 +184,22 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
+    // Admin per-request override is for prompt experimentation in non-prod; the admin owns
+    // the entire prompt body in that path (including date instructions if they want them).
     if (!isProduction
         && isAdmin
         && request.systemPrompt != null
         && !request.systemPrompt.isEmpty()) {
       return request.systemPrompt;
     }
+    return todayHeader()
+        + getDefaultSystemPrompt(
+            request.page, request.promptType, request.chartData, request.metadata);
+  }
 
-    return getDefaultSystemPrompt(
-        request.page, request.promptType, request.chartData, request.metadata);
+  private String todayHeader() {
+    String today = clock.nowUtc().toDateTime(DateTimeZone.UTC).toLocalDate().toString();
+    return "Today is " + today + " (UTC).\n\n";
   }
 
   private String getDefaultSystemPrompt(
@@ -199,7 +220,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
 
     sb.append("\n## Context\n");
     if (metadata != null) {
-      if (metadata.has("dateRange")) {
+      if (metadata.has("dateRange") && hasNonEmptyDateRange(metadata.get("dateRange"))) {
         sb.append("Date range: ").append(metadata.get("dateRange")).append("\n");
       }
       if (metadata.has("filteredTlds") && metadata.getAsJsonArray("filteredTlds").size() > 0) {
@@ -215,5 +236,17 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     }
 
     return sb.toString();
+  }
+
+  private static boolean hasNonEmptyDateRange(JsonElement dateRange) {
+    if (dateRange == null || !dateRange.isJsonObject()) {
+      return false;
+    }
+    JsonObject obj = dateRange.getAsJsonObject();
+    return isNonBlankString(obj.get("start")) && isNonBlankString(obj.get("end"));
+  }
+
+  private static boolean isNonBlankString(JsonElement el) {
+    return el != null && el.isJsonPrimitive() && !el.getAsString().isBlank();
   }
 }
