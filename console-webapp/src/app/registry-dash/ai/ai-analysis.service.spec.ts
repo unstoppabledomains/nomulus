@@ -192,6 +192,36 @@ describe('AiAnalysisService', () => {
     expect(tools[1].status).toBe('EMPTY_FOR_RANGE');
   });
 
+  it('same tool invoked twice: results match pills FIFO (oldest first) (SRE-1963)', async () => {
+    // Backend emits tool_result frames in the same FIFO order as tool_use.
+    // If we matched LIFO, A1's result would land on the second pill and
+    // A2's result on the first — diagnostics swapped.
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_transfers","args":{"tld":"a"}}\n\n',
+        'data: {"type":"tool_use","tool":"query_transfers","args":{"tld":"b"}}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"OK","diagnostic":"first"}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"EMPTY_FOR_RANGE","diagnostic":"second"}\n\n',
+        'data: {"type":"text","text":"done"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    const tools = service.conversationHistory().filter(
+      (e): e is ToolMessage => e.role === 'tool',
+    );
+    expect(tools.length).toBe(2);
+    // First pill (oldest IN_FLIGHT) should carry the FIRST result.
+    expect(tools[0].status).toBe('OK');
+    expect(tools[0].diagnostic).toBe('first');
+    // Second pill should carry the second result.
+    expect(tools[1].status).toBe('EMPTY_FOR_RANGE');
+    expect(tools[1].diagnostic).toBe('second');
+  });
+
   it('text → tool → text preserves chronological order in conversationHistory (SRE-1963)', async () => {
     fetchSpy.and.resolveTo(
       streamResponse([
@@ -215,6 +245,28 @@ describe('AiAnalysisService', () => {
     expect(history[2].role).toBe('tool');
     expect(history[3].role).toBe('assistant');
     expect((history[3] as { content: string }).content).toBe('all done');
+  });
+
+  it('IN_FLIGHT tool entry on stream-end-without-result gets "Interrupted" diagnostic (SRE-1963)', async () => {
+    // Stream emits a tool_use, then closes cleanly with no tool_result —
+    // simulates a network drop / unexpected stream end. Since the
+    // controller was NOT aborted, the diagnostic should be "Interrupted",
+    // not "Cancelled".
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    const tools = service.conversationHistory().filter(
+      (e): e is ToolMessage => e.role === 'tool',
+    );
+    expect(tools.length).toBe(1);
+    expect(tools[0].status).toBe('INTERNAL_ERROR');
+    expect(tools[0].diagnostic).toBe('Interrupted');
   });
 
   it('IN_FLIGHT tool entry resolves to terminal state on cancel (SRE-1963)', async () => {

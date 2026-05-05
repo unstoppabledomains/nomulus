@@ -279,11 +279,13 @@ export class AiAnalysisService {
       // one — otherwise an aborted older call would clobber the newer call's
       // freshly-set streaming state when its finally runs.
       if (this.abortController === controller) {
-        // Resolve any IN_FLIGHT tool entries left over (cancel mid-flight,
-        // network drop, etc.) so the pill stops pulsing — otherwise it
-        // looks stuck. INTERNAL_ERROR with a "cancelled" diagnostic
-        // distinguishes this from a backend-reported error.
-        this.conversationHistory.update(h => terminateInFlight(h));
+        // Resolve any IN_FLIGHT tool entries left over so the pill stops
+        // pulsing. Use a diagnostic that matches the actual failure mode:
+        // user-initiated abort gets "Cancelled"; network drop / 5xx /
+        // unexpected stream end get "Interrupted" so the pill doesn't
+        // misrepresent the failure.
+        const diagnostic = controller.signal.aborted ? 'Cancelled' : 'Interrupted';
+        this.conversationHistory.update(h => terminateInFlight(h, diagnostic));
         this.streaming.set(false);
         this.abortController = null;
       }
@@ -330,16 +332,19 @@ export class AiAnalysisService {
 }
 
 /**
- * Returns a new timeline with the most recent `IN_FLIGHT` entry for `tool`
- * resolved with the given patch. Iterates from the end so concurrent
- * sequential calls to the same tool are matched LIFO.
+ * Returns a new timeline with the OLDEST `IN_FLIGHT` entry for `tool`
+ * resolved with the given patch. The backend emits `tool_result` frames
+ * in the same FIFO order as their `tool_use` blocks, so when the same
+ * tool is invoked multiple times in a single turn we need to match
+ * results to pills oldest-first; LIFO matching would swap the
+ * statuses/diagnostics of duplicate invocations.
  */
 function updateLatestInFlight(
   timeline: ChatTimelineEntry[],
   tool: string,
   patch: { status: ToolStatus; ok: boolean; diagnostic?: string },
 ): ChatTimelineEntry[] {
-  for (let i = timeline.length - 1; i >= 0; i--) {
+  for (let i = 0; i < timeline.length; i++) {
     const e = timeline[i];
     if (e.role === 'tool' && e.tool === tool && e.status === 'IN_FLIGHT') {
       const out = timeline.slice();
@@ -352,10 +357,15 @@ function updateLatestInFlight(
 
 /**
  * Resolve any leftover `IN_FLIGHT` tool entries to a terminal state so
- * the pill stops pulsing on cancel/drop. Marks them as INTERNAL_ERROR
- * with a "cancelled" diagnostic — distinguishes from a real tool error.
+ * the pill stops pulsing on cancel/drop. Caller passes the diagnostic
+ * to attach (e.g. "Cancelled" on user-initiated abort, "Interrupted"
+ * on network drop / 5xx) so the pill doesn't misrepresent the failure
+ * mode.
  */
-function terminateInFlight(timeline: ChatTimelineEntry[]): ChatTimelineEntry[] {
+function terminateInFlight(
+  timeline: ChatTimelineEntry[],
+  diagnostic: string,
+): ChatTimelineEntry[] {
   let mutated: ChatTimelineEntry[] | null = null;
   for (let i = 0; i < timeline.length; i++) {
     const e = timeline[i];
@@ -365,7 +375,7 @@ function terminateInFlight(timeline: ChatTimelineEntry[]): ChatTimelineEntry[] {
         ...e,
         status: 'INTERNAL_ERROR',
         ok: false,
-        diagnostic: e.diagnostic ?? 'Cancelled',
+        diagnostic: e.diagnostic ?? diagnostic,
       };
     }
   }
