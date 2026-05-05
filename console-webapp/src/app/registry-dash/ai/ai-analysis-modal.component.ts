@@ -24,6 +24,8 @@ import {
   AiModelCatalog,
   AiModelChoice,
   ConversationMessage,
+  TOOL_STATUS_CHIPS,
+  ToolCompleted,
 } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
 import { AiModalResizeDirective } from './ai-modal-resize.directive';
@@ -126,6 +128,21 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
   streamedText = computed(() => this.aiService.streamedText());
   error = computed(() => this.aiService.error());
   toolsInFlight = computed(() => this.aiService.toolsInFlight());
+  toolsCompleted = computed(() => this.aiService.toolsCompleted());
+
+  /**
+   * Returns the chip descriptor for a completed tool, or `null` when the
+   * status is OK (silent — we don't render anything for happy paths). Used by
+   * the template to drive a `*ngIf` and to pull chip text/tone.
+   *
+   * TODO(SRE-1958): no `ai-analysis-modal.component.spec.ts` exists today;
+   * when one is added, cover chip rendering for at least one non-OK status
+   * (e.g. EMPTY_FOR_RANGE, OUT_OF_RANGE) and assert the diagnostic flows into
+   * the matTooltip binding.
+   */
+  chipFor(t: ToolCompleted): { text: string; tone: 'warn' | 'error' } | null {
+    return TOOL_STATUS_CHIPS[t.status];
+  }
 
   autoScrollEnabled = signal(true);
   showJumpToLatest = computed(() => !this.autoScrollEnabled() && this.streaming());

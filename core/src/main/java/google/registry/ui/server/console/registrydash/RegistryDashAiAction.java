@@ -166,6 +166,10 @@ public class RegistryDashAiAction extends ConsoleApiAction {
                 } else if (event instanceof AiOrchestrator.ToolResultEvent tr) {
                   frame.addProperty("type", "tool_result");
                   frame.addProperty("tool", tr.tool());
+                  frame.addProperty("status", tr.status().name());
+                  if (tr.diagnostic() != null) {
+                    frame.addProperty("diagnostic", tr.diagnostic());
+                  }
                   frame.addProperty("ok", tr.ok());
                 } else if (event instanceof AiOrchestrator.DoneEvent) {
                   frame.addProperty("type", "done");

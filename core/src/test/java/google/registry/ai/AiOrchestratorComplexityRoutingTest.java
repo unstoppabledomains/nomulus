@@ -18,11 +18,11 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import google.registry.ai.tools.AiTool;
 import google.registry.ai.tools.AiToolRegistry;
+import google.registry.ai.tools.ToolResult;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import java.io.IOException;
@@ -245,8 +245,8 @@ class AiOrchestratorComplexityRoutingTest {
     }
 
     @Override
-    public JsonElement execute(JsonObject args, User user) {
-      return JsonParser.parseString("{\"ok\":true}");
+    public ToolResult executeWithStatus(JsonObject args, User user) {
+      return ToolResult.ok(JsonParser.parseString("{\"ok\":true}"));
     }
   }
 }

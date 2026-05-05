@@ -19,16 +19,16 @@ import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import google.registry.ai.tools.AiTool.AiToolException;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.testing.FakeClock;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +38,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 class QueryRevenueBreakdownToolTest {
 
   private final FakeClock clock = new FakeClock(DateTime.parse("2026-04-30T00:00:00.000Z"));
+  private final Clock javaClock =
+      Clock.fixed(Instant.parse("2026-04-30T00:00:00Z"), ZoneOffset.UTC);
 
   @RegisterExtension
   final JpaTestExtensions.JpaIntegrationTestExtension jpa =
       new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
 
-  private final QueryRevenueBreakdownTool tool = new QueryRevenueBreakdownTool();
+  private final QueryRevenueBreakdownTool tool = new QueryRevenueBreakdownTool(javaClock);
 
   @BeforeEach
   void setUp() {
@@ -86,86 +88,120 @@ class QueryRevenueBreakdownToolTest {
     return obj;
   }
 
-  @Test
-  void execute_admin_groupByOperation_returnsRows() throws Exception {
-    User user = createFteUser("admin@example.com");
-
-    JsonElement result =
-        tool.execute(args("tld", "2026-01-01", "2026-04-30", "operation"), user);
-
-    JsonObject obj = result.getAsJsonObject();
-    assertThat(obj.has("rows")).isTrue();
-    assertThat(obj.has("rowCount")).isTrue();
-    assertThat(obj.has("truncated")).isTrue();
+  private static void assertStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ")");
+    }
   }
 
   @Test
-  void execute_admin_groupByPeriod_returnsRows() throws Exception {
+  void execute_admin_groupByOperation_emptyForRange() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("tld", "2026-01-01", "2026-04-30", "period"), user);
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29", "operation"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    // No billing events in test → empty range.
+    assertStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.has("rows")).isTrue();
   }
 
   @Test
-  void execute_unmappedNonAdmin_throwsPermissionDenied() {
+  void execute_admin_groupByPeriod_emptyForRange() {
+    User user = createFteUser("admin@example.com");
+
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29", "period"), user);
+
+    assertStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    assertThat(result.data().getAsJsonObject().has("rows")).isTrue();
+  }
+
+  @Test
+  void execute_unmappedNonAdmin_returnsPermissionDenied() {
     User user = createNonAdminUser("stranger@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args("tld", "2026-01-01", "2026-04-30", "operation"), user));
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29", "operation"), user);
 
-    assertThat(ex).hasMessageThat().contains("Permission denied");
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).contains("Permission denied");
   }
 
   @Test
-  void execute_dateRangeOver2Years_throws() {
+  void execute_dateRangeOver2Years_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args("tld", "2020-01-01", "2024-01-01", "operation"), user));
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2020-01-01", "2024-01-01", "operation"), user);
 
-    assertThat(ex).hasMessageThat().contains("2-year cap");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("2-year cap");
   }
 
   @Test
-  void execute_invalidGroupBy_throws() {
+  void execute_invalidGroupBy_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args("tld", "2026-01-01", "2026-04-30", "registrar"), user));
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29", "registrar"), user);
 
-    assertThat(ex).hasMessageThat().contains("Invalid group_by");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Invalid group_by");
   }
 
   @Test
-  void execute_endBeforeStart_throws() {
+  void execute_endBeforeStart_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args("tld", "2026-04-30", "2026-01-01", "operation"), user));
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-04-30", "2026-01-01", "operation"), user);
 
-    assertThat(ex).hasMessageThat().contains("end_date must be on or after start_date");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("end_date must be on or after start_date");
   }
 
   @Test
-  void execute_missingArg_throws() {
+  void execute_missingArg_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args(null, "2026-01-01", "2026-04-30", "operation"), user));
+    ToolResult result =
+        tool.executeWithStatus(args(null, "2026-01-01", "2026-04-29", "operation"), user);
 
-    assertThat(ex).hasMessageThat().contains("Missing required arg: tld");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Missing required arg: tld");
+  }
+
+  @Test
+  void execute_futureDateRange_returnsOutOfRange() {
+    User user = createFteUser("admin@example.com");
+
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2027-01-01", "2027-03-31", "operation"), user);
+
+    assertStatus(result, ToolResult.Status.OUT_OF_RANGE);
+  }
+
+  /**
+   * Regression test (SRE-1958 review): permission check must run BEFORE the future-date
+   * OUT_OF_RANGE fast path, so an unmapped user cannot probe TLD existence by sending a
+   * future date and observing OUT_OF_RANGE vs PERMISSION_DENIED.
+   */
+  @Test
+  void execute_unauthorizedTldFutureRange_returnsPermissionDeniedNotOutOfRange() {
+    User user = createNonAdminUser("stranger@example.com");
+
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2027-01-01", "2027-03-31", "operation"), user);
+
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
   }
 }

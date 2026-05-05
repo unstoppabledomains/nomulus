@@ -36,6 +36,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Shared helpers for AI tools that wrap the Explore query infrastructure. */
 final class ToolJpaHelper {
@@ -241,6 +242,71 @@ final class ToolJpaHelper {
       return date.atStartOfDay().toInstant(ZoneOffset.UTC);
     }
   }
+
+  /**
+   * Cheap probe: returns the {@code (min, max)} of a timestamp column on the given table, scoped to
+   * the user's effective TLDs (when {@code tldColumn} is non-null). Used by date-bounded tools to
+   * fill an {@code EMPTY_FOR_RANGE} diagnostic with the actual data extent.
+   *
+   * <p>Returns {@link Optional#empty()} if the table is empty (or the probe itself fails). The
+   * caller should treat {@code empty} as "no extent available" — never bubble a probe failure as a
+   * tool error.
+   */
+  static Optional<DataExtent> probeDataExtent(
+      String table, String timestampColumn, String tldColumn, ImmutableSet<String> tlds) {
+    StringBuilder sql = new StringBuilder();
+    sql.append("SELECT MIN(")
+        .append(timestampColumn)
+        .append("), MAX(")
+        .append(timestampColumn)
+        .append(") FROM \"")
+        .append(table)
+        .append("\"");
+    boolean hasTldFilter = tldColumn != null && tlds != null && !tlds.isEmpty();
+    if (hasTldFilter) {
+      sql.append(" WHERE ").append(tldColumn).append(" IN (:tlds)");
+    }
+    try {
+      return tm().transact(
+          () -> {
+            Query q = tm().getEntityManager().createNativeQuery(sql.toString());
+            if (hasTldFilter) {
+              q.setParameter("tlds", tlds);
+            }
+            Object raw = q.getSingleResult();
+            if (!(raw instanceof Object[] arr) || arr.length < 2) {
+              return Optional.<DataExtent>empty();
+            }
+            Instant min = toInstant(arr[0]);
+            Instant max = toInstant(arr[1]);
+            if (min == null || max == null) {
+              return Optional.<DataExtent>empty();
+            }
+            return Optional.of(new DataExtent(min, max));
+          });
+    } catch (RuntimeException e) {
+      return Optional.empty();
+    }
+  }
+
+  private static Instant toInstant(Object val) {
+    if (val == null) {
+      return null;
+    }
+    if (val instanceof java.sql.Timestamp ts) {
+      return ts.toInstant();
+    }
+    if (val instanceof java.time.OffsetDateTime odt) {
+      return odt.toInstant();
+    }
+    if (val instanceof Instant inst) {
+      return inst;
+    }
+    return null;
+  }
+
+  /** Min/max timestamp pair returned by {@link #probeDataExtent}. */
+  record DataExtent(Instant min, Instant max) {}
 
   /**
    * Builds an {@link ExploreQueryDescriptor} programmatically by serializing args to JSON and

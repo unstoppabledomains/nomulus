@@ -20,11 +20,8 @@ import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import google.registry.ai.tools.AiTool.AiToolException;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
@@ -90,13 +87,29 @@ class GetRegistrarDetailsToolTest {
     return obj;
   }
 
+  private static void assertStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ", data="
+              + result.data()
+              + ")");
+    }
+  }
+
   @Test
-  void execute_admin_returnsFullProfile() throws Exception {
+  void execute_admin_returnsFullProfile() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("registrar1"), user);
+    ToolResult result = tool.executeWithStatus(args("registrar1"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.OK);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.get("registrar_id").getAsString()).isEqualTo("registrar1");
     assertThat(obj.has("registrar_name")).isTrue();
     assertThat(obj.has("type")).isTrue();
@@ -107,44 +120,44 @@ class GetRegistrarDetailsToolTest {
   }
 
   @Test
-  void execute_mappedNonAdmin_returnsProfile() throws Exception {
+  void execute_mappedNonAdmin_returnsProfile() {
     User user = createNonAdminUser("ro@example.com");
     addMapping("ro@example.com", "registrar1", "tld");
 
-    JsonElement result = tool.execute(args("registrar1"), user);
+    ToolResult result = tool.executeWithStatus(args("registrar1"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.OK);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.get("registrar_id").getAsString()).isEqualTo("registrar1");
   }
 
   @Test
-  void execute_unmappedNonAdmin_throwsPermissionDenied() {
+  void execute_unmappedNonAdmin_returnsPermissionDenied() {
     User user = createNonAdminUser("stranger@example.com");
 
-    AiToolException ex =
-        assertThrows(AiToolException.class, () -> tool.execute(args("registrar1"), user));
+    ToolResult result = tool.executeWithStatus(args("registrar1"), user);
 
-    assertThat(ex).hasMessageThat().contains("Permission denied for registrar");
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).contains("Permission denied for registrar");
   }
 
   @Test
-  void execute_unknownRegistrar_returnsErrorJson() throws Exception {
+  void execute_unknownRegistrar_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("does-not-exist"), user);
+    ToolResult result = tool.executeWithStatus(args("does-not-exist"), user);
 
-    JsonObject obj = result.getAsJsonObject();
-    assertThat(obj.has("error")).isTrue();
-    assertThat(obj.get("error").getAsString()).contains("Registrar not found");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Registrar not found");
   }
 
   @Test
-  void execute_missingArg_throws() {
+  void execute_missingArg_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(AiToolException.class, () -> tool.execute(args(null), user));
+    ToolResult result = tool.executeWithStatus(args(null), user);
 
-    assertThat(ex).hasMessageThat().contains("Missing required arg: registrar_id");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Missing required arg: registrar_id");
   }
 }

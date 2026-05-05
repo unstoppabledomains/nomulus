@@ -18,10 +18,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.FluentLogger;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.ai.tools.AiTool;
 import google.registry.ai.tools.AiToolRegistry;
+import google.registry.ai.tools.ToolResult;
 import google.registry.model.console.User;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 
 /**
  * Multi-turn loop that lets Claude call backend {@link AiTool}s mid-conversation.
@@ -164,28 +165,32 @@ public class AiOrchestrator {
         resultBlock.addProperty("type", "tool_result");
         resultBlock.addProperty("tool_use_id", p.toolUseId);
         Optional<AiTool> maybeTool = registry.get(p.name);
+        ToolResult toolResult;
         if (maybeTool.isEmpty()) {
-          resultBlock.addProperty("is_error", true);
-          resultBlock.addProperty("content", "Unknown tool: " + p.name);
-          sink.accept(new ToolResultEvent(p.name, false));
+          toolResult = ToolResult.invalidArgs("Unknown tool: " + p.name);
         } else {
           AiTool tool = maybeTool.get();
           turnMax = maxComplexity(turnMax, tool.complexity());
           try {
-            JsonElement out = tool.execute(p.args, user);
-            resultBlock.addProperty("content", GSON.toJson(out));
-            sink.accept(new ToolResultEvent(p.name, true));
+            toolResult = tool.executeWithStatus(p.args, user);
           } catch (AiTool.AiToolException e) {
-            resultBlock.addProperty("is_error", true);
-            resultBlock.addProperty("content", e.getMessage());
-            sink.accept(new ToolResultEvent(p.name, false));
+            // Tools should now return a typed ToolResult instead of throwing for user-visible
+            // failures (bad args, permission denied, etc.). A throw here is a backstop for
+            // genuinely unexpected runtime conditions; surface as INTERNAL_ERROR.
+            toolResult = ToolResult.internalError(sanitize(e.getMessage()));
           } catch (RuntimeException e) {
-            resultBlock.addProperty("is_error", true);
-            resultBlock.addProperty(
-                "content", "Tool execution error: " + e.getClass().getSimpleName());
-            sink.accept(new ToolResultEvent(p.name, false));
+            // Don't leak stack traces to Claude — sanitize to a short, opaque message.
+            toolResult =
+                ToolResult.internalError("Tool execution error: " + e.getClass().getSimpleName());
           }
         }
+        if (toolResult.isError()) {
+          resultBlock.addProperty("is_error", true);
+        }
+        resultBlock.addProperty("content", GSON.toJson(toolResult.toJson()));
+        sink.accept(
+            new ToolResultEvent(p.name, !toolResult.isError(), toolResult.status(),
+                toolResult.diagnostic()));
         toolResultsContent.add(resultBlock);
       }
       prevTurnMaxComplexity = turnMax;
@@ -235,9 +240,19 @@ public class AiOrchestrator {
 
   public record ToolUseEvent(String tool, JsonObject args) implements OrchestratorEvent {}
 
-  public record ToolResultEvent(String tool, boolean ok) implements OrchestratorEvent {}
+  public record ToolResultEvent(
+      String tool, boolean ok, ToolResult.Status status, @Nullable String diagnostic)
+      implements OrchestratorEvent {}
 
   public record DoneEvent() implements OrchestratorEvent {}
 
   private record PendingToolCall(String toolUseId, String name, JsonObject args) {}
+
+  private static String sanitize(String message) {
+    if (message == null || message.isEmpty()) {
+      return "Tool failed";
+    }
+    // Cap to a reasonable length so we don't echo a giant message back to Claude.
+    return message.length() > 240 ? message.substring(0, 240) : message;
+  }
 }

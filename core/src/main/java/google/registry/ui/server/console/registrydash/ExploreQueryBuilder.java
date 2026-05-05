@@ -92,6 +92,9 @@ public final class ExploreQueryBuilder {
     if (!f.getActivityTypes().isEmpty()) {
       whereClauses.add("dh.history_type IN (:activityTypes)");
     }
+    if (!f.getRegistrarIds().isEmpty()) {
+      whereClauses.add("d.current_sponsor_registrar_id IN (:registrarIds)");
+    }
     return assembleQuery(
         selectCols,
         "\"DomainHistory\" dh JOIN \"Domain\" d ON d.repo_id = dh.domain_repo_id",

@@ -14,7 +14,6 @@
 
 package google.registry.ai.tools;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 
@@ -22,8 +21,13 @@ import google.registry.model.console.User;
  * A tool Claude can invoke during an AI analysis conversation to fetch additional registry data.
  *
  * <p>Tools are registered in {@link AiToolRegistry} and surfaced to Anthropic's tool-use API. The
- * orchestrator dispatches {@code tool_use} blocks back to the matching {@link AiTool#execute}
- * implementation.
+ * orchestrator dispatches {@code tool_use} blocks back to the matching {@link
+ * AiTool#executeWithStatus} implementation.
+ *
+ * <p>Tools should prefer returning a typed {@link ToolResult} over throwing — {@link
+ * AiToolException} is reserved for genuinely unexpected runtime errors (the orchestrator catches
+ * them and maps to {@link ToolResult.Status#INTERNAL_ERROR}). User-visible failure modes (bad args,
+ * permission denied, out-of-range, empty-for-range) belong on {@link ToolResult.Status}.
  */
 public interface AiTool {
 
@@ -37,11 +41,10 @@ public interface AiTool {
   JsonObject inputSchema();
 
   /**
-   * Run the tool. Implementations are responsible for permission checks against {@code user} and
-   * for capping/truncating large result sets. Throw {@link AiToolException} for user-visible
-   * errors; the orchestrator will surface the message to Claude as an error tool_result.
+   * Run the tool and return a typed {@link ToolResult}. Implementations are responsible for
+   * permission checks against {@code user} and for capping/truncating large result sets.
    */
-  JsonElement execute(JsonObject args, User user) throws AiToolException;
+  ToolResult executeWithStatus(JsonObject args, User user) throws AiToolException;
 
   /**
    * Static complexity tag the orchestrator uses to route the post-tool synthesis turn to a

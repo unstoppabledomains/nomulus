@@ -17,7 +17,6 @@ package google.registry.ai.tools;
 import static google.registry.persistence.transaction.TransactionManagerFactory.tm;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.ForeignKeyUtils;
 import google.registry.model.console.User;
@@ -81,9 +80,9 @@ public class QueryDomainDetailsTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
+  public ToolResult executeWithStatus(JsonObject args, User user) {
     if (!args.has("domain_name") || args.get("domain_name").isJsonNull()) {
-      throw new AiToolException("Missing required arg: domain_name");
+      return ToolResult.invalidArgs("Missing required arg: domain_name");
     }
     String domainName = args.get("domain_name").getAsString();
 
@@ -93,18 +92,14 @@ public class QueryDomainDetailsTool implements AiTool {
               ForeignKeyUtils.loadResourceByCacheIfEnabled(
                   Domain.class, domainName, tm().getTransactionTime());
           if (maybe.isEmpty()) {
-            JsonObject err = new JsonObject();
-            err.addProperty("error", "Domain not found: " + domainName);
-            return err;
+            return ToolResult.invalidArgs("Domain not found: " + domainName);
           }
           Domain domain = maybe.get();
 
           try {
             ToolJpaHelper.assertTldAccess(user, domain.getTld());
           } catch (AiToolException e) {
-            JsonObject err = new JsonObject();
-            err.addProperty("error", e.getMessage());
-            return err;
+            return ToolResult.permissionDenied(e.getMessage());
           }
 
           JsonObject out = new JsonObject();
@@ -149,7 +144,7 @@ public class QueryDomainDetailsTool implements AiTool {
           out.add("history", history);
           out.addProperty("historyCount", history.size());
           out.addProperty("historyTruncated", history.size() >= MAX_HISTORY_EVENTS);
-          return out;
+          return ToolResult.ok(out);
         });
   }
 

@@ -16,7 +16,6 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
@@ -82,20 +81,24 @@ public class GetPricingRulesTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
+  public ToolResult executeWithStatus(JsonObject args, User user) {
     String tld =
         args.has("tld") && !args.get("tld").isJsonNull()
             ? args.get("tld").getAsString()
             : null;
     if (tld == null || tld.isEmpty()) {
-      throw new AiToolException("Missing required arg: tld");
+      return ToolResult.invalidArgs("Missing required arg: tld");
     }
     String registrarId =
         args.has("registrar_id") && !args.get("registrar_id").isJsonNull()
             ? args.get("registrar_id").getAsString()
             : null;
 
-    ToolJpaHelper.assertTldAccess(user, tld);
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     ExploreQueryDescriptor desc =
@@ -110,7 +113,22 @@ public class GetPricingRulesTool implements AiTool {
             null,
             null);
 
-    return ToolJpaHelper.runExplore(
-        ExploreDataSource.PRICING_RULES, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.PRICING_RULES, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
+    }
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    String diag =
+        registrarId == null
+            ? "no active pricing rules for tld=" + tld
+            : "no active pricing rules for tld=" + tld + ", registrar=" + registrarId;
+    return ToolResult.emptyForRange(payload, diag);
   }
 }

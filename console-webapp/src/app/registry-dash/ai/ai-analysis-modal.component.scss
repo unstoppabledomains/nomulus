@@ -260,6 +260,30 @@ mat-dialog-actions {
   font-style: italic;
 }
 
+.tool-status-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 8px 4px 0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+  cursor: help;
+
+  &--warn {
+    background: var(--ud-warn-bg, #fff8e1);
+    color: var(--ud-warn-text, #8a6d00);
+    border: 1px solid var(--ud-warn-border, #ffd54f);
+  }
+
+  &--error {
+    background: var(--ud-error-bg, #fdecea);
+    color: var(--ud-error-text, #b00020);
+    border: 1px solid var(--ud-error-border, #f5b3ad);
+  }
+}
+
 .tool-indicator-dots {
   display: inline-block;
   margin-left: 2px;

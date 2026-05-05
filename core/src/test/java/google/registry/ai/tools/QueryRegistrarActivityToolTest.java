@@ -19,13 +19,18 @@ import static google.registry.testing.DatabaseHelper.createTld;
 
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link QueryRegistrarActivityTool}. */
 class QueryRegistrarActivityToolTest extends AiToolTestBase {
 
-  private final QueryRegistrarActivityTool tool = new QueryRegistrarActivityTool();
+  private final Clock javaClock =
+      Clock.fixed(Instant.parse("2026-04-30T10:00:00.000Z"), ZoneOffset.UTC);
+  private final QueryRegistrarActivityTool tool = new QueryRegistrarActivityTool(javaClock);
 
   @BeforeEach
   void setUp() {
@@ -44,20 +49,68 @@ class QueryRegistrarActivityToolTest extends AiToolTestBase {
   }
 
   @Test
-  void execute_missingRegistrarId_throws() {
+  void execute_missingRegistrarId_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = new JsonObject();
-    assertAiToolException(() -> tool.execute(argsJson, user), "registrar_id");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("registrar_id");
   }
 
   @Test
-  void execute_tldOutsideUserScope_throwsPermissionDenied() {
+  void execute_tldOutsideUserScope_returnsPermissionDenied() {
     createTld("other-tld");
     User user = createRoUser("ro@example.com");
     mapUserToTld("ro@example.com", "other-tld");
     JsonObject argsJson = new JsonObject();
     argsJson.addProperty("registrar_id", "test-registrar");
     argsJson.addProperty("tld", "tld");
-    assertAiToolException(() -> tool.execute(argsJson, user), "Permission denied");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).ignoringCase().contains("permission denied");
+  }
+
+  @Test
+  void execute_futureDateRange_returnsOutOfRange() {
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("registrar_id", "registrar1");
+    argsJson.addProperty("tld", "tld");
+    argsJson.addProperty("start_date", "2027-03-01");
+    argsJson.addProperty("end_date", "2027-03-31");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.OUT_OF_RANGE);
+  }
+
+  /**
+   * Regression test (SRE-1958 review): permission check must run BEFORE the future-date
+   * OUT_OF_RANGE fast path, so an unmapped user cannot probe TLD existence by sending a
+   * future date and observing OUT_OF_RANGE vs PERMISSION_DENIED.
+   */
+  @Test
+  void execute_unauthorizedTldFutureRange_returnsPermissionDeniedNotOutOfRange() {
+    createTld("other-tld");
+    User user = createRoUser("ro@example.com");
+    mapUserToTld("ro@example.com", "other-tld");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("registrar_id", "registrar1");
+    argsJson.addProperty("tld", "tld");
+    argsJson.addProperty("start_date", "2027-03-01");
+    argsJson.addProperty("end_date", "2027-03-31");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
+  }
+
+  @Test
+  void execute_emptyForRange_returnsEmptyStatusWithDiagnostic() {
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("registrar_id", "registrar1");
+    argsJson.addProperty("tld", "tld");
+    argsJson.addProperty("start_date", "2026-01-01");
+    argsJson.addProperty("end_date", "2026-01-31");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    assertThat(result.diagnostic()).contains("registrar1");
   }
 }

@@ -16,7 +16,6 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
@@ -77,9 +76,9 @@ public class GetRegistrarDetailsTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
+  public ToolResult executeWithStatus(JsonObject args, User user) {
     if (!args.has("registrar_id") || args.get("registrar_id").isJsonNull()) {
-      throw new AiToolException("Missing required arg: registrar_id");
+      return ToolResult.invalidArgs("Missing required arg: registrar_id");
     }
     String registrarId = args.get("registrar_id").getAsString();
 
@@ -88,15 +87,13 @@ public class GetRegistrarDetailsTool implements AiTool {
       ImmutableSet<String> mapped =
           RegistryDashAccessUtil.getMappedRegistrarIds(user.getEmailAddress());
       if (!mapped.contains(registrarId)) {
-        throw new AiToolException("Permission denied for registrar: " + registrarId);
+        return ToolResult.permissionDenied("Permission denied for registrar: " + registrarId);
       }
     }
 
     Optional<Registrar> maybe = Registrar.loadByRegistrarId(registrarId);
     if (maybe.isEmpty()) {
-      JsonObject err = new JsonObject();
-      err.addProperty("error", "Registrar not found: " + registrarId);
-      return err;
+      return ToolResult.invalidArgs("Registrar not found: " + registrarId);
     }
     Registrar registrar = maybe.get();
 
@@ -137,6 +134,6 @@ public class GetRegistrarDetailsTool implements AiTool {
     }
     out.add("contacts", contacts);
 
-    return out;
+    return ToolResult.ok(out);
   }
 }

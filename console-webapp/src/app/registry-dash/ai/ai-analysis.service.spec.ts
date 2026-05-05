@@ -123,6 +123,50 @@ describe('AiAnalysisService', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('tool_result EMPTY_FOR_RANGE removes in-flight and records completed with diagnostic', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"EMPTY_FOR_RANGE","diagnostic":"no rows for tld=tld between 2026-01-01 and 2026-01-31"}\n\n',
+        'data: {"type":"text","text":"done"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    expect(service.toolsInFlight()).toEqual([]);
+    const completed = service.toolsCompleted();
+    expect(completed.length).toBe(1);
+    expect(completed[0].tool).toBe('query_transfers');
+    expect(completed[0].status).toBe('EMPTY_FOR_RANGE');
+    expect(completed[0].ok).toBeTrue();
+    expect(completed[0].diagnostic).toContain('no rows for tld=tld');
+  });
+
+  it('tool_result INVALID_ARGS records non-ok completed entry', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_revenue_breakdown","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"query_revenue_breakdown","ok":false,"status":"INVALID_ARGS","diagnostic":"Missing required arg: tld"}\n\n',
+        'data: {"type":"text","text":"sorry"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    expect(service.toolsInFlight()).toEqual([]);
+    const completed = service.toolsCompleted();
+    expect(completed.length).toBe(1);
+    expect(completed[0].tool).toBe('query_revenue_breakdown');
+    expect(completed[0].status).toBe('INVALID_ARGS');
+    expect(completed[0].ok).toBeFalse();
+    expect(completed[0].diagnostic).toContain('Missing required arg');
+  });
+
   it('cancel aborts the in-flight stream and clears streaming', async () => {
     // Build a stream that will be aborted mid-flight.
     let abortFn: (() => void) | null = null;

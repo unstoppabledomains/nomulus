@@ -78,6 +78,36 @@ class ExploreQueryBuilderTest {
   }
 
   @Test
+  void domainActivity_withRegistrarIdsFilter_includesRegistrarClause() {
+    // SRE-1958 phase A bug fix: DOMAIN_ACTIVITY must apply registrarIds filter when
+    // present, otherwise restricted users would see all registrars' activity.
+    ExploreQueryDescriptor desc = parse("""
+        {
+          "dataSource": "DOMAIN_ACTIVITY",
+          "metrics": [{"field": "count"}],
+          "dimensions": ["tld", "registrar"],
+          "filters": {"registrarIds": ["registrar1", "registrar2"]}
+        }""");
+    String sql = ExploreQueryBuilder.build(
+        ExploreDataSource.DOMAIN_ACTIVITY, desc, ImmutableSet.of("modem"));
+    assertThat(sql).contains("d.current_sponsor_registrar_id IN (:registrarIds)");
+  }
+
+  @Test
+  void domainActivity_emptyRegistrarIds_omitsRegistrarClause() {
+    ExploreQueryDescriptor desc = parse("""
+        {
+          "dataSource": "DOMAIN_ACTIVITY",
+          "metrics": [{"field": "count"}],
+          "dimensions": ["tld"],
+          "filters": {}
+        }""");
+    String sql = ExploreQueryBuilder.build(
+        ExploreDataSource.DOMAIN_ACTIVITY, desc, ImmutableSet.of("modem"));
+    assertThat(sql).doesNotContain(":registrarIds");
+  }
+
+  @Test
   void revenue_basicQuery_includesCostBasisJoin() {
     ExploreQueryDescriptor desc = parse("""
         {

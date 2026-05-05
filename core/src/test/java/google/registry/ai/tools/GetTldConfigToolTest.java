@@ -20,11 +20,8 @@ import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import google.registry.ai.tools.AiTool.AiToolException;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
@@ -95,13 +92,29 @@ class GetTldConfigToolTest {
     return obj;
   }
 
+  private static void assertStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ", data="
+              + result.data()
+              + ")");
+    }
+  }
+
   @Test
-  void execute_admin_returnsConfig() throws Exception {
+  void execute_admin_returnsConfig() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("tld"), user);
+    ToolResult result = tool.executeWithStatus(args("tld"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.OK);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.get("tld").getAsString()).isEqualTo("tld");
     assertThat(obj.has("tld_state")).isTrue();
     assertThat(obj.has("currency")).isTrue();
@@ -113,48 +126,49 @@ class GetTldConfigToolTest {
   }
 
   @Test
-  void execute_mappedNonAdmin_returnsConfig() throws Exception {
+  void execute_mappedNonAdmin_returnsConfig() {
     User user = createNonAdminUser("ro@example.com");
     addMapping("ro@example.com", "tld");
 
-    JsonElement result = tool.execute(args("tld"), user);
+    ToolResult result = tool.executeWithStatus(args("tld"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.OK);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.get("tld").getAsString()).isEqualTo("tld");
   }
 
   @Test
-  void execute_unmappedNonAdmin_throwsPermissionDenied() {
+  void execute_unmappedNonAdmin_returnsPermissionDenied() {
     User user = createNonAdminUser("stranger@example.com");
 
-    AiToolException ex =
-        assertThrows(AiToolException.class, () -> tool.execute(args("tld"), user));
+    ToolResult result = tool.executeWithStatus(args("tld"), user);
 
-    assertThat(ex).hasMessageThat().contains("Permission denied for tld");
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).contains("Permission denied for tld");
   }
 
   @Test
-  void execute_unknownTld_returnsErrorJson() throws Exception {
+  void execute_unknownTld_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("nonexistent"), user);
+    ToolResult result = tool.executeWithStatus(args("nonexistent"), user);
 
-    JsonObject obj = result.getAsJsonObject();
-    assertThat(obj.has("error")).isTrue();
-    assertThat(obj.get("error").getAsString()).contains("TLD not found");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("TLD not found");
   }
 
   @Test
-  void execute_missingArg_throws() {
+  void execute_missingArg_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex = assertThrows(AiToolException.class, () -> tool.execute(args(null), user));
+    ToolResult result = tool.executeWithStatus(args(null), user);
 
-    assertThat(ex).hasMessageThat().contains("Missing required arg: tld");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Missing required arg: tld");
   }
 
   @Test
-  void execute_allowedRegistrarsCappedAt100() throws Exception {
+  void execute_allowedRegistrarsCappedAt100() {
     User user = createFteUser("admin@example.com");
     // setUp + createTld defaults give 3 registrars on "tld" already; add 109 more = 112 total.
     for (int i = 2; i <= 110; i++) {
@@ -163,9 +177,10 @@ class GetTldConfigToolTest {
       allowRegistrarAccess(registrarId, "tld");
     }
 
-    JsonElement result = tool.execute(args("tld"), user);
+    ToolResult result = tool.executeWithStatus(args("tld"), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.OK);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.get("allowed_registrars").getAsJsonArray()).hasSize(100);
     assertThat(obj.get("allowed_registrars_count").getAsInt()).isEqualTo(112);
     assertThat(obj.get("allowed_registrars_truncated").getAsBoolean()).isTrue();

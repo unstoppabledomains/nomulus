@@ -19,6 +19,7 @@ import com.google.common.flogger.FluentLogger;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.util.Optional;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
@@ -182,14 +183,29 @@ public class RunExploreQueryTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
-    String dataSourceName = stringArg(args, "data_source");
-    String tld = stringArg(args, "tld");
-    String startDate = stringArg(args, "start_date");
-    String endDate = stringArg(args, "end_date");
-    List<String> metrics = stringArrayArg(args, "metrics");
+  public ToolResult executeWithStatus(JsonObject args, User user) {
+    Optional<String> dataSourceName = stringArg(args, "data_source");
+    if (dataSourceName.isEmpty()) {
+      return ToolResult.invalidArgs("Missing required arg: data_source");
+    }
+    Optional<String> tld = stringArg(args, "tld");
+    if (tld.isEmpty()) {
+      return ToolResult.invalidArgs("Missing required arg: tld");
+    }
+    Optional<String> startDate = stringArg(args, "start_date");
+    if (startDate.isEmpty()) {
+      return ToolResult.invalidArgs("Missing required arg: start_date");
+    }
+    Optional<String> endDate = stringArg(args, "end_date");
+    if (endDate.isEmpty()) {
+      return ToolResult.invalidArgs("Missing required arg: end_date");
+    }
+    if (!args.has("metrics") || args.get("metrics").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: metrics");
+    }
+    List<String> metrics = readStringArray(args, "metrics");
     if (metrics.isEmpty()) {
-      throw new AiToolException("metrics must be non-empty");
+      return ToolResult.invalidArgs("metrics must be non-empty");
     }
     List<String> dimensions = optionalStringArrayArg(args, "dimensions");
     List<String> registrarIds = optionalStringArrayArg(args, "registrar_ids");
@@ -198,26 +214,30 @@ public class RunExploreQueryTool implements AiTool {
 
     ExploreDataSource source;
     try {
-      source = ExploreDataSource.valueOf(dataSourceName);
+      source = ExploreDataSource.valueOf(dataSourceName.get());
     } catch (IllegalArgumentException e) {
-      throw new AiToolException(
-          "Unknown data_source: " + dataSourceName + ". Valid: " + validDataSourceNames());
+      return ToolResult.invalidArgs(
+          "Unknown data_source: " + dataSourceName.get() + ". Valid: " + validDataSourceNames());
     }
 
-    ToolJpaHelper.assertTldAccess(user, tld);
-    ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld.get());
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
+    ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld.get());
 
     ExploreQueryDescriptor desc =
         ToolJpaHelper.descriptor(
             source.name(),
             dimensions,
             metrics,
-            List.of(tld),
+            List.of(tld.get()),
             registrarIds,
             operations,
             activityTypes,
-            startDate,
-            endDate);
+            startDate.get(),
+            endDate.get());
 
     // Tool-local audit log: descriptor-level detail not captured by the orchestrator's toolsUsed
     // list. Consolidation into the orchestrator's log line is a follow-up.
@@ -225,23 +245,43 @@ public class RunExploreQueryTool implements AiTool {
         "AI tool run_explore_query: user=%s tld=%s dataSource=%s dimensions=%s metrics=%s"
             + " registrarIds=%s operations=%s activityTypes=%s startDate=%s endDate=%s",
         user.getEmailAddress(),
-        tld,
+        tld.get(),
         source.name(),
         dimensions,
         metrics,
         registrarIds,
         operations,
         activityTypes,
-        startDate,
-        endDate);
+        startDate.get(),
+        endDate.get());
 
-    return ToolJpaHelper.runExplore(
-        source,
-        desc,
-        effectiveTlds,
-        columnsFor(dimensions, metrics),
-        maxRows,
-        statementTimeoutSeconds);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              source,
+              desc,
+              effectiveTlds,
+              columnsFor(dimensions, metrics),
+              maxRows,
+              statementTimeoutSeconds);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
+    }
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    return ToolResult.emptyForRange(
+        payload,
+        "no rows for data_source="
+            + source.name()
+            + ", tld="
+            + tld.get()
+            + " between "
+            + startDate.get()
+            + " and "
+            + endDate.get());
   }
 
   /**
@@ -270,18 +310,11 @@ public class RunExploreQueryTool implements AiTool {
     return sb.toString();
   }
 
-  private static String stringArg(JsonObject args, String key) throws AiToolException {
+  private static Optional<String> stringArg(JsonObject args, String key) {
     if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
+      return Optional.empty();
     }
-    return args.get(key).getAsString();
-  }
-
-  private static List<String> stringArrayArg(JsonObject args, String key) throws AiToolException {
-    if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
-    }
-    return readStringArray(args, key);
+    return Optional.of(args.get(key).getAsString());
   }
 
   private static List<String> optionalStringArrayArg(JsonObject args, String key) {
