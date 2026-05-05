@@ -25,7 +25,8 @@ import {
   AiModelChoice,
   ConversationMessage,
   TOOL_STATUS_CHIPS,
-  ToolCompleted,
+  ToolMessage,
+  toWireHistory,
 } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
 import { AiModalResizeDirective } from './ai-modal-resize.directive';
@@ -127,21 +128,25 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
   streaming = computed(() => this.aiService.streaming());
   streamedText = computed(() => this.aiService.streamedText());
   error = computed(() => this.aiService.error());
-  toolsInFlight = computed(() => this.aiService.toolsInFlight());
-  toolsCompleted = computed(() => this.aiService.toolsCompleted());
 
   /**
-   * Returns the chip descriptor for a completed tool, or `null` when the
-   * status is OK (silent — we don't render anything for happy paths). Used by
-   * the template to drive a `*ngIf` and to pull chip text/tone.
-   *
-   * TODO(SRE-1958): no `ai-analysis-modal.component.spec.ts` exists today;
-   * when one is added, cover chip rendering for at least one non-OK status
-   * (e.g. EMPTY_FOR_RANGE, OUT_OF_RANGE) and assert the diagnostic flows into
-   * the matTooltip binding.
+   * Returns the chip-suffix descriptor for a tool entry, or `null` when
+   * the status is OK or IN_FLIGHT (the pill itself carries those — no
+   * extra suffix needed). Drives the template's `*ngIf` and pulls chip
+   * text/tone for non-OK terminal statuses.
    */
-  chipFor(t: ToolCompleted): { text: string; tone: 'warn' | 'error' } | null {
+  chipFor(t: ToolMessage): { text: string; tone: 'warn' | 'error' } | null {
+    if (t.status === 'IN_FLIGHT') return null;
     return TOOL_STATUS_CHIPS[t.status];
+  }
+
+  /** Composes the screen-reader label for a tool pill. */
+  ariaLabelFor(t: ToolMessage): string {
+    if (t.status === 'IN_FLIGHT') return `${t.label} — running`;
+    const chip = TOOL_STATUS_CHIPS[t.status];
+    const suffix = chip ? ` — ${chip.text}` : '';
+    const diag = t.diagnostic ? `: ${t.diagnostic}` : '';
+    return `${t.label}${suffix}${diag}`;
   }
 
   autoScrollEnabled = signal(true);
@@ -355,8 +360,10 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
    * auto-fire effect that drains the queue.
    */
   private async runQueuedPrompt(text: string): Promise<void> {
+    // Tool entries in the timeline (SRE-1963) are UI-only; strip them
+    // so the wire payload stays {role, content} as the backend expects.
     const updatedHistory: ConversationMessage[] = [
-      ...this.conversationHistory(),
+      ...toWireHistory(this.conversationHistory()),
       { role: 'user', content: text },
     ];
 

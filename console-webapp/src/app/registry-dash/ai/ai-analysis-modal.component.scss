@@ -249,7 +249,16 @@ mat-dialog-actions {
   }
 }
 
-.tool-indicator {
+// Persistent tool pill (SRE-1963). Renders inline in the chat scrollback
+// for every tool that ran. Stays visible after completion so the user
+// can see what was called. State variants:
+//   - --in-flight: italic, pulsing dots while running
+//   - --ok: solid muted pill (presence == success)
+//   - --warn / --error: chip suffix carries status text + tooltip
+.tool-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin: 8px 0;
   padding: 6px 10px;
   background: var(--ud-surface-2, #f5f5f5);
@@ -257,19 +266,35 @@ mat-dialog-actions {
   border-radius: 4px;
   font-size: 13px;
   color: var(--ud-text-muted, #666);
-  font-style: italic;
+  cursor: help;
+
+  &--in-flight {
+    font-style: italic;
+  }
+
+  &--warn {
+    border-left-color: var(--ud-warn-border, #ffd54f);
+  }
+
+  &--error {
+    border-left-color: var(--ud-error-border, #f5b3ad);
+  }
 }
 
-.tool-status-chip {
+.tool-pill-dots {
+  display: inline-block;
+  animation: tool-pulse 1.2s ease-in-out infinite;
+}
+
+.tool-pill-chip {
   display: inline-flex;
   align-items: center;
-  margin: 4px 8px 4px 0;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
   line-height: 1.4;
   font-weight: 500;
-  cursor: help;
+  font-style: normal;
 
   &--warn {
     background: var(--ud-warn-bg, #fff8e1);
@@ -282,12 +307,6 @@ mat-dialog-actions {
     color: var(--ud-error-text, #b00020);
     border: 1px solid var(--ud-error-border, #f5b3ad);
   }
-}
-
-.tool-indicator-dots {
-  display: inline-block;
-  margin-left: 2px;
-  animation: tool-pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes tool-pulse {

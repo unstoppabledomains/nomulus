@@ -14,7 +14,7 @@
 
 import { TestBed } from '@angular/core/testing';
 import { AiAnalysisService } from './ai-analysis.service';
-import { AiAnalyzeRequest } from './ai-analysis.models';
+import { AiAnalyzeRequest, ToolMessage } from './ai-analysis.models';
 
 function streamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -74,7 +74,7 @@ describe('AiAnalysisService', () => {
     expect(history.length).toBe(2);
     expect(history[0]).toEqual({ role: 'user', content: 'hi' });
     expect(history[1].role).toBe('assistant');
-    expect(history[1].content).toBe('hello world');
+    expect((history[1] as { content: string }).content).toBe('hello world');
     expect(service.hasActiveConversation()).toBeTrue();
     expect(service.lastRequest()?.page).toBe('explore');
   });
@@ -113,7 +113,7 @@ describe('AiAnalysisService', () => {
     expect(history.length).toBe(4);
     expect(history[2]).toEqual({ role: 'user', content: 'follow up' });
     expect(history[3].role).toBe('assistant');
-    expect(history[3].content).toBe('second');
+    expect((history[3] as { content: string }).content).toBe('second');
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -123,7 +123,7 @@ describe('AiAnalysisService', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('tool_result EMPTY_FOR_RANGE removes in-flight and records completed with diagnostic', async () => {
+  it('tool_result EMPTY_FOR_RANGE persists tool entry in conversationHistory with diagnostic (SRE-1963)', async () => {
     fetchSpy.and.resolveTo(
       streamResponse([
         'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
@@ -136,16 +136,16 @@ describe('AiAnalysisService', () => {
     req.conversationHistory = [{ role: 'user', content: 'q' }];
     await service.analyze(req);
 
-    expect(service.toolsInFlight()).toEqual([]);
-    const completed = service.toolsCompleted();
-    expect(completed.length).toBe(1);
-    expect(completed[0].tool).toBe('query_transfers');
-    expect(completed[0].status).toBe('EMPTY_FOR_RANGE');
-    expect(completed[0].ok).toBeTrue();
-    expect(completed[0].diagnostic).toContain('no rows for tld=tld');
+    const history = service.conversationHistory();
+    const toolEntries = history.filter((e): e is ToolMessage => e.role === 'tool');
+    expect(toolEntries.length).toBe(1);
+    expect(toolEntries[0].tool).toBe('query_transfers');
+    expect(toolEntries[0].status).toBe('EMPTY_FOR_RANGE');
+    expect(toolEntries[0].ok).toBeTrue();
+    expect(toolEntries[0].diagnostic).toContain('no rows for tld=tld');
   });
 
-  it('tool_result INVALID_ARGS records non-ok completed entry', async () => {
+  it('tool_result INVALID_ARGS persists non-ok tool entry in conversationHistory (SRE-1963)', async () => {
     fetchSpy.and.resolveTo(
       streamResponse([
         'data: {"type":"tool_use","tool":"query_revenue_breakdown","args":{}}\n\n',
@@ -158,13 +158,146 @@ describe('AiAnalysisService', () => {
     req.conversationHistory = [{ role: 'user', content: 'q' }];
     await service.analyze(req);
 
-    expect(service.toolsInFlight()).toEqual([]);
-    const completed = service.toolsCompleted();
-    expect(completed.length).toBe(1);
-    expect(completed[0].tool).toBe('query_revenue_breakdown');
-    expect(completed[0].status).toBe('INVALID_ARGS');
-    expect(completed[0].ok).toBeFalse();
-    expect(completed[0].diagnostic).toContain('Missing required arg');
+    const history = service.conversationHistory();
+    const toolEntries = history.filter((e): e is ToolMessage => e.role === 'tool');
+    expect(toolEntries.length).toBe(1);
+    expect(toolEntries[0].tool).toBe('query_revenue_breakdown');
+    expect(toolEntries[0].status).toBe('INVALID_ARGS');
+    expect(toolEntries[0].ok).toBeFalse();
+    expect(toolEntries[0].diagnostic).toContain('Missing required arg');
+  });
+
+  it('multiple sequential tool calls each get their own entry, ordered (SRE-1963)', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"OK"}\n\n',
+        'data: {"type":"tool_use","tool":"get_pricing_rules","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"get_pricing_rules","ok":true,"status":"EMPTY_FOR_RANGE","diagnostic":"no rules"}\n\n',
+        'data: {"type":"text","text":"done"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    const tools = service.conversationHistory().filter(
+      (e): e is ToolMessage => e.role === 'tool',
+    );
+    expect(tools.length).toBe(2);
+    expect(tools[0].tool).toBe('query_transfers');
+    expect(tools[0].status).toBe('OK');
+    expect(tools[1].tool).toBe('get_pricing_rules');
+    expect(tools[1].status).toBe('EMPTY_FOR_RANGE');
+  });
+
+  it('text → tool → text preserves chronological order in conversationHistory (SRE-1963)', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"text","text":"thinking..."}\n\n',
+        'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"OK"}\n\n',
+        'data: {"type":"text","text":"all done"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    await service.analyze(req);
+
+    const history = service.conversationHistory();
+    // Expect: user → assistant("thinking...") → tool → assistant("all done")
+    expect(history.length).toBe(4);
+    expect(history[0].role).toBe('user');
+    expect(history[1].role).toBe('assistant');
+    expect((history[1] as { content: string }).content).toBe('thinking...');
+    expect(history[2].role).toBe('tool');
+    expect(history[3].role).toBe('assistant');
+    expect((history[3] as { content: string }).content).toBe('all done');
+  });
+
+  it('IN_FLIGHT tool entry resolves to terminal state on cancel (SRE-1963)', async () => {
+    let abortFn: (() => void) | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(
+          enc.encode('data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n'),
+        );
+        abortFn = () => controller.close();
+      },
+    });
+    fetchSpy.and.callFake((_url: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      signal?.addEventListener('abort', () => abortFn?.());
+      return Promise.resolve(new Response(stream, { status: 200 }));
+    });
+
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q' }];
+    const analyzePromise = service.analyze(req);
+
+    // Yield until the tool_use frame has been processed (IN_FLIGHT
+    // entry visible in history). Don't cap iterations too low — fetch
+    // resolution + reader.read() each take a microtask plus internal
+    // promise-chain churn that varies by platform.
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 0));
+      const toolsNow = service.conversationHistory().filter(
+        (e): e is ToolMessage => e.role === 'tool',
+      );
+      if (toolsNow.length > 0) break;
+    }
+
+    service.cancel();
+    await analyzePromise;
+
+    const tools = service.conversationHistory().filter(
+      (e): e is ToolMessage => e.role === 'tool',
+    );
+    expect(tools.length).toBe(1);
+    expect(tools[0].status).not.toBe('IN_FLIGHT');
+    expect(tools[0].status).toBe('INTERNAL_ERROR');
+    expect(tools[0].diagnostic).toBe('Cancelled');
+  });
+
+  it('appendUserTurnAndAnalyze preserves tool entries from prior turns (SRE-1963)', async () => {
+    // First turn: text + tool + text.
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"tool_use","tool":"query_transfers","args":{}}\n\n',
+        'data: {"type":"tool_result","tool":"query_transfers","ok":true,"status":"OK"}\n\n',
+        'data: {"type":"text","text":"first reply"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'q1' }];
+    await service.analyze(req);
+
+    // Second turn: just text.
+    fetchSpy.and.resolveTo(
+      streamResponse([
+        'data: {"type":"text","text":"second reply"}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    await service.appendUserTurnAndAnalyze('q2', {
+      chartData: { rows: [], columns: [] },
+    });
+
+    // Tool entry from turn 1 must survive into turn 2's timeline.
+    const history = service.conversationHistory();
+    const tools = history.filter((e): e is ToolMessage => e.role === 'tool');
+    expect(tools.length).toBe(1);
+    expect(tools[0].tool).toBe('query_transfers');
+
+    // Wire-shape sent to backend on turn 2 must NOT contain the tool entry.
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    const wireRoles = (body.conversationHistory as Array<{ role: string }>).map(m => m.role);
+    expect(wireRoles).not.toContain('tool');
+    expect(wireRoles).toEqual(['user', 'assistant', 'user']);
   });
 
   it('cancel aborts the in-flight stream and clears streaming', async () => {
@@ -328,7 +461,5 @@ describe('AiAnalysisService', () => {
     expect(service.lastRequest()).toBeNull();
     expect(service.streamedText()).toBe('');
     expect(service.error()).toBeNull();
-    expect(service.toolsInFlight()).toEqual([]);
-    expect(service.toolsUsed()).toEqual([]);
   });
 });

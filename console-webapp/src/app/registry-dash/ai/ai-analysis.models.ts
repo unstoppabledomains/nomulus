@@ -57,6 +57,36 @@ export interface ConversationMessage {
   content: string;
 }
 
+/**
+ * A tool-call entry as it appears in the chat timeline. Persisted so the
+ * user can see every tool that ran (SRE-1963), interleaved chronologically
+ * with user/assistant turns. Status is `IN_FLIGHT` while the tool is
+ * running and resolves to a {@link ToolStatus} when the `tool_result`
+ * frame arrives. Tool entries are UI-only and are NOT sent back to the
+ * backend in subsequent {@link AiAnalyzeRequest.conversationHistory}.
+ */
+export interface ToolMessage {
+  role: 'tool';
+  tool: string;
+  label: string;
+  status: ToolStatus | 'IN_FLIGHT';
+  ok: boolean;
+  diagnostic?: string;
+}
+
+/** Union of all entries that appear in the modal's chat timeline. */
+export type ChatTimelineEntry = ConversationMessage | ToolMessage;
+
+/**
+ * Filters a UI timeline down to the wire shape the backend expects on
+ * subsequent turns. Tool entries are stripped because the LLM has
+ * already received tool results in-band on the current turn; replaying
+ * them would only confuse it.
+ */
+export function toWireHistory(timeline: ChatTimelineEntry[]): ConversationMessage[] {
+  return timeline.filter((e): e is ConversationMessage => e.role !== 'tool');
+}
+
 export interface AiPromptOption {
   icon: string;
   label: string;
@@ -110,23 +140,14 @@ export type AiStreamFrame =
     }
   | { type: 'done' };
 
-export interface ToolInFlight {
-  tool: string;
-  label: string;
-}
-
-export interface ToolCompleted {
-  tool: string;
-  label: string;
-  status: ToolStatus;
-  diagnostic?: string;
-  ok: boolean;
-}
-
 /**
  * Short chip text shown next to a completed tool when its status is not OK.
- * `null` means render no chip (silent success). The diagnostic from the frame
- * is surfaced separately as a tooltip.
+ * `null` means the pill itself is the only marker (no extra suffix). The
+ * diagnostic from the frame is surfaced separately as a tooltip on the pill.
+ *
+ * SRE-1963: with persistent tool pills, the OK case is now also visible —
+ * the pill renders by itself with no chip suffix, signaling success purely
+ * by being there. Non-OK cases append a chip with status text.
  */
 export const TOOL_STATUS_CHIPS: Record<ToolStatus, { text: string; tone: 'warn' | 'error' } | null> =
   {

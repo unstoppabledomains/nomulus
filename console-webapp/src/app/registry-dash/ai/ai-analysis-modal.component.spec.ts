@@ -27,7 +27,7 @@ import {
 } from './ai-analysis-modal.component';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiModalResizeDirective } from './ai-modal-resize.directive';
-import { ConversationMessage, ToolInFlight } from './ai-analysis.models';
+import { ChatTimelineEntry, ConversationMessage } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
 
 /**
@@ -41,9 +41,7 @@ class StubAiService {
   streaming = signal(false);
   streamedText = signal('');
   error = signal<string | null>(null);
-  toolsInFlight = signal<ToolInFlight[]>([]);
-  toolsUsed = signal<string[]>([]);
-  conversationHistory = signal<ConversationMessage[]>([]);
+  conversationHistory = signal<ChatTimelineEntry[]>([]);
   lastRequest = signal<unknown>(null);
   hasActiveConversation = signal(false);
 
@@ -58,8 +56,6 @@ class StubAiService {
     if (this.streaming()) return;
     this.streamedText.set('');
     this.error.set(null);
-    this.toolsInFlight.set([]);
-    this.toolsUsed.set([]);
   }
 
   clearError(): void {
@@ -664,6 +660,136 @@ describe('AiAnalysisModalComponent', () => {
       expect(textarea.getAttribute('cdkAutosizeMinRows')).toBe('1');
     });
   });
+
+  // ──────────────────────────────────────────────────────────────────
+  // SRE-1963: persistent tool pills in the chat timeline
+  // ──────────────────────────────────────────────────────────────────
+  describe('persistent tool pills (SRE-1963)', () => {
+    beforeEach(() => makeFixture());
+
+    it('renders an in-flight tool pill with pulsing dots', () => {
+      stubService.conversationHistory.set([
+        { role: 'user', content: 'q' },
+        {
+          role: 'tool',
+          tool: 'query_transfers',
+          label: '🔍 Searching transfers',
+          status: 'IN_FLIGHT',
+          ok: false,
+        },
+      ]);
+      fixture.detectChanges();
+      const pill: HTMLElement | null = fixture.nativeElement.querySelector('.tool-pill');
+      expect(pill).toBeTruthy();
+      expect(pill!.classList).toContain('tool-pill--in-flight');
+      expect(pill!.querySelector('.tool-pill-dots')).toBeTruthy();
+      expect(pill!.querySelector('.tool-pill-chip')).toBeNull();
+    });
+
+    it('renders an OK tool pill with no chip suffix and no dots', () => {
+      stubService.conversationHistory.set([
+        { role: 'user', content: 'q' },
+        {
+          role: 'tool',
+          tool: 'query_transfers',
+          label: '🔍 Searching transfers',
+          status: 'OK',
+          ok: true,
+        },
+      ]);
+      fixture.detectChanges();
+      const pill: HTMLElement | null = fixture.nativeElement.querySelector('.tool-pill');
+      expect(pill).toBeTruthy();
+      expect(pill!.classList).toContain('tool-pill--ok');
+      expect(pill!.querySelector('.tool-pill-dots')).toBeNull();
+      expect(pill!.querySelector('.tool-pill-chip')).toBeNull();
+    });
+
+    it('renders a non-OK tool pill with chip suffix and tone class', () => {
+      stubService.conversationHistory.set([
+        { role: 'user', content: 'q' },
+        {
+          role: 'tool',
+          tool: 'query_transfers',
+          label: '🔍 Searching transfers',
+          status: 'EMPTY_FOR_RANGE',
+          ok: true,
+          diagnostic: 'no rows for tld=tld',
+        },
+      ]);
+      fixture.detectChanges();
+      const pill: HTMLElement | null = fixture.nativeElement.querySelector('.tool-pill');
+      expect(pill).toBeTruthy();
+      expect(pill!.classList).toContain('tool-pill--warn');
+      const chip: HTMLElement | null = pill!.querySelector('.tool-pill-chip');
+      expect(chip).toBeTruthy();
+      expect(chip!.classList).toContain('tool-pill-chip--warn');
+      expect(chip!.textContent?.trim()).toBe('No data');
+    });
+
+    it('multiple tool entries render distinct pills in order', () => {
+      stubService.conversationHistory.set([
+        { role: 'user', content: 'q' },
+        {
+          role: 'tool',
+          tool: 'query_transfers',
+          label: '🔍 Searching transfers',
+          status: 'OK',
+          ok: true,
+        },
+        {
+          role: 'tool',
+          tool: 'get_pricing_rules',
+          label: '💰 Looking up pricing',
+          status: 'EMPTY_FOR_RANGE',
+          ok: true,
+        },
+      ]);
+      fixture.detectChanges();
+      const pills = fixture.nativeElement.querySelectorAll('.tool-pill') as NodeListOf<HTMLElement>;
+      expect(pills.length).toBe(2);
+      expect(pills[0].getAttribute('data-tool')).toBe('query_transfers');
+      expect(pills[1].getAttribute('data-tool')).toBe('get_pricing_rules');
+    });
+
+    it('tool pills persist after streaming flips to false', () => {
+      stubService.conversationHistory.set([
+        { role: 'user', content: 'q' },
+        {
+          role: 'tool',
+          tool: 'query_transfers',
+          label: '🔍 Searching transfers',
+          status: 'OK',
+          ok: true,
+        },
+        { role: 'assistant', content: 'done' },
+      ]);
+      stubService.streaming.set(false);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.tool-pill')).toBeTruthy();
+    });
+
+    it('chipFor returns null for IN_FLIGHT and OK', () => {
+      const inFlight = {
+        role: 'tool',
+        tool: 't',
+        label: 'l',
+        status: 'IN_FLIGHT',
+        ok: false,
+      } as const;
+      const ok = { role: 'tool', tool: 't', label: 'l', status: 'OK', ok: true } as const;
+      const error = {
+        role: 'tool',
+        tool: 't',
+        label: 'l',
+        status: 'INVALID_ARGS',
+        ok: false,
+      } as const;
+      expect(component.chipFor(inFlight)).toBeNull();
+      expect(component.chipFor(ok)).toBeNull();
+      expect(component.chipFor(error)?.tone).toBe('error');
+    });
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────
@@ -690,11 +816,10 @@ function makeData(overrides: Partial<AiAnalysisModalData> = {}): AiAnalysisModal
 }
 
 interface MockAiService {
-  conversationHistory: ReturnType<typeof signal<ConversationMessage[]>>;
+  conversationHistory: ReturnType<typeof signal<ChatTimelineEntry[]>>;
   streaming: ReturnType<typeof signal<boolean>>;
   streamedText: ReturnType<typeof signal<string>>;
   error: ReturnType<typeof signal<string | null>>;
-  toolsInFlight: ReturnType<typeof signal<any[]>>;
   hasActiveConversation: ReturnType<typeof signal<boolean>>;
   analyze: jasmine.Spy;
   clearStaleDisplayState: jasmine.Spy;
@@ -703,11 +828,10 @@ interface MockAiService {
 
 function createMockAiService(): MockAiService {
   return {
-    conversationHistory: signal<ConversationMessage[]>([]),
+    conversationHistory: signal<ChatTimelineEntry[]>([]),
     streaming: signal(false),
     streamedText: signal(''),
     error: signal<string | null>(null),
-    toolsInFlight: signal<any[]>([]),
     hasActiveConversation: signal(false),
     analyze: jasmine.createSpy('analyze').and.resolveTo(undefined),
     clearStaleDisplayState: jasmine.createSpy('clearStaleDisplayState'),
