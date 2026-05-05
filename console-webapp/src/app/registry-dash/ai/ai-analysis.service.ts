@@ -249,7 +249,6 @@ export class AiAnalysisService {
     }
 
     const metadata = overrides.metadata ?? last?.metadata ?? {
-      dateRange: { start: '', end: '' },
       filteredTlds: [],
       filteredRegistrars: [],
     };

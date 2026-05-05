@@ -14,7 +14,8 @@
     <app-ai-sparkle-button
       page="portfolio"
       [prompts]="aiPrompts"
-      [chartData]="dashService.filteredPortfolio()">
+      [chartData]="dashService.filteredPortfolio()"
+      [includeDateRange]="false">
     </app-ai-sparkle-button>
   </div>
   <p class="subtitle">All registrars accredited to operate under this registry, their status, domain counts, and authorized TLDs.</p>

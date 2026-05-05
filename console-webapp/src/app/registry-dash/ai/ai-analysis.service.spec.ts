@@ -34,7 +34,6 @@ function baseRequest(): AiAnalyzeRequest {
     page: 'explore',
     promptType: 'summarize_trends',
     metadata: {
-      dateRange: { start: '', end: '' },
       filteredTlds: [],
       filteredRegistrars: [],
     },
@@ -226,6 +225,48 @@ describe('AiAnalysisService', () => {
     expect(service.error()).toBe('something went wrong');
     service.clearError();
     expect(service.error()).toBeNull();
+  });
+
+  it('analyze forwards request body with dateRange omitted when caller did not set it', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),
+    );
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+    await service.analyze(req);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    expect(body.metadata.dateRange).toBeUndefined();
+  });
+
+  it('analyze forwards a populated dateRange unchanged when caller provides one', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),
+    );
+    const req = baseRequest();
+    req.metadata = {
+      ...req.metadata,
+      dateRange: { start: '2025-05-04', end: '2026-05-04' },
+    };
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+    await service.analyze(req);
+
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    expect(body.metadata.dateRange).toEqual({ start: '2025-05-04', end: '2026-05-04' });
+  });
+
+  it('appendUserTurnAndAnalyze fallback metadata omits dateRange', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"first"}\n\n', 'data: [DONE]\n\n']),
+    );
+    await service.appendUserTurnAndAnalyze('q', {
+      page: 'explore',
+      promptType: 'summarize_trends',
+      chartData: {},
+    });
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    expect(body.metadata.dateRange).toBeUndefined();
   });
 
   it('resetConversation clears state', async () => {
