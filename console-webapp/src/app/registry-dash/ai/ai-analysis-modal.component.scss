@@ -61,14 +61,14 @@
   }
 }
 
+.conversation-wrapper {
+  position: relative;
+}
+
 .conversation {
   max-height: 60vh;
   overflow-y: auto;
   margin-bottom: 16px;
-}
-
-mat-dialog-content {
-  position: relative;
 }
 
 .jump-to-latest-fab {

@@ -69,7 +69,6 @@ export class AiAnalysisModalComponent implements OnInit {
   autoScrollEnabled = signal(true);
   showJumpToLatest = computed(() => !this.autoScrollEnabled() && this.streaming());
   private programmaticScrollGuard = false;
-  private wasStreaming = false;
 
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,
@@ -84,6 +83,11 @@ export class AiAnalysisModalComponent implements OnInit {
     // Reactively follow streaming output: when streamedText or
     // conversationHistory changes, scroll to bottom if user hasn't
     // scrolled away. Guarded against running before the view is ready.
+    // Note: this also covers the streaming → idle transition because the
+    // service updates conversationHistory (with the assistant turn) BEFORE
+    // flipping streaming to false. On cancel, neither streamedText nor
+    // conversationHistory updates — desirable, since an interrupting user
+    // may have intentionally scrolled up.
     effect(() => {
       // Track these signals so the effect re-runs on change.
       this.streamedText();
@@ -92,21 +96,6 @@ export class AiAnalysisModalComponent implements OnInit {
       if (this.autoScrollEnabled()) {
         requestAnimationFrame(() => this.scrollToBottom());
       }
-    });
-
-    // Re-engage auto-scroll naturally on streaming → idle transition.
-    effect(() => {
-      const isStreaming = this.streaming();
-      if (this.wasStreaming && !isStreaming) {
-        if (!this.scrollContainer) {
-          this.wasStreaming = isStreaming;
-          return;
-        }
-        if (this.autoScrollEnabled()) {
-          requestAnimationFrame(() => this.scrollToBottom());
-        }
-      }
-      this.wasStreaming = isStreaming;
     });
   }
 
