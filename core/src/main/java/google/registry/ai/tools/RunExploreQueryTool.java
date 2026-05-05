@@ -81,11 +81,14 @@ public class RunExploreQueryTool implements AiTool {
           .append(": metrics=")
           .append(source.getAllowedMetrics())
           .append(", dimensions=")
-          .append(source.getAllowedDimensions());
+          .append(source.getAllowedDimensions())
+          .append(", dates=")
+          .append(source.supportsDateRange() ? "required" : "n/a (current-state snapshot)");
     }
     sb.append(
-        "\n\nAlways pass start_date and end_date (ISO YYYY-MM-DD). Filters registrar_ids, "
-            + "operations, activity_types are optional.");
+        "\n\nstart_date and end_date (ISO YYYY-MM-DD) are required for sources marked"
+            + " dates=required and ignored for sources marked dates=n/a. Filters registrar_ids,"
+            + " operations, activity_types are optional.");
     return sb.toString();
   }
 
@@ -115,13 +118,19 @@ public class RunExploreQueryTool implements AiTool {
     JsonObject startDate = new JsonObject();
     startDate.addProperty("type", "string");
     startDate.addProperty(
-        "description", "ISO date or datetime, inclusive (e.g. '2026-04-01').");
+        "description",
+        "ISO date or datetime, inclusive (e.g. '2026-04-01'). Required for sources that support"
+            + " dateRange (see tool description). Ignored for current-state sources like"
+            + " DOMAIN_COUNTS and PRICING_RULES.");
     props.add("start_date", startDate);
 
     JsonObject endDate = new JsonObject();
     endDate.addProperty("type", "string");
     endDate.addProperty(
-        "description", "ISO date or datetime, inclusive (e.g. '2026-04-30').");
+        "description",
+        "ISO date or datetime, inclusive (e.g. '2026-04-30'). Required for sources that support"
+            + " dateRange (see tool description). Ignored for current-state sources like"
+            + " DOMAIN_COUNTS and PRICING_RULES.");
     props.add("end_date", endDate);
 
     JsonObject metrics = new JsonObject();
@@ -174,8 +183,6 @@ public class RunExploreQueryTool implements AiTool {
     JsonArray required = new JsonArray();
     required.add("data_source");
     required.add("tld");
-    required.add("start_date");
-    required.add("end_date");
     required.add("metrics");
     schema.add("required", required);
 
@@ -193,13 +200,7 @@ public class RunExploreQueryTool implements AiTool {
       return ToolResult.invalidArgs("Missing required arg: tld");
     }
     Optional<String> startDate = stringArg(args, "start_date");
-    if (startDate.isEmpty()) {
-      return ToolResult.invalidArgs("Missing required arg: start_date");
-    }
     Optional<String> endDate = stringArg(args, "end_date");
-    if (endDate.isEmpty()) {
-      return ToolResult.invalidArgs("Missing required arg: end_date");
-    }
     if (!args.has("metrics") || args.get("metrics").isJsonNull()) {
       return ToolResult.invalidArgs("Missing required arg: metrics");
     }
@@ -220,6 +221,24 @@ public class RunExploreQueryTool implements AiTool {
           "Unknown data_source: " + dataSourceName.get() + ". Valid: " + validDataSourceNames());
     }
 
+    // Per-source date handling. Sources that support dateRange require both dates; sources that
+    // don't (DOMAIN_COUNTS, PRICING_RULES) silently strip any dates the LLM passes and surface a
+    // note in the OK payload so the LLM can echo the constraint back to the user.
+    String dateNote = null;
+    if (source.supportsDateRange()) {
+      if (startDate.isEmpty() || endDate.isEmpty()) {
+        return ToolResult.invalidArgs(
+            "start_date and end_date are required for data_source=" + source.name());
+      }
+    } else if (startDate.isPresent() || endDate.isPresent()) {
+      dateNote =
+          "start_date/end_date were ignored: "
+              + source.name()
+              + " is a current-state snapshot and does not support date filtering.";
+      startDate = Optional.empty();
+      endDate = Optional.empty();
+    }
+
     try {
       ToolJpaHelper.assertTldAccess(user, tld.get());
     } catch (AiToolException e) {
@@ -236,8 +255,8 @@ public class RunExploreQueryTool implements AiTool {
             registrarIds,
             operations,
             activityTypes,
-            startDate.get(),
-            endDate.get());
+            startDate.orElse(null),
+            endDate.orElse(null));
 
     // Tool-local audit log: descriptor-level detail not captured by the orchestrator's toolsUsed
     // list. Consolidation into the orchestrator's log line is a follow-up.
@@ -252,8 +271,8 @@ public class RunExploreQueryTool implements AiTool {
         registrarIds,
         operations,
         activityTypes,
-        startDate.get(),
-        endDate.get());
+        startDate.orElse(null),
+        endDate.orElse(null));
 
     JsonObject payload;
     try {
@@ -268,20 +287,27 @@ public class RunExploreQueryTool implements AiTool {
     } catch (AiToolException e) {
       return ToolResult.invalidArgs(e.getMessage());
     }
+    if (dateNote != null) {
+      JsonArray notes = new JsonArray();
+      notes.add(dateNote);
+      payload.add("notes", notes);
+    }
     int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
     if (rowCount > 0) {
       return ToolResult.ok(payload);
     }
-    return ToolResult.emptyForRange(
-        payload,
-        "no rows for data_source="
-            + source.name()
-            + ", tld="
-            + tld.get()
-            + " between "
-            + startDate.get()
-            + " and "
-            + endDate.get());
+    String emptyDiag =
+        startDate.isPresent() && endDate.isPresent()
+            ? "no rows for data_source="
+                + source.name()
+                + ", tld="
+                + tld.get()
+                + " between "
+                + startDate.get()
+                + " and "
+                + endDate.get()
+            : "no rows for data_source=" + source.name() + ", tld=" + tld.get();
+    return ToolResult.emptyForRange(payload, emptyDiag);
   }
 
   /**
