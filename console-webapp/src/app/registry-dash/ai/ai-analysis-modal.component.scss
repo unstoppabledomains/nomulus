@@ -71,6 +71,28 @@
   margin-bottom: 16px;
 }
 
+.ai-modal-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  z-index: 3;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.3) 50%,
+    rgba(0, 0, 0, 0.3) 60%,
+    transparent 60%,
+    transparent 70%,
+    rgba(0, 0, 0, 0.3) 70%,
+    rgba(0, 0, 0, 0.3) 80%,
+    transparent 80%
+  );
+}
+
 .jump-to-latest-fab {
   position: absolute;
   bottom: 16px;

@@ -15,13 +15,42 @@
 import { Component, ElementRef, Inject, ViewChild, computed, effect, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogConfig, MatDialogRef } from '@angular/material/dialog';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MaterialModule } from '../../material.module';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiAnalyzeRequest, AiModelChoice, ConversationMessage } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
+import { AiModalResizeDirective } from './ai-modal-resize.directive';
 import { marked } from 'marked';
+
+/**
+ * localStorage keys for persisting the user's chosen AI modal size.
+ */
+export const AI_MODAL_WIDTH_KEY = 'ai-modal-width-px';
+export const AI_MODAL_HEIGHT_KEY = 'ai-modal-height-px';
+
+/**
+ * Builds a MatDialogConfig for the AI analysis modal. Honors any
+ * previously-persisted size in localStorage; otherwise defaults to
+ * 960px wide x 85vh tall. Always caps at 95vw / 95vh.
+ *
+ * Single source of truth for all three dialog open call sites
+ * (sparkle button + 2x explore).
+ */
+export function aiModalConfig<T extends AiAnalysisModalData>(data: T): MatDialogConfig<T> {
+  const savedW = Number(localStorage.getItem(AI_MODAL_WIDTH_KEY));
+  const savedH = Number(localStorage.getItem(AI_MODAL_HEIGHT_KEY));
+  const width = savedW > 0 ? `${savedW}px` : '960px';
+  const height = savedH > 0 ? `${savedH}px` : '85vh';
+  return {
+    width,
+    height,
+    maxWidth: '95vw',
+    maxHeight: '95vh',
+    data,
+  };
+}
 
 @Pipe({ name: 'markdown', standalone: true })
 export class MarkdownPipe implements PipeTransform {
@@ -48,7 +77,7 @@ export interface AiAnalysisModalData {
 @Component({
   selector: 'app-ai-analysis-modal',
   standalone: true,
-  imports: [CommonModule, MaterialModule, FormsModule, MarkdownPipe],
+  imports: [CommonModule, MaterialModule, FormsModule, MarkdownPipe, AiModalResizeDirective],
   templateUrl: './ai-analysis-modal.component.html',
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
@@ -192,6 +221,24 @@ export class AiAnalysisModalComponent implements OnInit {
   jumpToLatest(): void {
     this.autoScrollEnabled.set(true);
     this.scrollToBottom();
+  }
+
+  /**
+   * Live-update the dialog size as the user drags the resize handle.
+   * Fires continuously during drag — no localStorage write here.
+   */
+  onModalResize(size: { width: number; height: number }): void {
+    this.dialogRef.updateSize(`${Math.round(size.width)}px`, `${Math.round(size.height)}px`);
+  }
+
+  /**
+   * Commit the chosen size to localStorage. Fires exactly once per drag,
+   * on mouseup. Subsequent dialog opens will pick this up via
+   * aiModalConfig().
+   */
+  onModalResizeCommit(size: { width: number; height: number }): void {
+    localStorage.setItem(AI_MODAL_WIDTH_KEY, String(Math.round(size.width)));
+    localStorage.setItem(AI_MODAL_HEIGHT_KEY, String(Math.round(size.height)));
   }
 
   private scrollToBottom(): void {

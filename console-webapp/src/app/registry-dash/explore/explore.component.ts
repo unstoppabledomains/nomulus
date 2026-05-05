@@ -29,6 +29,7 @@ import { AiAnalysisService } from '../ai/ai-analysis.service';
 import {
   AiAnalysisModalComponent,
   AiAnalysisModalData,
+  aiModalConfig,
 } from '../ai/ai-analysis-modal.component';
 import { EXPLORE_AI_ROW_CAP, AiModelChoice } from '../ai/ai-analysis.models';
 
@@ -165,11 +166,7 @@ export class ExploreComponent implements OnInit {
       savedModel: this.savedAiModel(),
     };
 
-    this.dialog.open(AiAnalysisModalComponent, {
-      width: '800px',
-      maxHeight: '90vh',
-      data,
-    });
+    this.dialog.open(AiAnalysisModalComponent, aiModalConfig(data));
   }
 
   addToCurrentChat(): void {
@@ -201,11 +198,7 @@ export class ExploreComponent implements OnInit {
       isAdmin: false,
       savedModel: this.savedAiModel(),
     };
-    this.dialog.open(AiAnalysisModalComponent, {
-      width: '800px',
-      maxHeight: '90vh',
-      data,
-    });
+    this.dialog.open(AiAnalysisModalComponent, aiModalConfig(data));
   }
 
   exportCsv(): void {
