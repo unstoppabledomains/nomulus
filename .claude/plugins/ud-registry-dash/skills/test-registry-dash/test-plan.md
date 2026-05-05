@@ -558,3 +558,64 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 - Final text reads something like *"Query exceeded 1s - try a narrower date range or smaller scope."*
 - Server log includes the descriptor line and the SQL state 57014.
 - No generic 502/504 gateway error reaches the browser.
+
+---
+
+## Test 30: Tier 3 Tool Use - Result-status chips (SRE-1958)
+
+**Goal:** Verify the modal renders disambiguated status chips next to tool-call indicators when a tool returns a non-OK status, with the diagnostic visible on hover.
+
+### Steps:
+1. Navigate to **Domain Activity** and open the analysis modal (any prompt).
+2. Wait for the initial analysis to finish.
+3. Trigger an `EMPTY_FOR_RANGE` case: ask "Show transfers for tld example between 2025-01-01 and 2025-01-02." (adjust dates to a known-empty window in the target env).
+4. Watch the tool indicator - when it resolves, a yellow/muted chip should appear with text "No data". Hover the chip; the tooltip must contain a diagnostic naming the active filter and data extent.
+5. Trigger an `INVALID_ARGS` case: via DevTools issue an analyze request with `tld=""` or omit a required arg. The chip should be red, text "Invalid args", tooltip naming the offending arg.
+6. Trigger a `PERMISSION_DENIED` case: while logged in as a non-FTE user with limited scope, ask about a TLD outside the scope. The chip should be red, text "No access".
+
+### Expected:
+- For `OK`: no chip, current silent green-checkmark behavior preserved.
+- For `EMPTY_FOR_RANGE`: yellow/muted chip "No data" + diagnostic in `matTooltip`.
+- For `OUT_OF_RANGE`: yellow chip "Out of range" + diagnostic.
+- For `INVALID_ARGS`: red chip "Invalid args" + diagnostic.
+- For `PERMISSION_DENIED`: red chip "No access" + diagnostic.
+- For `INTERNAL_ERROR`: red chip "Tool error" + sanitized diagnostic.
+- The streamed `tool_result` frame in the network tab carries `{type: "tool_result", tool, status, diagnostic?, ok}`.
+
+---
+
+## Test 31: Tier 3 - query_registrar_activity registrarIds filter (SRE-1958 regression)
+
+**Goal:** Confirm the previously-broken `registrarIds` filter on `query_registrar_activity` now actually filters in SQL and returns rows.
+
+### Steps:
+1. Pick a TLD with seeded activity for at least two registrars (alpha: `food` + `acme`; local: default Fixture TLD with `TheRegistrar`/`NewRegistrar`).
+2. Open the analysis modal on **Domain Activity**.
+3. Ask: "What activity is there for tld <X> for registrar <Y> over the last 30 days?" with concrete names.
+4. Watch the indicator and final response.
+5. Tail the server log (or Cloud Logging on alpha-gke) for the `query_registrar_activity` SQL.
+
+### Expected:
+- Final text cites only domains/events for registrar `<Y>` - no rows from any other registrar.
+- Emitted SQL contains a WHERE clause with `registrar_id IN (:registrarIds)` (or the equivalent parameter binding).
+- Status chip is `OK` (no chip rendered) with non-empty data.
+- If the same query is re-run with a registrar id outside the user's scope, response is `PERMISSION_DENIED`.
+
+---
+
+## Test 32: Tier 3 - March 2027 doesn't loop (SRE-1958 acceptance)
+
+**Goal:** Confirm asking about a date range entirely beyond available data terminates in a single tool round-trip with `OUT_OF_RANGE`, instead of looping.
+
+### Steps:
+1. Open the analysis modal on **Domain Activity** (or **Financials > Registry Revenue** / **Forecasting**).
+2. Ask: "Were there any transfers in March 2027?"
+3. Watch the tool indicators and the final assistant text.
+4. Tail the server log for `RegistryDashAiAction`.
+
+### Expected:
+- Exactly one `query_transfers` tool call fires (no retry loop).
+- The `tool_result` frame carries `status: "OUT_OF_RANGE"` and a diagnostic naming the latest available data point.
+- Modal renders a yellow "Out of range" chip with the diagnostic in tooltip.
+- Final assistant text tells the user the range is in the future and suggests a different range - does NOT silently say "no transfers in March 2027" without context.
+- Server log shows `toolsUsed=[query_transfers]` with no second invocation of the same tool with the same args.
