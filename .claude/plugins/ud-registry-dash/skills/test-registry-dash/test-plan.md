@@ -11,57 +11,64 @@
 
 ## Test 1: Sparkle Button Visibility
 
-**Goal:** Verify sparkle buttons appear on all 7 dashboard pages.
+**Goal:** Verify sparkle buttons appear on every dashboard page and on every Financials sub-tab (per SRE-1957 universal coverage).
 
 ### Steps:
 1. Navigate to **Domain Activity** (`/#/registry-dash/domain-activity`).
 2. Verify two sparkle icons (`auto_awesome`) appear — one per chart ("Activity Breakdown by TLD" and "Current Domain Counts by TLD").
 3. Hover over the sparkle icon — verify tooltip says "Analyze with AI".
-4. Navigate to **Financials → Registry Revenue** tab.
-5. Verify two sparkle icons appear on the revenue charts ("Registry Revenue by TLD", "Registry Revenue by Operation").
-6. Switch to **Financials → Forecasting** tab.
-7. Verify a sparkle icon appears on "Net Growth Projection". A second chart, "Domain Expirations by TLD", is conditionally rendered based on backend data availability — see [SRE-1935](https://linear.app/unstoppable-domains/issue/SRE-1935/charts-not-displaying-review-expirationcurveoptions) for the open investigation. If the second chart renders, it should also have a sparkle icon.
-8. Navigate to **Overview** (`/#/registry-dash/overview`).
-9. Verify three sparkle icons appear, one per chart: "Registrar Market Share", "Domain Activity Trend", "Renewal Rate by TLD".
-10. Navigate to **Data Exploration** (`/#/registry-dash/explore`).
-11. Before running a query, verify NO sparkle icon is visible (the button is conditional on chart data existing).
-12. Configure a query (Source: Domain Activity, Metric: Count, Group By: TLD) and click "Run Query".
-13. Verify a sparkle icon appears above the rendered chart.
-14. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
-15. Verify a single sparkle icon appears in the page header row, to the right of the "Registrar Portfolio" heading.
-16. Navigate to **Pricing** (`/#/registry-dash/pricing`).
-17. Verify a single sparkle icon appears in the page header row, between the "Registrar Custom Pricing Rules" heading and the "Add Rule" button.
+4. Navigate to **Financials → Overview** tab. Verify a sparkle icon appears on the "Registry Revenue by Operation" chart (added in SRE-1957).
+5. Switch to **Financials → Default Fees by TLD** tab. Verify a sparkle icon appears next to the "Default Fees per TLD per Operation" section heading (added in SRE-1957). This single sparkle covers both the bar chart and the fees table — its chart-context payload bundles both views.
+6. Switch to **Financials → Effective Fees** tab. Verify a sparkle icon appears next to the "Effective Fees by Registrar" heading (added in SRE-1957).
+7. Switch to **Financials → Registry Revenue** tab. Verify two sparkle icons appear on the revenue charts ("Registry Revenue by TLD", "Registry Revenue by Operation").
+8. Switch to **Financials → Forecasting** tab. Verify a sparkle icon appears on "Net Growth Projection". A second chart, "Domain Expirations by TLD", is conditionally rendered based on backend data availability — see [SRE-1935](https://linear.app/unstoppable-domains/issue/SRE-1935/charts-not-displaying-review-expirationcurveoptions) for the open investigation. If the second chart renders, it should also have a sparkle icon.
+9. Navigate to **Overview** (`/#/registry-dash/overview`).
+10. Verify three sparkle icons appear, one per chart: "Registrar Market Share", "Domain Activity Trend", "Renewal Rate by TLD".
+11. Navigate to **Data Exploration** (`/#/registry-dash/explore`).
+12. Before running a query, verify NO sparkle icon is visible (the button is conditional on chart data existing).
+13. Configure a query (Source: Domain Activity, Metric: Count, Group By: TLD) and click "Run Query".
+14. Verify a sparkle icon appears above the rendered chart.
+15. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
+16. Verify a single sparkle icon appears in the page header row, to the right of the "Registrar Portfolio" heading.
+17. Navigate to **Pricing** (`/#/registry-dash/pricing`).
+18. Verify a single sparkle icon appears in the page header row, between the "Registrar Custom Pricing Rules" heading and the "Add Rule" button.
 
 ### Expected:
-- Sparkle icons visible on all 7 pages (after query runs on Explore).
+- Sparkle icons visible on every page and every Financials sub-tab (after query runs on Explore). No tab/chart that renders meaningful data is missing a sparkle.
 - Icons are subtle (slightly transparent, opacity ~0.6) and become fully opaque on hover.
-- Charts also have an "open in new" explore button alongside the sparkle (Portfolio + Pricing have only the sparkle, no explore button).
+- Charts also have an "open in new" explore button alongside the sparkle on the pages that pre-date SRE-1957 (Portfolio + Pricing have only the sparkle, no explore button; the new Financials Overview/Default Fees/Effective Fees sparkles are sparkle-only).
 
 ---
 
 ## Test 2: Prompt Menu
 
-**Goal:** Verify clicking the sparkle button shows the correct prompt menu for each page.
+**Goal:** Verify clicking the sparkle button shows the correct prompt menu for each page, including the SRE-1957 cold-start "Ask anything…" entry as the last item on every menu.
 
 ### Steps:
 1. On **Domain Activity**, click the sparkle button.
-2. Verify menu shows 3 options:
+2. Verify menu shows 4 options in this order (presets first, ask-anything last):
    - `bar_chart` Summarize trends
    - `search` Find anomalies
    - `lightbulb` Suggest actions
+   - `chat` Ask anything…
 3. Press Escape to close the menu.
-4. Navigate to **Financials → Registry Revenue**, click sparkle. Verify the same 3 options as Domain Activity.
+4. Navigate to **Financials → Registry Revenue**, click sparkle. Verify the same 4 options as Domain Activity.
 5. Navigate to **Financials → Forecasting**, click sparkle.
 6. Verify menu shows:
    - `bar_chart` Summarize trends
    - `warning` Identify risks (NOT "Find anomalies")
    - `lightbulb` Suggest actions
-7. Navigate to **Overview**, click sparkle. Verify the same 3 generic options as Domain Activity.
-8. Navigate to **Portfolio**, click sparkle. Verify menu shows the same 3 generic options (`bar_chart` Summarize trends, `search` Find anomalies, `lightbulb` Suggest actions).
-9. Navigate to **Pricing**, click sparkle. Verify the same 3 generic options.
+   - `chat` Ask anything…
+7. Navigate to **Overview**, click sparkle. Verify the same 4 generic options as Domain Activity.
+8. Navigate to **Portfolio**, click sparkle. Verify the same 4 generic options.
+9. Navigate to **Pricing**, click sparkle. Verify the same 4 generic options.
+10. Navigate to **Financials → Overview**, click the SRE-1957 sparkle on the "Registry Revenue by Operation" chart. Verify the same 4 options as Registry Revenue (this sparkle reuses the `revenue-billing` page menu).
+11. Navigate to **Financials → Default Fees by TLD**, click the SRE-1957 sparkle. Verify the same 4 options as Pricing (this sparkle reuses the `pricing` page menu).
+12. Navigate to **Financials → Effective Fees**, click the SRE-1957 sparkle. Verify the same 4 options as Pricing.
 
 ### Expected:
-- Each page has 3 prompt options.
+- Every page's menu has exactly 4 prompt options — three page-specific presets plus "Ask anything…" pinned as the last entry.
+- "Ask anything…" uses the `chat` Material icon and never appears in the middle of the list.
 - Forecasting has "Identify risks" instead of "Find anomalies".
 - Menu closes when clicking outside or pressing Escape.
 
@@ -743,3 +750,60 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 - DevTools → Headers → Response Headers shows `content-type: text/event-stream;charset=utf-8` (charset present, lowercase or uppercase fine).
 - Server log is clean — no `Unsupported encoding` or `MalformedInput` warnings.
 - (Optional sanity) Repeat against an environment that does NOT have PR #128 — e.g. a stale alpha pre-deploy — and confirm the same prompt produces `?` substitutions there. This is the regression baseline.
+---
+
+## Test 38: Ask-anything cold-start entry (SRE-1957)
+
+**Goal:** Verify the new "Ask anything…" entry opens an idle modal with no auto-fired request, and that submitting the first turn from the follow-up input fires `/console-api/registry-dash/ai/analyze` with `promptType: "ask_anything"`, the same chart-context payload a preset would have sent, and a single-message `conversationHistory` containing the user's typed text.
+
+### Prerequisites:
+- Local-dev or alpha. No special seed.
+
+### Steps:
+1. Open DevTools → Network and filter on `analyze`.
+2. Navigate to **Domain Activity**.
+3. Click the sparkle button on the first chart. The menu opens with four entries; the last entry is `chat` Ask anything…
+4. Click "Ask anything…". The modal opens.
+5. Confirm the modal is **idle** — no streaming progress bar, no assistant-bubble being built, no `Response interrupted` error. The conversation area is empty. The follow-up input at the bottom is enabled with placeholder "Ask anything about this chart…" (note: NOT "Ask a follow-up question…").
+6. Confirm DevTools → Network shows **no** request to `/console-api/registry-dash/ai/analyze` was fired on modal open.
+7. Type `What changed last week?` into the follow-up input and press Enter (or click the send button).
+8. Confirm a single POST to `/console-api/registry-dash/ai/analyze` fires.
+9. Inspect the request body:
+   - `promptType` is `ask_anything`.
+   - `metadata.filteredTlds`, `metadata.filteredRegistrars`, `metadata.dateRange` reflect the current dashboard filters (same shape as a preset request).
+   - `chartData` is non-empty and matches the chart payload that a preset click on the same chart would send.
+   - `conversationHistory` is exactly `[{role: "user", content: "What changed last week?"}]` — no seeded preset prompt prepended.
+10. The assistant streams a response. The modal renders the streaming text and tool indicators normally.
+11. Type a follow-up turn and submit. Confirm `conversationHistory` now contains user→assistant→user, exactly as on the preset path.
+12. Click **Start new chat** in the modal header. Confirm the modal returns to the idle cold-start state — no auto-fired request, follow-up input ready to type — because the original entry was cold-start (empty seed).
+
+### Expected:
+- Step 6: zero `analyze` requests on modal open for the cold-start path. Preset path (regression check) still fires immediately on open.
+- Step 9: payload shape and chart-context fields are identical to a preset request — only `promptType` and the seed user turn differ.
+- Step 12: Start new chat does not silently send an empty-prompt request for cold-start entries.
+
+---
+
+## Test 39: Universal sparkle coverage on Financials sub-tabs (SRE-1957 drift guard)
+
+**Goal:** Lock in SRE-1957's universal-coverage promise so future refactors don't silently strip the new ✨ buttons. Each Financials sub-tab is asserted independently with the page-type and prompt menu it should report at the analyze endpoint.
+
+### Prerequisites:
+- Local-dev or alpha. Default `Fixture.java` data is sufficient.
+
+### Steps:
+1. Open DevTools → Network and filter on `analyze`.
+2. Navigate to **Financials → Overview**. Click the sparkle on "Registry Revenue by Operation" → click "Summarize trends".
+3. Inspect the `analyze` request: `page` is `revenue-billing`, `promptType` is `summarize_trends`. (The Overview chart reuses the revenue-billing prompt menu rather than introducing a new page type.)
+4. Close the modal.
+5. Switch to **Financials → Default Fees by TLD**. Click the sparkle next to the section heading → click "Summarize trends".
+6. Inspect the request: `page` is `pricing`, `promptType` is `summarize_trends`. The `chartData` payload contains BOTH a `feesByTld` aggregated bar dataset AND a `tldFeeEntries` raw list (single sparkle covers both views).
+7. Close the modal.
+8. Switch to **Financials → Effective Fees**. Click the sparkle next to "Effective Fees by Registrar" → click "Summarize trends".
+9. Inspect the request: `page` is `pricing`, `promptType` is `summarize_trends`. `chartData` is the filtered effective-fees row list.
+10. For each of the three sparkles above, also click "Ask anything…" and confirm it opens the cold-start modal (no auto-fired request) — these sparkles use the same shared component so the behavior must be uniform.
+
+### Expected:
+- All three SRE-1957 sparkles fire requests with the page types declared above.
+- Tabs that previously had no sparkle now do; no Financials sub-tab is missing one when its data renders.
+- The cold-start "Ask anything…" entry is uniformly available on every new sparkle.

@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "e8626eb68db64bcbd42b6d21b5bfa4a645f751bd",
-  "lastReviewedAt": "2026-05-05",
+  "lastReviewedCommit": "61ad2fdeeda4a0866e5f4186a24ea03869efcc94",
+  "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "Tier 3 (PRs #122, #124, #126), Add-to-AI-Chat (#125), modal state reset / abort fix (#127, SRE-1954), and SSE UTF-8 charset fix (#128, SRE-1952). Adds tests 30-37 covering tool fan-out, batch-2 guardrails, registrar-scoped permission, post-#127 conversation lifecycle, promptVersion=v1.0.2, maxRows truncation, modal abort/reset behavior, and multibyte rendering."
+  "lastReviewerNote": "SRE-1957 entry-point coverage: \"Ask anything\u2026\" cold-start entry on every preset menu, sparkle buttons added on Financials Overview / Default Fees by TLD / Effective Fees sub-tabs. Updates Test 1 (visibility on new Financials sub-tabs), Test 2 (4-item menu with cold-start last), and adds Test 38 (cold-start request payload) and Test 39 (universal coverage drift guard)."
 }
