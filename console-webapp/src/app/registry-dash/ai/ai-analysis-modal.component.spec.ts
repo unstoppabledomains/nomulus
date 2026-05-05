@@ -72,8 +72,18 @@ async function setup(
   data: AiAnalysisModalData,
   mockService: MockAiService,
 ): Promise<ComponentFixture<AiAnalysisModalComponent>> {
-  const dashSpy = jasmine.createSpyObj('RegistryDashService', ['updateSettingsSelf']);
+  const dashSpy = jasmine.createSpyObj('RegistryDashService', [
+    'updateSettingsSelf',
+    'getAiModelCatalog',
+  ]);
   dashSpy.updateSettingsSelf.and.returnValue(of(undefined));
+  // Master added a getAiModelCatalog() call in modal ngOnInit (PR #132,
+  // SRE-1959). Stub a populated catalog so modal init doesn't fall back
+  // to the empty-families branch.
+  dashSpy.getAiModelCatalog.and.returnValue(of({
+    catalog: { haiku: [{ id: 'haiku-x' }], sonnet: [{ id: 'sonnet-x' }], opus: [{ id: 'opus-x' }] },
+    fetchedAt: '2026-01-01T00:00:00Z',
+  }));
 
   await TestBed.configureTestingModule({
     imports: [AiAnalysisModalComponent, NoopAnimationsModule],
