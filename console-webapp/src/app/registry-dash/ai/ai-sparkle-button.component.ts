@@ -20,6 +20,7 @@ import {
   AiAnalysisModalComponent,
   AiAnalysisModalData,
 } from './ai-analysis-modal.component';
+import { AiAnalysisService } from './ai-analysis.service';
 import { AiPromptOption, AiAnalyzeRequest, AiModelChoice } from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
 
@@ -39,6 +40,7 @@ export class AiSparkleButtonComponent {
   constructor(
     private dialog: MatDialog,
     private dashService: RegistryDashService,
+    private aiService: AiAnalysisService,
   ) {}
 
   onPromptSelect(prompt: AiPromptOption) {
@@ -47,6 +49,12 @@ export class AiSparkleButtonComponent {
     const regIds = this.dashService.selectedRegistrarIds();
     const savedModel = (this.dashService.settingsCache()?.['aiModel']
       || localStorage.getItem('ai-model-preference')) as AiModelChoice | undefined;
+
+    // Each ✨ click is chart-scoped: start from a clean slate so we never
+    // render the previous session's history, errors, or partial response,
+    // and so the new modal's userMessage actually fires (instead of being
+    // skipped by hasActiveConversation()).
+    this.aiService.resetConversation();
 
     const data: AiAnalysisModalData = {
       title: `${prompt.label} — ${this.pageLabel()}`,
@@ -69,6 +77,13 @@ export class AiSparkleButtonComponent {
       maxHeight: '90vh',
       data,
     });
+    // Note: we deliberately do NOT subscribe to afterClosed() to reset state.
+    // afterClosed() fires after the dialog's close animation (~300ms), which
+    // creates a race with rapid close-then-open: the prior dialog's
+    // afterClosed handler would fire after the new dialog's analyze() had
+    // already started, aborting the new request. The pre-open reset above
+    // is sufficient — it aborts any in-flight stream and clears all state
+    // before opening the next dialog.
   }
 
   private pageLabel(): string {
