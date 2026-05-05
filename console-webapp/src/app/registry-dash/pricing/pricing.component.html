@@ -16,7 +16,8 @@
         <app-ai-sparkle-button
           page="pricing"
           [prompts]="aiPrompts"
-          [chartData]="filteredRules()">
+          [chartData]="filteredRules()"
+          [includeDateRange]="false">
         </app-ai-sparkle-button>
         <button mat-raised-button color="primary" (click)="openAddForm()">
           <mat-icon>add</mat-icon> Add Rule
