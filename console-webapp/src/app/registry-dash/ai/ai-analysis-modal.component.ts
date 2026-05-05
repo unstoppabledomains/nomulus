@@ -113,6 +113,20 @@ export class AiAnalysisModalComponent implements OnInit {
   showJumpToLatest = computed(() => !this.autoScrollEnabled() && this.streaming());
   private programmaticScrollGuard = false;
 
+  // Sub-feature 3: prompt queue. Submitting while streaming pushes the
+  // text onto pendingQueue; queued items fire serially after the active
+  // response completes (auto-fire effect below). Stop sets isPaused so the
+  // queue stays preserved without being drained until the user resumes.
+  pendingQueue = signal<string[]>([]);
+  pendingCount = computed(() => this.pendingQueue().length);
+  isPaused = signal(false);
+  // Synchronous guard preventing the auto-fire effect from re-firing
+  // before the just-scheduled `runQueuedPrompt(head)` microtask runs and
+  // flips `streaming` to true. Without it, the post-pop effect re-run in
+  // the same tick sees streaming still false and would drain the rest of
+  // the queue immediately.
+  private firingInProgress = false;
+
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,
     @Inject(MAT_DIALOG_DATA) public data: AiAnalysisModalData,
@@ -139,6 +153,38 @@ export class AiAnalysisModalComponent implements OnInit {
       if (this.autoScrollEnabled()) {
         requestAnimationFrame(() => this.scrollToBottom());
       }
+    });
+
+    // Sub-feature 3: auto-fire queued prompts. Re-runs whenever streaming,
+    // error, paused, or queue changes. Returns early on every "blocked"
+    // condition so it never recurses or infinite-loops:
+    //  - streaming → wait for completion
+    //  - error → wait for user to click Retry
+    //  - paused → wait for user to click Resume (Stop scenario)
+    //  - empty queue → nothing to do
+    //  - firingInProgress → already scheduled a head-fire this tick;
+    //    avoids draining the entire queue before `analyze()` flips
+    //    `streaming` to true (the gate that normally throttles firing).
+    // When firing, we pop the head synchronously (so a re-run in the same
+    // tick sees an empty queue) and defer the actual `analyze()` call to a
+    // microtask to avoid touching signals while another effect is still
+    // resolving.
+    effect(() => {
+      const isStreaming = this.streaming();
+      const hasError = !!this.error();
+      const queue = this.pendingQueue();
+      if (this.isPaused()) return;
+      if (isStreaming) return;
+      if (hasError) return;
+      if (queue.length === 0) return;
+      if (this.firingInProgress) return;
+      const [head, ...rest] = queue;
+      this.firingInProgress = true;
+      this.pendingQueue.set(rest);
+      queueMicrotask(() => {
+        this.firingInProgress = false;
+        this.runQueuedPrompt(head);
+      });
     });
   }
 
@@ -174,15 +220,43 @@ export class AiAnalysisModalComponent implements OnInit {
     });
   }
 
-  async sendFollowUp() {
-    const input = this.followUpText.trim();
-    if (!input) return;
+  /**
+   * Thin wrapper for the template's send-button click. Routes through
+   * `enqueueOrSend` so the streaming-vs-idle decision lives in one place.
+   */
+  sendFollowUp(): void {
+    this.enqueueOrSend(this.followUpText);
+  }
 
+  /**
+   * Single entry point for new prompt submissions. While the AI is still
+   * responding (or the queue is paused after a Stop), the prompt is
+   * appended to `pendingQueue` instead of firing immediately; the
+   * auto-fire effect drains the queue serially once the response
+   * completes. Otherwise the prompt is sent immediately.
+   */
+  enqueueOrSend(text: string): void {
+    const input = text.trim();
+    if (!input) return;
+    if (this.streaming() || this.isPaused()) {
+      this.pendingQueue.update(q => [...q, input]);
+      this.followUpText = '';
+      return;
+    }
+    this.followUpText = '';
+    void this.runQueuedPrompt(input);
+  }
+
+  /**
+   * Send a prompt whose text is supplied directly (i.e. NOT read from
+   * `followUpText`). Used both for the immediate-send path and for the
+   * auto-fire effect that drains the queue.
+   */
+  private async runQueuedPrompt(text: string): Promise<void> {
     const updatedHistory: ConversationMessage[] = [
       ...this.conversationHistory(),
-      { role: 'user', content: input },
+      { role: 'user', content: text },
     ];
-    this.followUpText = '';
 
     await this.aiService.analyze({
       page: this.data.page,
@@ -195,7 +269,40 @@ export class AiAnalysisModalComponent implements OnInit {
     });
   }
 
+  removeQueued(idx: number): void {
+    this.pendingQueue.update(q => q.filter((_, i) => i !== idx));
+  }
+
+  /**
+   * Hoist a queued prompt back into the input for editing. The chip is
+   * removed so the user doesn't end up with a duplicate after re-sending.
+   */
+  editQueued(idx: number): void {
+    const item = this.pendingQueue()[idx];
+    if (item === undefined) return;
+    this.followUpText = item;
+    this.removeQueued(idx);
+  }
+
+  resumeQueue(): void {
+    this.isPaused.set(false);
+    // Auto-fire effect picks up the remaining queue.
+  }
+
+  /**
+   * Clears both the paused gate AND the error signal so the auto-fire
+   * effect can proceed. We clear `error` here (rather than relying on
+   * analyze()) because the effect reads `error()` BEFORE firing — without
+   * an explicit clear the effect would short-circuit.
+   */
+  retryAfterError(): void {
+    this.isPaused.set(false);
+    this.aiService.error.set(null);
+  }
+
   startNewChat() {
+    this.pendingQueue.set([]);
+    this.isPaused.set(false);
     this.aiService.resetConversation();
     this.sendInitialRequest();
   }
@@ -209,12 +316,18 @@ export class AiAnalysisModalComponent implements OnInit {
   onFollowUpKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      this.sendFollowUp();
+      this.enqueueOrSend(this.followUpText);
     }
   }
 
   onStop(): void {
     this.aiService.cancel();
+    // Preserve the queue but prevent the auto-fire effect from draining
+    // it once cancel() flips streaming → false. The user can hit Resume
+    // to restart, or remove/edit chips first.
+    if (this.pendingQueue().length > 0) {
+      this.isPaused.set(true);
+    }
   }
 
   toggleAdvanced() {

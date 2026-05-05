@@ -82,6 +82,34 @@
 </mat-dialog-content>
 
 <mat-dialog-actions>
+  <div *ngIf="pendingCount() > 0 || (isPaused() && pendingCount() > 0) || (error() && pendingCount() > 0)"
+       class="queue-row">
+    <span class="queue-label" *ngIf="pendingCount() > 0">Queued ({{ pendingCount() }}):</span>
+    <mat-chip-listbox class="queue-chips" *ngIf="pendingCount() > 0">
+      <mat-chip *ngFor="let item of pendingQueue(); let i = index"
+                [removable]="true"
+                (removed)="removeQueued(i)"
+                (click)="editQueued(i)"
+                matTooltip="Click to edit, x to remove">
+        {{ item.length > 50 ? (item.substring(0, 50) + '…') : item }}
+        <mat-icon matChipRemove>cancel</mat-icon>
+      </mat-chip>
+    </mat-chip-listbox>
+    <button *ngIf="isPaused() && pendingCount() > 0"
+            mat-stroked-button
+            color="primary"
+            class="queue-resume-btn"
+            (click)="resumeQueue()">
+      Resume
+    </button>
+    <button *ngIf="error() && pendingCount() > 0"
+            mat-stroked-button
+            color="warn"
+            class="queue-retry-btn"
+            (click)="retryAfterError()">
+      Retry queue
+    </button>
+  </div>
   <div class="follow-up-bar">
     <textarea
       cdkTextareaAutosize
@@ -94,9 +122,12 @@
     <button mat-icon-button
             [matTooltip]="streaming() ? 'Stop response' : 'Send'"
             [disabled]="!streaming() && !followUpText.trim()"
-            (click)="streaming() ? onStop() : sendFollowUp()">
+            (click)="streaming() ? onStop() : enqueueOrSend(followUpText)">
       <mat-icon>{{ streaming() ? 'stop' : 'send' }}</mat-icon>
     </button>
+  </div>
+  <div *ngIf="streaming() && followUpText.trim().length > 0" class="queue-hint">
+    Will send after current response{{ pendingCount() > 0 ? ' (' + pendingCount() + ' queued)' : '' }}
   </div>
   <button mat-button mat-dialog-close>Close</button>
 </mat-dialog-actions>
