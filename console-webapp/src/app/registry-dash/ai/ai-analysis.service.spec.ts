@@ -221,6 +221,13 @@ describe('AiAnalysisService', () => {
     expect(service.error()).toBeNull();
   });
 
+  it('clearError sets error to null', () => {
+    service.error.set('something went wrong');
+    expect(service.error()).toBe('something went wrong');
+    service.clearError();
+    expect(service.error()).toBeNull();
+  });
+
   it('resetConversation clears state', async () => {
     fetchSpy.and.resolveTo(
       streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),

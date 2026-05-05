@@ -126,6 +126,13 @@ export class AiAnalysisModalComponent implements OnInit {
   // the same tick sees streaming still false and would drain the rest of
   // the queue immediately.
   private firingInProgress = false;
+  // Monotonic counter used to invalidate already-scheduled drain
+  // microtasks. The auto-fire effect captures the current value before
+  // queuing its microtask; the microtask only runs `runQueuedPrompt`
+  // when its captured value still matches. `startNewChat()` bumps this,
+  // which neutralizes any in-flight microtask so a stale queued head
+  // can't fire into (and abort) the freshly-started chat.
+  private drainGeneration = 0;
 
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,
@@ -181,8 +188,13 @@ export class AiAnalysisModalComponent implements OnInit {
       const [head, ...rest] = queue;
       this.firingInProgress = true;
       this.pendingQueue.set(rest);
+      // Capture the generation; if startNewChat() (or any other reset)
+      // bumps `drainGeneration` before this microtask runs, the captured
+      // gen no longer matches and we skip firing the now-stale head.
+      const gen = ++this.drainGeneration;
       queueMicrotask(() => {
         this.firingInProgress = false;
+        if (gen !== this.drainGeneration) return;
         this.runQueuedPrompt(head);
       });
     });
@@ -297,12 +309,19 @@ export class AiAnalysisModalComponent implements OnInit {
    */
   retryAfterError(): void {
     this.isPaused.set(false);
-    this.aiService.error.set(null);
+    this.aiService.clearError();
   }
 
   startNewChat() {
     this.pendingQueue.set([]);
     this.isPaused.set(false);
+    // Invalidate any in-flight auto-fire microtask: the effect already
+    // synchronously popped a queue head and scheduled a microtask before
+    // we got here. Bumping drainGeneration (and clearing firingInProgress
+    // for good measure) ensures that microtask becomes a no-op instead
+    // of firing the stale head into (and aborting) the new chat.
+    this.firingInProgress = false;
+    this.drainGeneration++;
     this.aiService.resetConversation();
     this.sendInitialRequest();
   }

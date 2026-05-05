@@ -82,10 +82,9 @@
 </mat-dialog-content>
 
 <mat-dialog-actions>
-  <div *ngIf="pendingCount() > 0 || (isPaused() && pendingCount() > 0) || (error() && pendingCount() > 0)"
-       class="queue-row">
-    <span class="queue-label" *ngIf="pendingCount() > 0">Queued ({{ pendingCount() }}):</span>
-    <mat-chip-listbox class="queue-chips" *ngIf="pendingCount() > 0">
+  <div *ngIf="pendingCount() > 0" class="queue-row">
+    <span class="queue-label">Queued ({{ pendingCount() }}):</span>
+    <mat-chip-set class="queue-chips">
       <mat-chip *ngFor="let item of pendingQueue(); let i = index"
                 [removable]="true"
                 (removed)="removeQueued(i)"
@@ -94,7 +93,7 @@
         {{ item.length > 50 ? (item.substring(0, 50) + '…') : item }}
         <mat-icon matChipRemove>cancel</mat-icon>
       </mat-chip>
-    </mat-chip-listbox>
+    </mat-chip-set>
     <button *ngIf="isPaused() && pendingCount() > 0"
             mat-stroked-button
             color="primary"

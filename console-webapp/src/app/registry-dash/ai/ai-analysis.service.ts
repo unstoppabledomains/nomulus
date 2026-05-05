@@ -65,6 +65,16 @@ export class AiAnalysisService {
     this.toolsUsed.set([]);
   }
 
+  /**
+   * Public setter for clearing the error signal. Consumers (e.g. the
+   * modal's retryAfterError flow) should use this rather than reaching
+   * into `error.set(null)` directly so the service retains ownership of
+   * its own state.
+   */
+  clearError(): void {
+    this.error.set(null);
+  }
+
   resetConversation(): void {
     this.abortController?.abort();
     this.abortController = null;

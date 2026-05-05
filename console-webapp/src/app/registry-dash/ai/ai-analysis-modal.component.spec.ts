@@ -62,6 +62,10 @@ class StubAiService {
     this.toolsUsed.set([]);
   }
 
+  clearError(): void {
+    this.error.set(null);
+  }
+
   resetConversation(): void {
     this.conversationHistory.set([]);
     this.hasActiveConversation.set(false);
@@ -465,6 +469,47 @@ describe('AiAnalysisModalComponent', () => {
       expect(component.pendingQueue()).toEqual([]);
       expect(component.isPaused()).toBeFalse();
     });
+
+    it('startNewChat invalidates a scheduled-but-not-yet-fired drain microtask', fakeAsync(() => {
+      // Race scenario: the auto-fire effect synchronously pops a queue
+      // head and schedules a microtask, then the user clicks Start New
+      // Chat BEFORE the microtask runs. The stale microtask must NOT
+      // fire the popped head into the new chat (which would also abort
+      // the new chat's initial analyze() call).
+      stubService.streaming.set(false);
+      stubService.error.set(null);
+
+      const callsBefore = stubService.analyzeCalls.length;
+      // Push something into pendingQueue → effect runs synchronously,
+      // pops head, schedules microtask. We deliberately do NOT flush
+      // microtasks yet.
+      component.pendingQueue.set(['stale-head']);
+      // The effect uses a signal write (pendingQueue.set([])) which
+      // schedules. Trigger effect resolution without flushing the
+      // outer microtask. In Angular 19 signals, effects run in the
+      // current zone — detectChanges resolves them. After this, the
+      // queue should be empty (head popped) but the microtask still
+      // pending.
+      fixture.detectChanges();
+      expect(component.pendingQueue()).toEqual([]);
+
+      // Now invoke startNewChat BEFORE microtasks flush.
+      component.startNewChat();
+      // startNewChat → sendInitialRequest → analyze() (one call recorded).
+      // The stale microtask should now be a no-op.
+      flushMicrotasks();
+      tick();
+      flushMicrotasks();
+
+      // We expect exactly ONE analyze call (the one from startNewChat's
+      // sendInitialRequest), NOT two (which would happen if the stale
+      // 'stale-head' microtask also fired).
+      const newCalls = stubService.analyzeCalls.length - callsBefore;
+      expect(newCalls).toBe(1);
+      // And specifically the recorded call should NOT carry the stale head.
+      const lastCall = stubService.analyzeCalls.at(-1);
+      expect(lastCall?.history.at(-1)?.content).not.toBe('stale-head');
+    }));
 
     it('renders one chip per queued prompt with truncation past 50 chars', () => {
       // Pause first so the auto-fire effect doesn't drain the queue
