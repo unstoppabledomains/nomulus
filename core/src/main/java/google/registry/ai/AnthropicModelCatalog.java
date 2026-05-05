@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import okhttp3.OkHttpClient;
@@ -93,7 +94,17 @@ public class AnthropicModelCatalog {
       @Named("anthropicApiBaseUrl") String baseUrl,
       @Named("anthropicApiKey") String apiKey,
       @Named("modelCatalogTtlMinutes") int ttlMinutes) {
-    this.httpClient = httpClient;
+    // Reuse the connection pool from the shared client but apply tighter per-call
+    // timeouts. The chat-streaming client has a 120s read timeout to accommodate
+    // long completions; that's wildly too long for a metadata fetch on the modal-
+    // open critical path. 10s connect/read keeps modal-open snappy on TTL expiry,
+    // and the catalog falls back to its hardcoded seed on timeout.
+    this.httpClient =
+        httpClient
+            .newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build();
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     this.apiKey = apiKey;
     this.cacheTtlMillis = Math.max(1, ttlMinutes) * 60_000L;

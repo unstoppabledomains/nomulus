@@ -86,6 +86,12 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       return;
     }
 
+    // Resolve the model catalog OUTSIDE the JPA transaction: a TTL-expired catalog
+    // triggers a synchronous Anthropic fetch, and we don't want to hold a DB
+    // connection open while waiting on an external service.
+    Object catalogSnapshot = modelCatalog.currentCatalog();
+    String catalogFetchedAt = modelCatalog.lastFetchedAt().toString();
+
     tm().transact(
         () -> {
           // Load all registries with their TLDs and users
@@ -162,8 +168,8 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
           Map<String, Object> response = new HashMap<>();
           response.put("registries", registryList);
           response.put("systemInfo", systemInfo);
-          response.put("aiModelCatalog", modelCatalog.currentCatalog());
-          response.put("aiModelCatalogFetchedAt", modelCatalog.lastFetchedAt().toString());
+          response.put("aiModelCatalog", catalogSnapshot);
+          response.put("aiModelCatalogFetchedAt", catalogFetchedAt);
 
           consoleApiParams.response().setPayload(
               consoleApiParams.gson().toJson(response));
