@@ -31,6 +31,7 @@ import {
   AiAnalysisModalData,
 } from '../ai/ai-analysis-modal.component';
 import { EXPLORE_AI_ROW_CAP, AiModelChoice } from '../ai/ai-analysis.models';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({
   selector: 'app-explore',
@@ -43,6 +44,7 @@ export class ExploreComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private dashService = inject(RegistryDashService);
   private dialog = inject(MatDialog);
+  private userDataService = inject(UserDataService);
   exploreService = inject(ExploreService);
   aiService = inject(AiAnalysisService);
   readonly aiPrompts = EXPLORE_PROMPTS;
@@ -162,7 +164,7 @@ export class ExploreComponent implements OnInit {
       userMessage: EXPLORE_PROMPTS[0].userMessage,
       metadata: this.buildMetadata(),
       chartData: truncated,
-      isAdmin: false,
+      isAdmin: this.userDataService.userData()?.isAdmin ?? false,
       savedModel: this.savedAiModel(),
     };
 
@@ -199,7 +201,7 @@ export class ExploreComponent implements OnInit {
       userMessage: EXPLORE_PROMPTS[0].userMessage,
       metadata: this.buildMetadata(),
       chartData: truncated,
-      isAdmin: false,
+      isAdmin: this.userDataService.userData()?.isAdmin ?? false,
       savedModel: this.savedAiModel(),
     };
     this.dialog.open(AiAnalysisModalComponent, {

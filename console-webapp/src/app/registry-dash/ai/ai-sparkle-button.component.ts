@@ -22,6 +22,7 @@ import {
 } from './ai-analysis-modal.component';
 import { AiPromptOption, AiAnalyzeRequest, AiModelChoice } from './ai-analysis.models';
 import { RegistryDashService, computeDateRange } from '../registry-dash.service';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({
   selector: 'app-ai-sparkle-button',
@@ -34,12 +35,18 @@ export class AiSparkleButtonComponent {
   @Input({ required: true }) page!: AiAnalyzeRequest['page'];
   @Input({ required: true }) prompts!: AiPromptOption[];
   @Input({ required: true }) chartData!: any;
-  @Input() isAdmin = false;
+  /** Optional override; defaults to UserDataService.userData()?.isAdmin. */
+  @Input() isAdmin?: boolean;
 
   constructor(
     private dialog: MatDialog,
     private dashService: RegistryDashService,
+    private userDataService: UserDataService,
   ) {}
+
+  private resolvedIsAdmin(): boolean {
+    return this.isAdmin ?? this.userDataService.userData()?.isAdmin ?? false;
+  }
 
   onPromptSelect(prompt: AiPromptOption) {
     const range = this.dashService.selectedRangeConfig();
@@ -61,7 +68,7 @@ export class AiSparkleButtonComponent {
         filteredRegistrars: regIds,
       },
       chartData: this.chartData,
-      isAdmin: this.isAdmin,
+      isAdmin: this.resolvedIsAdmin(),
       savedModel,
     };
 
