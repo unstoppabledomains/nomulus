@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "e8626eb68db64bcbd42b6d21b5bfa4a645f751bd",
-  "lastReviewedAt": "2026-05-05",
+  "lastReviewedCommit": "1f22362d4090e79e4bf4e5be79372386f61eff2d",
+  "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "Tier 3 (PRs #122, #124, #126), Add-to-AI-Chat (#125), modal state reset / abort fix (#127, SRE-1954), and SSE UTF-8 charset fix (#128, SRE-1952). Adds tests 30-37 covering tool fan-out, batch-2 guardrails, registrar-scoped permission, post-#127 conversation lifecycle, promptVersion=v1.0.2, maxRows truncation, modal abort/reset behavior, and multibyte rendering."
+  "lastReviewerNote": "SRE-1959: dynamic Anthropic model catalog (admin panel + force-refresh) and complexity-based routing for background turns. Adds tests 38-41."
 }
