@@ -43,6 +43,24 @@ public interface AiTool {
    */
   JsonElement execute(JsonObject args, User user) throws AiToolException;
 
+  /**
+   * Static complexity tag the orchestrator uses to route the post-tool synthesis turn to a
+   * cheaper model when none of the tools called this turn warrant the user-selected model.
+   */
+  default Complexity complexity() {
+    return Complexity.MEDIUM;
+  }
+
+  /** Difficulty of synthesizing this tool's output. */
+  enum Complexity {
+    /** Lookups and other one-shot reads — Haiku is sufficient. */
+    EASY,
+    /** Aggregations and structured queries — Sonnet is sufficient. */
+    MEDIUM,
+    /** Free-form analysis — keep the user-selected model. */
+    COMPLEX
+  }
+
   /** User-visible failure during tool execution (bad args, permission denied, etc.). */
   class AiToolException extends Exception {
     public AiToolException(String message) {

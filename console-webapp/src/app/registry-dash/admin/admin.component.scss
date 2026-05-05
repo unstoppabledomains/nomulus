@@ -150,3 +150,42 @@ h3 {
   align-items: center;
   margin-top: 8px;
 }
+
+.ai-models-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.ai-models-family h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ud-text-secondary);
+}
+
+.ai-models-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.ai-models-row code {
+  font-family: var(--ud-font-mono, monospace);
+  font-size: 12px;
+}
+
+.ai-models-name {
+  color: var(--ud-text-secondary);
+  font-size: 11px;
+}
+
+.ai-models-empty {
+  font-style: italic;
+  color: var(--ud-text-secondary);
+  font-size: 12px;
+}

@@ -26,6 +26,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import google.registry.ai.AiOrchestrator;
 import google.registry.ai.AiRateLimiter;
+import google.registry.ai.AnthropicModelCatalog;
 import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.User;
 import google.registry.persistence.transaction.JpaTestExtensions;
@@ -59,6 +60,7 @@ class RegistryDashAiActionTest {
       new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
 
   @Mock private AiOrchestrator orchestrator;
+  @Mock private AnthropicModelCatalog modelCatalog;
   private AiRateLimiter rateLimiter;
   private ConsoleApiParams params;
   private FakeResponse response;
@@ -95,7 +97,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), modelCatalog);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
@@ -128,7 +130,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), modelCatalog);
     action.run();
 
     String written = response.getStringWriter().toString();
@@ -142,7 +144,7 @@ class RegistryDashAiActionTest {
   void testBadRequest_missingPayload() {
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.empty(), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.empty(), orchestrator, rateLimiter, defaultPromptConfig(), modelCatalog);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -157,7 +159,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), modelCatalog);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(400);
@@ -224,7 +226,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, strictLimiter, defaultPromptConfig());
+            params, Optional.of(json), orchestrator, strictLimiter, defaultPromptConfig(), modelCatalog);
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);
@@ -270,7 +272,7 @@ class RegistryDashAiActionTest {
 
     RegistryDashAiAction action =
         new RegistryDashAiAction(
-            params, Optional.of(json), orchestrator, rateLimiter, promptConfig);
+            params, Optional.of(json), orchestrator, rateLimiter, promptConfig, modelCatalog);
     action.run();
     return capturedPrompt[0];
   }

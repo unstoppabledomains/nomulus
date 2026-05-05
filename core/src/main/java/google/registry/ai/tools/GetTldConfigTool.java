@@ -59,6 +59,11 @@ public class GetTldConfigTool implements AiTool {
   }
 
   @Override
+  public Complexity complexity() {
+    return Complexity.EASY;
+  }
+
+  @Override
   public String description() {
     return "Returns a TLD's configuration: current state (PREDELEGATION/QUIET_PERIOD/"
         + "GENERAL_AVAILABILITY), currency, premium/reserved list names, DNS writers, and the"
