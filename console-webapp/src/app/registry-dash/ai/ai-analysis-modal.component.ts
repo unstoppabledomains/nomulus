@@ -19,7 +19,12 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MaterialModule } from '../../material.module';
 import { AiAnalysisService } from './ai-analysis.service';
-import { AiAnalyzeRequest, AiModelChoice, ConversationMessage } from './ai-analysis.models';
+import {
+  AiAnalyzeRequest,
+  AiModelCatalog,
+  AiModelChoice,
+  ConversationMessage,
+} from './ai-analysis.models';
 import { RegistryDashService } from '../registry-dash.service';
 import { marked } from 'marked';
 
@@ -55,6 +60,17 @@ export interface AiAnalysisModalData {
 export class AiAnalysisModalComponent implements OnInit {
   static readonly SYSTEM_PROMPT_DRAFT_PREFIX = 'ai-system-prompt-draft:';
   selectedModel = signal<AiModelChoice>('sonnet');
+  catalog = signal<AiModelCatalog | undefined>(undefined);
+  /** Family shorthands ('haiku'/'sonnet'/'opus') currently available — others are hidden. */
+  availableFamilies = computed<AiModelChoice[]>(() => {
+    const c = this.catalog();
+    if (!c) return ['haiku', 'sonnet', 'opus'];
+    const out: AiModelChoice[] = [];
+    if (c.haiku && c.haiku.length > 0) out.push('haiku');
+    if (c.sonnet && c.sonnet.length > 0) out.push('sonnet');
+    if (c.opus && c.opus.length > 0) out.push('opus');
+    return out;
+  });
   conversationHistory = computed(() => this.aiService.conversationHistory());
   followUpText = '';
   showAdvanced = signal(false);
@@ -97,6 +113,15 @@ export class AiAnalysisModalComponent implements OnInit {
     // history) on the sparkle-button path runs in that component's pre-open
     // `resetConversation()` call instead of via `afterClosed()`.
     this.aiService.clearStaleDisplayState();
+    this.dashService.getAiModelCatalog().subscribe((res) => {
+      this.catalog.set(res.catalog);
+      // If the user's saved/default selection is no longer available, fall back
+      // to the first family that is.
+      const families = this.availableFamilies();
+      if (families.length > 0 && !families.includes(this.selectedModel())) {
+        this.selectedModel.set(families[0]);
+      }
+    });
     if (!this.aiService.hasActiveConversation()) {
       this.sendInitialRequest();
     }

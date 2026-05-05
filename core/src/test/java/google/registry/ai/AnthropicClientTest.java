@@ -33,15 +33,13 @@ class AnthropicClientTest {
   private MockWebServer server;
   private AnthropicClient client;
 
+  private static final String SONNET_ID = "claude-sonnet-4-5-20250929";
+
   @BeforeEach
   void setUp() throws IOException {
     server = new MockWebServer();
     server.start();
-    client = new AnthropicClient(
-        new OkHttpClient(),
-        server.url("/").toString(),
-        "test-api-key",
-        "sonnet");
+    client = new AnthropicClient(new OkHttpClient(), server.url("/").toString(), "test-api-key");
   }
 
   @AfterEach
@@ -61,13 +59,15 @@ class AnthropicClientTest {
             + "data: {\"type\":\"message_stop\"}\n\n"));
 
     List<String> chunks = new ArrayList<>();
-    client.streamMessage("system prompt", List.of(), "sonnet", chunks::add);
+    client.streamMessage("system prompt", List.of(), SONNET_ID, chunks::add);
 
     RecordedRequest request = server.takeRequest();
     assertThat(request.getHeader("x-api-key")).isEqualTo("test-api-key");
     assertThat(request.getHeader("anthropic-version")).isEqualTo("2023-06-01");
     assertThat(request.getHeader("Content-Type")).startsWith("application/json");
-    assertThat(request.getBody().readUtf8()).contains("\"stream\":true");
+    String body = request.getBody().readUtf8();
+    assertThat(body).contains("\"stream\":true");
+    assertThat(body).contains("\"model\":\"" + SONNET_ID + "\"");
   }
 
   @Test
@@ -85,7 +85,7 @@ class AnthropicClientTest {
             + "data: {\"type\":\"message_stop\"}\n\n"));
 
     List<String> chunks = new ArrayList<>();
-    client.streamMessage("system prompt", List.of(), "sonnet", chunks::add);
+    client.streamMessage("system prompt", List.of(), SONNET_ID, chunks::add);
 
     assertThat(chunks).containsExactly("Hello ", "world").inOrder();
   }
@@ -98,7 +98,7 @@ class AnthropicClientTest {
 
     List<String> chunks = new ArrayList<>();
     IOException thrown = assertThrows(IOException.class,
-        () -> client.streamMessage("system prompt", List.of(), "sonnet", chunks::add));
+        () -> client.streamMessage("system prompt", List.of(), SONNET_ID, chunks::add));
     assertThat(thrown.getMessage()).contains("500");
   }
 
@@ -111,14 +111,33 @@ class AnthropicClientTest {
     List<String> chunks = new ArrayList<>();
     AnthropicClient.AnthropicRateLimitException thrown =
         assertThrows(AnthropicClient.AnthropicRateLimitException.class,
-            () -> client.streamMessage("system prompt", List.of(), "sonnet", chunks::add));
+            () -> client.streamMessage("system prompt", List.of(), SONNET_ID, chunks::add));
     assertThat(thrown.getMessage()).contains("429");
   }
 
   @Test
-  void testModelMapping() {
-    assertThat(AnthropicClient.resolveModelId("haiku")).isEqualTo("claude-haiku-4-5-20251001");
-    assertThat(AnthropicClient.resolveModelId("sonnet")).isEqualTo("claude-sonnet-4-5-20250929");
-    assertThat(AnthropicClient.resolveModelId("opus")).isEqualTo("claude-opus-4-6");
+  void testStreamingRequest_capturesTokenUsage() throws Exception {
+    server.enqueue(new MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "text/event-stream")
+        .setBody("event: message_start\n"
+            + "data: {\"type\":\"message_start\",\"message\":"
+            + "{\"usage\":{\"input_tokens\":42,\"output_tokens\":1}}}\n\n"
+            + "event: content_block_delta\n"
+            + "data: {\"type\":\"content_block_delta\",\"delta\":"
+            + "{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n"
+            + "event: message_delta\n"
+            + "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},"
+            + "\"usage\":{\"output_tokens\":7}}\n\n"
+            + "event: message_stop\n"
+            + "data: {\"type\":\"message_stop\"}\n\n"));
+
+    AnthropicClient.StreamResult result = client.streamMessageWithTools(
+        "system prompt", new com.google.gson.JsonArray(), SONNET_ID,
+        new com.google.gson.JsonArray(), e -> {});
+
+    assertThat(result.inputTokens()).isEqualTo(42);
+    assertThat(result.outputTokens()).isEqualTo(7);
+    assertThat(result.stopReason()).isEqualTo("end_turn");
   }
 }

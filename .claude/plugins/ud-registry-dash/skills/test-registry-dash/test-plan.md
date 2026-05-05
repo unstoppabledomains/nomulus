@@ -441,8 +441,6 @@
 - No data from a TLD outside the user's access scope ever appears in the modal.
 - Final text is a clear "I don't have access" rather than a stack trace.
 
-
-
 ---
 
 ## Test 21: Add to AI Chat from Explore
@@ -743,3 +741,101 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 - DevTools → Headers → Response Headers shows `content-type: text/event-stream;charset=utf-8` (charset present, lowercase or uppercase fine).
 - Server log is clean — no `Unsupported encoding` or `MalformedInput` warnings.
 - (Optional sanity) Repeat against an environment that does NOT have PR #128 — e.g. a stale alpha pre-deploy — and confirm the same prompt produces `?` substitutions there. This is the regression baseline.
+
+---
+
+## Test 38: Dynamic Model Catalog — chat modal reads from server
+
+**Goal:** Verify the chat modal's model selector is driven by the live `AnthropicModelCatalog` served at `GET /console-api/registry-dash/ai/analyze`.
+
+### Steps:
+1. Open the analysis modal via any sparkle.
+2. With DevTools - Network open, capture the request to `GET /console-api/registry-dash/ai/analyze` issued on modal open.
+3. Response: `{ catalog: { opus: [...], sonnet: [...], haiku: [...] }, fetchedAt: "<ISO-8601>" }`. Each entry has `id` (e.g. `claude-sonnet-4-5-20250929`) and optional `displayName` / `createdAt`.
+4. Verify the model toggle group renders a tab for every family that has at least one entry — and only those.
+5. Click each visible tab; selection persists to localStorage + per-user settings.
+
+### Edge cases:
+- Family with no entries: tab in the chat modal must be hidden (not greyed out, not present).
+- Stale saved selection: if the saved family is no longer in the catalog, modal falls back to the first available family.
+
+### Expected:
+- Tabs match the families present in the GET response.
+- POST `/console-api/registry-dash/ai/analyze` still sends family shorthand (`haiku`/`sonnet`/`opus`) in `request.model` — server-side resolution unchanged.
+
+---
+
+## Test 39: Admin AI Models panel
+
+**Goal:** Verify the admin page renders the live model catalog and the fetched-at timestamp.
+
+### Prerequisites:
+- Logged in as an FTE/admin user (admin GET requires `MANAGE_COST_BASIS`).
+
+### Steps:
+1. Navigate to **Admin** (`/#/registry-dash/admin`).
+2. Verify a card titled **AI Models** appears near the top (above "My View").
+3. Subtitle: "Top 3 GA models per family fetched from Anthropic. Auto-refreshed lazily on read; click below to force-refresh now." followed by `Fetched: <ISO-8601>`.
+4. Body shows three columns labeled **Opus**, **Sonnet**, **Haiku**, each listing up to 3 entries. Each entry shows the model id in monospace; if `displayName` is present, it renders below in a smaller, muted style.
+5. **Refresh now** button below the grid is enabled by default.
+
+### Expected:
+- Catalog matches `GET /console-api/registry-dash/admin` (`aiModelCatalog` + `aiModelCatalogFetchedAt`).
+- Empty families render as italic "none".
+
+---
+
+## Test 40: Force-refresh AI model catalog
+
+**Goal:** Verify the **Refresh now** button re-fetches `/v1/models` from Anthropic and updates `fetchedAt`.
+
+### Steps:
+1. On the **Admin** page, note the current `Fetched:` value.
+2. Click **Refresh now**. Button label briefly changes to "Refreshing…" and is disabled in flight.
+3. Network tab shows a POST to `/console-api/registry-dash/admin` with body `{"action":"refreshAiModels"}` returning 200 with the new catalog payload.
+4. Within ~1-2 seconds the button returns to "Refresh now" and `Fetched:` advances.
+5. Open the chat modal — selector reflects any net-new model in the appropriate family.
+
+### Edge cases:
+- Anthropic 5xx: catalog falls back to a hardcoded seed and the admin request still returns 200; `fetchedAt` advances. Server log: `Anthropic model catalog refresh failed; falling back to seed.`.
+
+### Expected:
+- `Fetched:` timestamp strictly increases across clicks.
+- Other app instances/tabs pick up the change at their own next TTL expiry (not immediately) — cache is per-instance.
+
+---
+
+## Test 41: Complexity-based routing for background turns
+
+**Goal:** Confirm `AiOrchestrator` runs turn 0 on the user-selected model and routes post-tool synthesis turns to a cheaper model based on the max complexity of tools just executed.
+
+### Prerequisites:
+- Local-dev or alpha (so server logs are accessible).
+- `ai.complexityRoutingEnabled: true` (default).
+
+### Steps:
+1. On **Pricing**, open the AI modal.
+2. Pick **Opus** in the model selector.
+3. Ask: `What are our pricing rules for tld example?` — exercises `get_pricing_rules` (EASY).
+4. Tail the server log for `AiOrchestrator` lines.
+5. Repeat MEDIUM: on **Financials > Registry Revenue**, ask `Break down revenue for tld example over the last 6 months by operation` (`query_revenue_breakdown`, MEDIUM).
+6. Repeat COMPLEX on **Domain Activity**: ask `What is our average renewal price by registrar over the last quarter for tld example?` (`run_explore_query`, COMPLEX).
+
+### Expected (per server log):
+- Two `AI turn=...` log lines from `AiOrchestrator` per request:
+  - `turn=0` always logs `model=claude-opus-...` (user-selected) regardless of tool.
+  - `turn=1` model depends on prior turn's max complexity:
+    - EASY -> `model=claude-haiku-...`
+    - MEDIUM -> `model=claude-sonnet-...`
+    - COMPLEX -> `model=claude-opus-...` (no downgrade)
+- Each turn includes `inputTokens=N, outputTokens=N`.
+- The `RegistryDashAiAction` summary line logs `modelShorthand=opus` (user's selection), unchanged by routing.
+
+### Rollback verification:
+- Set `ai.complexityRoutingEnabled: false` in the local-stack config override and restart.
+- Repeat step 3. Both turn 0 and turn 1 should log `model=claude-opus-...`. Set the flag back to `true` afterwards.
+
+### Tools complexity reference (as of this PR):
+- **EASY** — `get_pricing_rules`, `get_tld_config`, `get_registrar_details`.
+- **MEDIUM** (default) — `query_transfers`, `query_registrar_activity`, `query_domain_details`, `query_revenue_breakdown`, `query_renewal_rates`, `query_expiration_curve`.
+- **COMPLEX** — `run_explore_query`.

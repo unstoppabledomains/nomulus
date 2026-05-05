@@ -264,6 +264,13 @@ public class RegistryConfigSettings {
     public String apiKeySecretName;
     public String defaultModel;
     public int rateLimitPerHour;
+    /** Cache TTL for the dynamic Anthropic model catalog (minutes). 0/negative = 1 minute. */
+    public int modelCatalogTtlMinutes;
+    /**
+     * If true (default), the orchestrator routes post-tool synthesis turns to a cheaper model
+     * based on tool complexity. Flip to false for emergency rollback to "always user-selected".
+     */
+    public boolean complexityRoutingEnabled;
     public Prompts prompts;
     public Tools tools;
   }
