@@ -37,6 +37,12 @@ export class AiSparkleButtonComponent {
   @Input({ required: true }) chartData!: any;
   /** Optional override; defaults to UserDataService.userData()?.isAdmin. */
   @Input() isAdmin?: boolean;
+  /**
+   * Whether the host page has a time-range filter that meaningfully scopes
+   * `chartData`. Pages without a time filter (Pricing, Portfolio) should
+   * pass false so we don't fabricate a date range from the global default.
+   */
+  @Input() includeDateRange = true;
 
   constructor(
     private dialog: MatDialog,
@@ -55,7 +61,8 @@ export class AiSparkleButtonComponent {
     const savedModel = (this.dashService.settingsCache()?.['aiModel']
       || localStorage.getItem('ai-model-preference')) as AiModelChoice | undefined;
 
-    const dateRange = range ? computeDateRange(range.lookbackHours) : undefined;
+    const dateRange =
+      this.includeDateRange && range ? computeDateRange(range.lookbackHours) : undefined;
     const data: AiAnalysisModalData = {
       title: `${prompt.label} — ${this.pageLabel()}`,
       page: this.page,

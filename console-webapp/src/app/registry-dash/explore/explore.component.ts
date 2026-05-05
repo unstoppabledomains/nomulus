@@ -22,7 +22,16 @@ import { RegistryDashService, computeDateRange } from '../registry-dash.service'
 import { ExploreService } from './explore.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
 import { ExploreChartComponent } from './explore-chart/explore-chart.component';
-import { ChartType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
+import { ChartType, DataSourceType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
+
+/** Data sources whose results are scoped by time, so a `dateRange` is meaningful for the LLM. */
+const TIME_BASED_SOURCES: ReadonlySet<DataSourceType> = new Set<DataSourceType>([
+  'DOMAIN_ACTIVITY',
+  'REVENUE',
+  'RENEWAL_RATES',
+  'EXPIRATION_CURVE',
+  'TRANSACTIONS',
+]);
 import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
 import { EXPLORE_PROMPTS } from '../ai/ai-prompts';
 import { AiAnalysisService } from '../ai/ai-analysis.service';
@@ -137,10 +146,11 @@ export class ExploreComponent implements OnInit {
 
   private buildMetadata(): AiAnalysisModalData['metadata'] {
     const range = this.dashService.selectedRangeConfig();
-    const dateRange = range ? computeDateRange(range.lookbackHours) : undefined;
+    const isTimeBased = TIME_BASED_SOURCES.has(this.query().dataSource);
+    const dateRange = isTimeBased && range ? computeDateRange(range.lookbackHours) : undefined;
     return {
       ...(dateRange ? { dateRange } : {}),
-      granularity: range?.granularity,
+      granularity: isTimeBased ? range?.granularity : undefined,
       filteredTlds: this.dashService.selectedTlds(),
       filteredRegistrars: this.dashService.selectedRegistrarIds(),
       exploreDescriptor: this.query(),

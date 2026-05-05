@@ -53,7 +53,7 @@ export interface AiAnalysisModalData {
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
 export class AiAnalysisModalComponent implements OnInit {
-  static readonly SYSTEM_PROMPT_DRAFT_KEY = 'ai-system-prompt-draft';
+  static readonly SYSTEM_PROMPT_DRAFT_PREFIX = 'ai-system-prompt-draft:';
   selectedModel = signal<AiModelChoice>('sonnet');
   conversationHistory = computed(() => this.aiService.conversationHistory());
   followUpText = '';
@@ -75,10 +75,13 @@ export class AiAnalysisModalComponent implements OnInit {
       this.selectedModel.set(data.savedModel);
     }
     if (data.isAdmin) {
-      const saved = localStorage.getItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY);
+      // Pre-fill the textarea with this page's saved draft, but do NOT
+      // auto-open the Advanced panel. The override only fires if the admin
+      // explicitly toggles Advanced — this prevents a stale draft from
+      // silently replacing the system prompt on next chat.
+      const saved = localStorage.getItem(this.draftKey());
       if (saved) {
         this.editableSystemPrompt = saved;
-        this.showAdvanced.set(true);
       }
     }
   }
@@ -89,13 +92,18 @@ export class AiAnalysisModalComponent implements OnInit {
     }
   }
 
+  /** Per-page draft key so a draft saved on one page never leaks into another. */
+  private draftKey(): string {
+    return AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_PREFIX + this.data.page;
+  }
+
   onSystemPromptChange(value: string) {
     this.editableSystemPrompt = value;
     if (this.data.isAdmin) {
       if (value) {
-        localStorage.setItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY, value);
+        localStorage.setItem(this.draftKey(), value);
       } else {
-        localStorage.removeItem(AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_KEY);
+        localStorage.removeItem(this.draftKey());
       }
     }
   }

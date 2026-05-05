@@ -123,7 +123,7 @@ describe('AiAnalysisService', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('analyze never sends empty-string dateRange to backend', async () => {
+  it('analyze forwards request body with dateRange omitted when caller did not set it', async () => {
     fetchSpy.and.resolveTo(
       streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),
     );
@@ -133,10 +133,23 @@ describe('AiAnalysisService', () => {
 
     expect(fetchSpy).toHaveBeenCalled();
     const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
-    if (body.metadata.dateRange) {
-      expect(body.metadata.dateRange.start).not.toBe('');
-      expect(body.metadata.dateRange.end).not.toBe('');
-    }
+    expect(body.metadata.dateRange).toBeUndefined();
+  });
+
+  it('analyze forwards a populated dateRange unchanged when caller provides one', async () => {
+    fetchSpy.and.resolveTo(
+      streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),
+    );
+    const req = baseRequest();
+    req.metadata = {
+      ...req.metadata,
+      dateRange: { start: '2025-05-04', end: '2026-05-04' },
+    };
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+    await service.analyze(req);
+
+    const body = JSON.parse(fetchSpy.calls.mostRecent().args[1].body);
+    expect(body.metadata.dateRange).toEqual({ start: '2025-05-04', end: '2026-05-04' });
   });
 
   it('appendUserTurnAndAnalyze fallback metadata omits dateRange', async () => {

@@ -19,7 +19,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 import { ExploreComponent } from './explore.component';
 import { ExploreService } from './explore.service';
-import { ExploreResult } from './explore.models';
+import { ExploreResult, DEFAULT_QUERY } from './explore.models';
 import { RegistryDashService } from '../registry-dash.service';
 import { AiAnalysisService } from '../ai/ai-analysis.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
@@ -175,6 +175,35 @@ describe('ExploreComponent', () => {
     component.addToNewChat();
     const data = dialogSpy.open.calls.first().args[1]!.data as any;
     expect(data.isAdmin).toBeFalse();
+  });
+
+  it('addToNewChat omits dateRange when the data source is not time-based', () => {
+    component.query.set({
+      ...DEFAULT_QUERY,
+      filters: { ...DEFAULT_QUERY.filters },
+      dataSource: 'PRICING_RULES',
+    });
+    exploreServiceStub.result.set(sampleResult);
+    fixture.detectChanges();
+    component.addToNewChat();
+    const data = dialogSpy.open.calls.first().args[1]!.data as any;
+    expect(data.metadata.dateRange).toBeUndefined();
+    expect(data.metadata.granularity).toBeUndefined();
+  });
+
+  it('addToNewChat populates dateRange when the data source is time-based', () => {
+    component.query.set({
+      ...DEFAULT_QUERY,
+      filters: { ...DEFAULT_QUERY.filters },
+      dataSource: 'DOMAIN_ACTIVITY',
+    });
+    exploreServiceStub.result.set(sampleResult);
+    fixture.detectChanges();
+    component.addToNewChat();
+    const data = dialogSpy.open.calls.first().args[1]!.data as any;
+    expect(data.metadata.dateRange?.start).toBeTruthy();
+    expect(data.metadata.dateRange?.end).toBeTruthy();
+    expect(data.metadata.granularity).toBe('day');
   });
 
   it('addToCurrentChat is a no-op when there is no active conversation', () => {
