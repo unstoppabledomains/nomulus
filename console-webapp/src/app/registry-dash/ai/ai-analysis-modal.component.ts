@@ -109,7 +109,7 @@ export class AiAnalysisModalComponent implements OnInit {
 
   async sendFollowUp() {
     const input = this.followUpText.trim();
-    if (!input || this.streaming()) return;
+    if (!input) return;
 
     const updatedHistory: ConversationMessage[] = [
       ...this.conversationHistory(),
@@ -144,6 +144,10 @@ export class AiAnalysisModalComponent implements OnInit {
       event.preventDefault();
       this.sendFollowUp();
     }
+  }
+
+  onStop(): void {
+    this.aiService.cancel();
   }
 
   toggleAdvanced() {

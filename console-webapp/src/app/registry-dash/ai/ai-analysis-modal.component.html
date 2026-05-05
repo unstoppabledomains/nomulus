@@ -72,15 +72,19 @@
 
 <mat-dialog-actions>
   <div class="follow-up-bar">
-    <input
-      type="text"
+    <textarea
+      cdkTextareaAutosize
+      cdkAutosizeMinRows="1"
+      cdkAutosizeMaxRows="6"
       [(ngModel)]="followUpText" name="followUp"
       (keydown)="onFollowUpKeydown($event)"
       placeholder="Ask a follow-up question..."
-      [disabled]="streaming()"
-      class="follow-up-input" />
-    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">
-      <mat-icon>send</mat-icon>
+      class="follow-up-input"></textarea>
+    <button mat-icon-button
+            [matTooltip]="streaming() ? 'Stop response' : 'Send'"
+            [disabled]="!streaming() && !followUpText.trim()"
+            (click)="streaming() ? onStop() : sendFollowUp()">
+      <mat-icon>{{ streaming() ? 'stop' : 'send' }}</mat-icon>
     </button>
   </div>
   <button mat-button mat-dialog-close>Close</button>

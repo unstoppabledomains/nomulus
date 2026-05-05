@@ -73,6 +73,17 @@ export class AiAnalysisService {
     this.resetTransientState();
   }
 
+  /**
+   * Cancel the in-flight stream without disturbing conversation state.
+   * Aborts the active request and clears any error signal so an
+   * intentional interrupt does not surface as an error to the user.
+   * The analyze() finally-block will set streaming to false cleanly.
+   */
+  cancel(): void {
+    this.abortController?.abort();
+    this.error.set(null);
+  }
+
   async analyze(request: AiAnalyzeRequest): Promise<void> {
     this.abortController?.abort();
     const controller = new AbortController();

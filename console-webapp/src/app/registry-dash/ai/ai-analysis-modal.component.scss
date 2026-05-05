@@ -140,7 +140,11 @@ mat-dialog-actions {
     border: 1px solid var(--ud-border);
     border-radius: var(--ud-radius-sm);
     font-size: 14px;
+    font-family: inherit;
     outline: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    resize: none;
 
     &:focus {
       border-color: var(--ud-accent);
