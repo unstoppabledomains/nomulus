@@ -99,10 +99,53 @@ class RegistryDashAiActionTest {
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentType().toString())
+        .isEqualTo("text/event-stream; charset=utf-8");
     String written = response.getStringWriter().toString();
     assertThat(written).contains("Hello ");
     assertThat(written).contains("world");
     assertThat(written).contains("[DONE]");
+  }
+
+  @Test
+  void testSuccess_preservesNonLatin1Characters() throws Exception {
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{\"activity\":[]},\"conversationHistory\":["
+            + "{\"role\":\"user\",\"content\":\"Summarize trends\"}"
+            + "]}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    // Em-dash, smart quotes, and emoji all live outside Latin-1 (ISO-8859-1) and would be
+    // substituted with '?' if the response writer were not configured for UTF-8.
+    String emDash = "—";
+    String openQuote = "“";
+    String closeQuote = "”";
+    String emoji = "🚀"; // rocket
+    String multibyteText =
+        "Anomaly " + openQuote + "spike" + closeQuote + " " + emDash + " " + emoji;
+
+    doAnswer(
+            invocation -> {
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.TextEvent(multibyteText));
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+    action.run();
+
+    String written = response.getStringWriter().toString();
+    assertThat(written).contains(emDash);
+    assertThat(written).contains(openQuote);
+    assertThat(written).contains(closeQuote);
+    assertThat(written).contains(emoji);
+    assertThat(written).doesNotContain("?");
   }
 
   @Test
