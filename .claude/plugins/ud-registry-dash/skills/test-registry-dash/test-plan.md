@@ -12,6 +12,7 @@
 ## Test 1: Sparkle Button Visibility
 
 **Goal:** Verify sparkle buttons appear on every dashboard page and on every Financials sub-tab (per SRE-1957 universal coverage).
+**Tier:** smoke
 
 ### Steps:
 1. Navigate to **Domain Activity** (`/#/registry-dash/domain-activity`).
@@ -43,6 +44,7 @@
 ## Test 2: Prompt Menu
 
 **Goal:** Verify clicking the sparkle button shows the correct prompt menu for each page, including the SRE-1957 cold-start "Ask anything…" entry as the last item on every menu.
+**Tier:** smoke
 
 ### Steps:
 1. On **Domain Activity**, click the sparkle button.
@@ -77,6 +79,7 @@
 ## Test 3: Analysis Modal — Initial Request
 
 **Goal:** Verify selecting a prompt opens the modal and streams an AI response.
+**Tier:** full
 
 ### Steps:
 1. On **Domain Activity**, click sparkle → select "Summarize trends".
@@ -108,6 +111,7 @@
 ## Test 4: Follow-Up Conversation
 
 **Goal:** Verify follow-up questions work and maintain conversation context.
+**Tier:** full
 
 ### Steps:
 1. Complete Test 3 (have an analysis modal open with a completed response).
@@ -133,6 +137,7 @@
 ## Test 5: Model Switching
 
 **Goal:** Verify model can be changed and preference persists.
+**Tier:** full
 
 ### Steps:
 1. Open a sparkle analysis on any chart (default should be Sonnet on first ever use; otherwise the last-saved model).
@@ -159,6 +164,7 @@
 ## Test 6: Error Handling
 
 **Goal:** Verify error states display user-friendly messages.
+**Tier:** full
 
 ### Steps:
 1. Open sparkle and trigger an analysis — verify it works.
@@ -185,6 +191,7 @@
 ## Test 7: Registry Revenue Page
 
 **Goal:** Verify AI analysis works correctly on financial data.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Financials → Registry Revenue**.
@@ -203,6 +210,7 @@
 ## Test 8: Forecasting Page
 
 **Goal:** Verify AI analysis works on forecasting data.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Financials → Forecasting**.
@@ -222,6 +230,7 @@
 ## Test 9: Data Exploration Page
 
 **Goal:** Verify AI analysis works on dynamically-generated explore queries.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Data Exploration**.
@@ -241,6 +250,7 @@
 ## Test 10: Overview Page
 
 **Goal:** Verify AI analysis works on overview summary charts.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Overview**.
@@ -257,6 +267,7 @@
 ## Test 11: Modal Close Behavior
 
 **Goal:** Verify modal can be closed cleanly in all states.
+**Tier:** full
 
 ### Steps:
 1. Open analysis modal, wait for response to complete, click "Close" — verify modal closes.
@@ -276,6 +287,7 @@
 ## Test 12: Cross-Page Navigation
 
 **Goal:** Verify sparkle buttons work correctly when navigating between pages.
+**Tier:** full
 
 ### Steps:
 1. Run analysis on Domain Activity → close modal.
@@ -294,6 +306,7 @@
 ## Test 13: Portfolio Page Analysis
 
 **Goal:** Verify AI analysis works on registrar portfolio data (Tier 2).
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
@@ -314,6 +327,7 @@
 ## Test 14: Pricing Page Analysis
 
 **Goal:** Verify AI analysis works on pricing data (Tier 2).
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Pricing** (`/#/registry-dash/pricing`).
@@ -333,6 +347,7 @@
 ## Test 15: Prompts Endpoint API Smoke
 
 **Goal:** Verify the new `GET /console-api/registry-dash/ai/prompts` endpoint serves per-page menus from backend YAML config.
+**Tier:** smoke
 
 ### Steps:
 1. From any dashboard page, open DevTools → Console.
@@ -363,6 +378,8 @@
 ## Test 16: Config-Driven System Prompt (advanced, local-dev only)
 
 **Goal:** Verify the backend system prompt is built from `default-config.yaml` `ai.prompts` instead of hardcoded Java strings.
+**Tier:** full
+**Tier rationale:** Requires editing config + restarting the test server and firing an analysis to validate.
 
 ### Steps:
 1. With the local test server running, edit `core/src/main/java/google/registry/config/files/default-config.yaml` and change `ai.prompts.basePreamble` to a sentinel value, e.g. `"PREAMBLE_SMOKE_TEST"`.
@@ -384,6 +401,8 @@
 ## Test 17: Cross-Page Navigation (Tier 2 update)
 
 **Goal:** Verify Portfolio + Pricing slot into the existing cross-page nav flow without regressions.
+**Tier:** smoke
+**Tier rationale:** Cross-page nav DOM check — page-by-page sparkle visibility regression guard, no streaming required to confirm Portfolio + Pricing slot into nav.
 
 ### Steps:
 1. Run analysis on Portfolio → close modal.
@@ -402,6 +421,7 @@
 ## Test 18: Tier 3 Tool Use — Indicator UX
 
 **Goal:** Verify the analysis modal shows transient tool indicators when Claude calls a tool.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Domain Activity** (or any page with sparkle).
@@ -422,6 +442,7 @@
 ## Test 19: Tier 3 Tool Use — Server Log
 
 **Goal:** Confirm the server-side log line records `toolsUsed=` for tool-firing requests.
+**Tier:** full
 
 ### Steps:
 1. Tail the test server log (or Cloud Logging in alpha-gke) for `RegistryDashAiAction`.
@@ -437,6 +458,7 @@
 ## Test 20: Tier 3 Tool Use — Permission Scope
 
 **Goal:** Tools must respect per-user TLD scope.
+**Tier:** full
 
 ### Steps:
 1. Log in as a non-FTE user mapped to a single registry/TLD set.
@@ -453,6 +475,7 @@
 ## Test 21: Add to AI Chat from Explore
 
 **Goal:** Verify the Data Exploration page can hand a query result off to the AI chat — either as a fresh chat or appended to an existing in-session conversation.
+**Tier:** full
 
 ### Prerequisites:
 - Same as Test 1 (dashboard access, local dev or alpha).
@@ -493,28 +516,39 @@
 - No backend errors; existing sparkle button on every page still opens fresh chats independently.
 ## Test 22: Tier 3 Batch 2 — get_registrar_details
 
-Goal: confirm get_registrar_details fires when the user asks about a specific registrar. Steps: open modal on Overview, ask "Tell me more about registrar TheRegistrar". Watch for the "Looking up registrar" indicator. Server log should include toolsUsed=[get_registrar_details]. Final text should cite type/state/allowedTlds.
+Goal: confirm get_registrar_details fires when the user asks about a specific registrar.
+**Tier:** full
+Steps: open modal on Overview, ask "Tell me more about registrar TheRegistrar". Watch for the "Looking up registrar" indicator. Server log should include toolsUsed=[get_registrar_details]. Final text should cite type/state/allowedTlds.
 
 ## Test 23: Tier 3 Batch 2 — get_tld_config
 
-Goal: confirm get_tld_config fires for "how is TLD X configured" questions. Steps: open modal on Overview, ask "How is the example TLD configured? Which registrars can sell on it?". Watch for the "Looking up TLD config" indicator. Final text should cite TLD state, currency, and at least one allowed registrar by name. TLDs with > 100 allowed registrars should mention truncation.
+Goal: confirm get_tld_config fires for "how is TLD X configured" questions.
+**Tier:** full
+Steps: open modal on Overview, ask "How is the example TLD configured? Which registrars can sell on it?". Watch for the "Looking up TLD config" indicator. Final text should cite TLD state, currency, and at least one allowed registrar by name. TLDs with > 100 allowed registrars should mention truncation.
 
 ## Test 24: Tier 3 Batch 2 — query_revenue_breakdown
 
-Goal: confirm query_revenue_breakdown fires for revenue drill-down questions. Steps: open modal on Financials > Registry Revenue, ask "Break down revenue for tld example over the last 6 months by operation". Repeat with "by period". Verify date ranges over 2 years are rejected by the tool, and group_by=registrar returns a tool error (not supported in v2).
+Goal: confirm query_revenue_breakdown fires for revenue drill-down questions.
+**Tier:** full
+Steps: open modal on Financials > Registry Revenue, ask "Break down revenue for tld example over the last 6 months by operation". Repeat with "by period". Verify date ranges over 2 years are rejected by the tool, and group_by=registrar returns a tool error (not supported in v2).
 
 ## Test 25: Tier 3 Batch 2 — query_renewal_rates
 
-Goal: confirm query_renewal_rates fires for renewal-trend questions. Steps: open modal on Overview, ask "What's the renewal rate for tld example over the last year?". Final text should cite a numeric renewal rate.
+Goal: confirm query_renewal_rates fires for renewal-trend questions.
+**Tier:** full
+Steps: open modal on Overview, ask "What's the renewal rate for tld example over the last year?". Final text should cite a numeric renewal rate.
 
 ## Test 26: Tier 3 Batch 2 — query_expiration_curve
 
-Goal: confirm query_expiration_curve fires for forward-looking expiration questions. Steps: open modal on Financials > Forecasting, ask "How many domains in tld example expire in the next 12 months, broken out by month?". Verify months_ahead outside [1, 60] is silently clamped.
+Goal: confirm query_expiration_curve fires for forward-looking expiration questions.
+**Tier:** full
+Steps: open modal on Financials > Forecasting, ask "How many domains in tld example expire in the next 12 months, broken out by month?". Verify months_ahead outside [1, 60] is silently clamped.
 ---
 
 ## Test 27: Tier 3 Tool Use - Generic run_explore_query (positive)
 
 **Goal:** Confirm Claude reaches for `run_explore_query` for questions no specific tool answers.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Domain Activity** and open the analysis modal.
@@ -535,6 +569,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 28: Tier 3 Tool Use - Generic vs Specific Tool Selection (negative)
 
 **Goal:** Confirm Claude prefers specific tools over the generic when one applies. Otherwise the description-level tie-breaker is too weak and needs strengthening.
+**Tier:** full
 
 ### Steps:
 1. Navigate to **Domain Activity**.
@@ -552,6 +587,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 29: Tier 3 Tool Use - Statement-timeout error message
 
 **Goal:** Confirm the `statement_timeout` config knob produces a user-visible error rather than a generic gateway timeout.
+**Tier:** full
 
 ### Steps:
 1. Temporarily set `ai.tools.statementTimeoutSeconds: 1` in the local-stack `default-config.yaml` override.
@@ -569,6 +605,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 30: Tier 3 v1 — All four tools fire with correct indicator
 
 **Goal:** Verify each of the four PR #122 tools (`query_transfers`, `get_pricing_rules`, `query_registrar_activity`, `query_domain_details`) is reachable from a natural-language prompt and that the SSE wire format includes `tool_use` / `tool_result` / `done` events for at least one of them.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. Local-dev: run `helpers/seed-test-data.sh` so seeded transfer history, pricing rules, and at least one domain with multi-event history exist.
@@ -592,6 +629,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 31: Tier 3 Batch 2 — Guardrail validation
 
 **Goal:** Verify the validation gates documented in PR #124 produce user-visible tool errors rather than silently broken responses: `query_revenue_breakdown` rejects ranges > 2y and `group_by=registrar`; `query_expiration_curve` clamps `months_ahead` to [1, 60]; `get_tld_config` truncates `allowed_registrars` at 100.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev preferred (server log inspection is required). Alpha works for the date-range and clamp checks but not for the truncation case unless a TLD with > 100 allowed registrars exists.
@@ -617,6 +655,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 32: Tier 3 Batch 2 — Registrar-scoped permission denial
 
 **Goal:** Verify `get_registrar_details` enforces the new registrar-scoped permission gate (distinct from the TLD scope checked by Test 20).
+**Tier:** full
 
 ### Prerequisites:
 - A non-FTE user mapped to one specific registrar (e.g. `TheRegistrar`) and **not** mapped to another registrar that exists in the system (e.g. `NewRegistrar`). If the seeded fixture / `seed-test-data.sh` doesn't already provide one, mark this test partial and note the gap.
@@ -638,6 +677,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 33: Add to AI Chat — Conversation continues only via explicit "Add to current chat"
 
 **Goal:** Verify post-#127 behavior: the conversation owned by `AiAnalysisService` is preserved *only* when the user explicitly opts in via the Explore split-button "Add to current chat" item. Sparkle clicks on any page reset the conversation before opening (the singleton service is no longer treated as a per-page session resumer).
+**Tier:** full
 
 ### Prerequisites:
 - Same as Test 21. Test data sufficient for both the Domain Activity sparkle prompt and a non-empty Explore query result.
@@ -665,6 +705,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 34: run_explore_query — promptVersion bump to v1.0.2
 
 **Goal:** Confirm the `ai.prompts.version` bump (v1.0.1 → v1.0.2) shipped in PR #126 reaches the orchestrator log line, since the bump is what carries the tools-header tie-breaker that drives Test 28's specific-vs-generic selection.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha with access to `RegistryDashAiAction` log lines.
@@ -683,6 +724,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 35: run_explore_query — Row-cap truncation (local-dev only)
 
 **Goal:** Verify the `ai.tools.maxRows` config knob caps the result payload and surfaces truncation either in the assistant's final text or in the audit log.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev only. Edit `default-config.yaml`'s `ai.tools.maxRows` to a small value (e.g. `5`). Restart the test server. Seed enough rows that an aggregation will exceed 5.
@@ -705,6 +747,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 36: Modal state reset on open — no stale "Response interrupted" or cross-chart prompt bleed
 
 **Goal:** Verify the PR #127 fixes for the AI chat modal: SSE fetches are wrapped in an `AbortController`, in-flight streams are cancelled on supersede / reset, the user-visible "Response interrupted. Try again?" is suppressed for aborted (non-network) fetches, and clicking the sparkle on a different chart does NOT fire chart-A's prompt while opening on chart B.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. No special seed.
@@ -732,6 +775,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 37: AI SSE response — multibyte characters render correctly (UTF-8 charset)
 
 **Goal:** Verify the PR #128 fix: the AI SSE response carries `Content-Type: text/event-stream; charset=utf-8` and the writer is UTF-8-encoded, so em-dashes, smart quotes, and emoji from Anthropic render as themselves in the modal — not as `?` or `??`.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. The model needs to actually emit multibyte characters; provoking this reliably is easiest with an explicit prompt.
@@ -753,6 +797,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 38: Dynamic Model Catalog — chat modal reads from server
 
 **Goal:** Verify the chat modal's model selector is driven by the live `AnthropicModelCatalog` served at `GET /console-api/registry-dash/ai/analyze`.
+**Tier:** smoke
 
 ### Steps:
 1. Open the analysis modal via any sparkle.
@@ -774,6 +819,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 39: Admin AI Models panel
 
 **Goal:** Verify the admin page renders the live model catalog and the fetched-at timestamp.
+**Tier:** smoke
 
 ### Prerequisites:
 - Logged in as an FTE/admin user (admin GET requires `MANAGE_COST_BASIS`).
@@ -794,6 +840,8 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 40: Force-refresh AI model catalog
 
 **Goal:** Verify the **Refresh now** button re-fetches `/v1/models` from Anthropic and updates `fetchedAt`.
+**Tier:** full
+**Tier rationale:** Triggers a server-side POST to refresh the catalog (admin-required state change, not pure UI render).
 
 ### Steps:
 1. On the **Admin** page, note the current `Fetched:` value.
@@ -814,6 +862,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 41: Complexity-based routing for background turns
 
 **Goal:** Confirm `AiOrchestrator` runs turn 0 on the user-selected model and routes post-tool synthesis turns to a cheaper model based on the max complexity of tools just executed.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha (so server logs are accessible).
@@ -848,6 +897,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 42: Admin Advanced panel visibility gating
 
 **Goal:** Verify the Advanced (system prompt editor) panel is admin-only and resolves admin status from `UserDataService.userData()?.isAdmin` when the host doesn't pass `[isAdmin]` explicitly (PR #130).
+**Tier:** smoke
 
 ### Prerequisites:
 - Two test users: one FTE/admin (`userData.isAdmin === true`) and one non-admin.
@@ -872,6 +922,8 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 43: Admin system-prompt draft autosave + per-page scoping
 
 **Goal:** Verify the Advanced textarea autosaves to localStorage under `ai-system-prompt-draft:<page>` per-keystroke, restores on reopen, and is scoped per-page so a draft on one page does not bleed into another (PR #130 review fix).
+**Tier:** smoke
+**Tier rationale:** Pure localStorage + DOM state — opens modal, types, inspects keys, no streaming required.
 
 ### Prerequisites:
 - Admin user. Local-dev or alpha.
@@ -898,6 +950,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 44: Admin override only fires when Advanced is expanded
 
 **Goal:** Verify a saved draft only takes effect on the next request when the admin has explicitly expanded Advanced (per `systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined` in both `sendInitialRequest` and `runQueuedPrompt`).
+**Tier:** full
 
 ### Prerequisites:
 - Admin user. Local-dev preferred (server log inspection).
@@ -919,6 +972,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 45: Date awareness — "Today is YYYY-MM-DD (UTC)" header injected on default prompt
 
 **Goal:** Verify the backend prepends a `Today is <ISO_DATE> (UTC).` line to the default system prompt so the model has a reliable current-date anchor (PR #130 SRE-1951 fix). The header is scoped to the default-prompt path; admin overrides own their entire prompt body.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. Ability to enable FINE-level logging on `RegistryDashAiAction` is helpful but not required (a behavioral check works too).
@@ -940,6 +994,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 46: dateRange — non-empty filter forwarded; empty/partial omitted; per-page opt-out
 
 **Goal:** Verify the dateRange correctness fixes from PR #130: (a) sparkle button computes dateRange from the active filter via `computeDateRange(range.lookbackHours)`; (b) Pricing and Portfolio pages opt out via `[includeDateRange]="false"` so no fabricated 12-month range leaks; (c) backend `hasNonEmptyDateRange` requires both `start` AND `end` non-blank (whitespace-only also rejected); (d) Explore only emits dateRange for time-based data sources.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. DevTools available.
@@ -964,6 +1019,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 47: Type during AI response — input remains enabled; queue hint shown
 
 **Goal:** Verify SRE-1956 sub-feature 3: while a response is streaming, the follow-up textarea is editable, and a queue-hint line ("Will send after current response ...") appears whenever `streaming() && followUpText.trim().length > 0`.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. Any page with sparkle.
@@ -986,6 +1042,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 48: Prompt queue FIFO drain after current response
 
 **Goal:** Verify queued prompts drain serially in FIFO order once the current response completes (auto-fire effect in `AiAnalysisModalComponent`).
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. A prompt that produces a slow / long response.
@@ -1011,6 +1068,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 49: Edit queued chip — text returns to input, chip removed
 
 **Goal:** Verify clicking on a queued chip body hoists its text back into the textarea and removes the chip (no duplicate after re-send).
+**Tier:** full
 
 ### Steps:
 1. Continue from Test 48 setup: queue 3 prompts mid-stream.
@@ -1029,6 +1087,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 50: Remove queued chip via cancel icon
 
 **Goal:** Verify clicking the `cancel` icon on a queued chip removes only that chip without touching the input or the rest of the queue.
+**Tier:** full
 
 ### Steps:
 1. Queue 3 prompts (A, B, C) mid-stream as in Test 48.
@@ -1047,6 +1106,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 51: Stop pauses queue; Resume drains
 
 **Goal:** Verify clicking Stop while streaming with queued prompts halts the stream cleanly, preserves the queue, surfaces a Resume button, and drains the queue when Resume is clicked.
+**Tier:** full
 
 ### Steps:
 1. Open sparkle, trigger a long response. While streaming, queue 2 prompts (A, B).
@@ -1066,6 +1126,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 52: Mid-stream error preserves queue + Retry queue button
 
 **Goal:** Verify when a network/server error interrupts a streaming response with prompts queued, the queue is preserved and a "Retry queue" button appears.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev preferred (kill the Anthropic backend or set a bogus admin system prompt to force a 502). Alpha works if you can inject an error reliably.
@@ -1088,6 +1149,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 53: Start new chat invalidates pending drain microtask
 
 **Goal:** Verify the `drainGeneration` guard: clicking "Start new chat" while a queue head was just popped (auto-fire effect ran but its microtask hasn't fired `runQueuedPrompt` yet) does NOT cause the stale head to fire into the new chat.
+**Tier:** full
 
 ### Steps:
 1. Trigger sparkle on Domain Activity, wait for initial response.
@@ -1106,6 +1168,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 54: Auto-scroll follows streaming output
 
 **Goal:** Verify SRE-1956 sub-feature 1: when a long response streams, the conversation viewport auto-pins to the bottom as tokens arrive (per the modal's reactive `effect` watching `streamedText` + `conversationHistory`).
+**Tier:** full
 
 ### Steps:
 1. Open sparkle on **Domain Activity**, choose a prompt that produces a long, multi-line response (e.g. "Summarize trends" with Opus selected).
@@ -1122,6 +1185,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 55: User scroll-up pauses auto-scroll; Jump-to-latest FAB appears + works
 
 **Goal:** Verify scrolling up mid-stream stops auto-scroll, surfaces the floating "Jump to latest" FAB, and clicking the FAB re-pins to bottom.
+**Tier:** full
 
 ### Steps:
 1. Trigger a long streaming response as in Test 54.
@@ -1142,6 +1206,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 56: Scroll-up after stream completes — FAB hidden
 
 **Goal:** Verify the FAB is gated by `streaming()`. Once the response is complete, scrolling up does NOT show the FAB (the user is in normal review mode).
+**Tier:** full
 
 ### Steps:
 1. Trigger a long streaming response, let it complete.
@@ -1157,6 +1222,8 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 57: Resize via drag handle — live update + persistence
 
 **Goal:** Verify SRE-1956 sub-feature 4: dragging the bottom-right handle resizes the modal in real time, the chosen size persists across modal reopens via localStorage, and both entry points (sparkle + Explore "Add to Chat") honor the saved size.
+**Tier:** smoke
+**Tier rationale:** Modal chrome only — drag handle + localStorage write; the streaming response itself is not under test.
 
 ### Steps:
 1. Clear `ai-modal-width-px` and `ai-modal-height-px` from localStorage.
@@ -1178,6 +1245,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 58: Resize clamping — max 95vw/95vh, min 480x400
 
 **Goal:** Verify the directive clamps width/height to `[480, 0.95 * window.innerWidth]` and `[400, 0.95 * window.innerHeight]` per `AiModalResizeDirective.MIN_WIDTH/MIN_HEIGHT` and the `* 0.95` ceiling in `onMove`.
+**Tier:** smoke
 
 ### Steps:
 1. Open the modal. Drag the handle as far down-right as possible (off-screen).
@@ -1196,6 +1264,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 59: Resize abort on alt-tab — body cursor restored, no commit
 
 **Goal:** Verify the `window.blur` ABORT path: if the user mousedowns the handle and alt-tabs away before mouseup, the body cursor is restored, listeners are detached, and NO `sizeCommit` fires (saved size unchanged).
+**Tier:** smoke
 
 ### Steps:
 1. Open the modal. Note the current saved size in localStorage (e.g. 960, 800).
@@ -1218,6 +1287,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 60: Default size on first open (localStorage cleared)
 
 **Goal:** Verify `aiModalConfig()` falls back to defaults (`width: '960px'`, `height: '85vh'`) when localStorage values are missing, non-finite, or below the minimums.
+**Tier:** smoke
 
 ### Steps:
 1. In DevTools, remove `ai-modal-width-px` and `ai-modal-height-px` from localStorage.
@@ -1239,6 +1309,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 61: Theme switch — resize handle stripes still visible
 
 **Goal:** Verify the resize handle stripes use a theme-aware color so they remain visible against both light and dark dialog surfaces (post-review fix in SRE-1956 ph3).
+**Tier:** smoke
 
 ### Steps:
 1. Open the modal in light mode. Locate the 14x14 striped handle in the bottom-right corner. Verify the stripes are clearly visible against the light surface.
@@ -1255,6 +1326,8 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 62: Textarea Shift+Enter newline + autogrow + send/stop swap + cancel preserves history
 
 **Goal:** Verify SRE-1956 sub-features 2 (textarea + autosize) and 5 (Stop button + cancel); the multi-feature smoke for the input area: Shift+Enter inserts newline, Enter alone submits, autogrow caps at 6 rows then internally scrolls, long URLs wrap via overflow-wrap, the right icon swaps between `send` and `stop` based on `streaming()`, and clicking Stop mid-stream preserves the user turn but clears the partial assistant response.
+**Tier:** full
+**Tier rationale:** Send/stop swap and cancel-preserves-history both require an in-flight stream to validate.
 
 ### Steps — Shift+Enter newline + Enter submit:
 1. Open the modal. Click into the follow-up textarea.
@@ -1293,6 +1366,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 63: Ask-anything cold-start entry (SRE-1957)
 
 **Goal:** Verify the new "Ask anything…" entry opens an idle modal with no auto-fired request, and that submitting the first turn from the follow-up input fires `/console-api/registry-dash/ai/analyze` with `promptType: "ask_anything"`, the same chart-context payload a preset would have sent, and a single-message `conversationHistory` containing the user's typed text.
+**Tier:** full
 
 ### Prerequisites:
 - Local-dev or alpha. No special seed.
@@ -1325,6 +1399,8 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ## Test 64: Universal sparkle coverage on Financials sub-tabs (SRE-1957 drift guard)
 
 **Goal:** Lock in SRE-1957's universal-coverage promise so future refactors don't silently strip the new ✨ buttons. Each Financials sub-tab is asserted independently with the page-type and prompt menu it should report at the analyze endpoint.
+**Tier:** full
+**Tier rationale:** Each sparkle click in the steps fires an `/ai/analyze` POST and inspects payloads from a real streamed turn.
 
 ### Prerequisites:
 - Local-dev or alpha. Default `Fixture.java` data is sufficient.
