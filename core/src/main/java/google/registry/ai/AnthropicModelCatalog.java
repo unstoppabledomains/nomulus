@@ -23,6 +23,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.annotations.Expose;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -254,7 +255,8 @@ public class AnthropicModelCatalog {
   }
 
   /** Public model record exposed via API to the UI. */
-  public record ModelInfo(String id, String displayName, String createdAt) {}
+  public record ModelInfo(
+      @Expose String id, @Expose String displayName, @Expose String createdAt) {}
 
   private record CatalogSnapshot(
       ImmutableMap<String, ImmutableList<ModelInfo>> catalog, Instant fetchedAt) {}
