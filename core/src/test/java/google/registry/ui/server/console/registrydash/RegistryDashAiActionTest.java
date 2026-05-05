@@ -99,7 +99,7 @@ class RegistryDashAiActionTest {
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(200);
-    assertThat(response.getHeaders().get("Content-Type"))
+    assertThat(response.getContentType().toString())
         .isEqualTo("text/event-stream; charset=utf-8");
     String written = response.getStringWriter().toString();
     assertThat(written).contains("Hello ");
