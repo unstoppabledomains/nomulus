@@ -45,8 +45,12 @@ for arg in "$@"; do
 done
 
 port_is_open() {
-  curl -sf --max-time 2 -o /dev/null "http://localhost:$1/" \
-    || curl -sf --max-time 2 -o /dev/null "http://[::1]:$1/"
+  # Treat any HTTP response (including 404) as "port open" — the test server
+  # has no root handler and returns 404 on /, but it's listening and serving.
+  # -f only succeeds on 2xx, so we'd miss a healthy server. Use plain --output
+  # /dev/null and check curl's exit status (0 = got a response).
+  curl -s --max-time 2 -o /dev/null "http://localhost:$1/" \
+    || curl -s --max-time 2 -o /dev/null "http://[::1]:$1/"
 }
 
 kill_stack() {
