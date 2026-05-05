@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "e8626eb68db64bcbd42b6d21b5bfa4a645f751bd",
-  "lastReviewedAt": "2026-05-05",
+  "lastReviewedCommit": "b435aa0b7d54da476df714311e85ab1ce46c5b9c",
+  "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "Tier 3 (PRs #122, #124, #126), Add-to-AI-Chat (#125), modal state reset / abort fix (#127, SRE-1954), and SSE UTF-8 charset fix (#128, SRE-1952). Adds tests 30-37 covering tool fan-out, batch-2 guardrails, registrar-scoped permission, post-#127 conversation lifecycle, promptVersion=v1.0.2, maxRows truncation, modal abort/reset behavior, and multibyte rendering."
+  "lastReviewerNote": "PR #134 SRE-1956 (modal interaction UX bundle: auto-scroll, queue, resize, input UX) + PR #130 admin prompt UX + date awareness. Adds tests 38-58 covering admin draft persistence, date awareness, auto-scroll/FAB, queue chip lifecycle (FIFO, edit, remove, Stop/Resume, error/Retry), resizable modal (drag, clamp, alt-tab abort, persistence), Shift+Enter newline + autogrow + wrap, send/stop icon swap, cancel-preserves-history."
 }
