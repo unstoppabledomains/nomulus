@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "1f22362d4090e79e4bf4e5be79372386f61eff2d",
+  "lastReviewedCommit": "448d3213bdeb366687cf734a8e315ae0da0fd3d9",
   "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "SRE-1959: dynamic Anthropic model catalog (admin panel + force-refresh) and complexity-based routing for background turns. Adds tests 38-41."
+  "lastReviewerNote": "SRE-1957 entry-point coverage (\"Ask anything\u2026\" cold-start + universal sparkle on Financials sub-tabs) merged with SRE-1959 dynamic Anthropic model catalog (admin panel + force-refresh + complexity-based routing). Adds Tests 38\u201341 (SRE-1959) and Tests 42\u201343 (SRE-1957). Updates Test 1 (visibility on new Financials sub-tabs) and Test 2 (4-item menu with cold-start last)."
 }
