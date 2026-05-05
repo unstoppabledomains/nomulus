@@ -64,7 +64,31 @@ export interface AiPromptOption {
   userMessage: string;
 }
 
+/**
+ * Family shorthand sent to the backend when picking a model. Always one of the three
+ * Claude families, but the per-family list of available dated ids is dynamic — see
+ * {@link AiModelCatalog}.
+ */
 export type AiModelChoice = 'haiku' | 'sonnet' | 'opus';
+
+/** Single resolved model returned by the backend catalog endpoint. */
+export interface AiModelInfo {
+  id: string;
+  displayName?: string | null;
+  createdAt?: string | null;
+}
+
+/** Catalog of available Claude models grouped by family. Empty array = family unavailable. */
+export interface AiModelCatalog {
+  haiku: AiModelInfo[];
+  sonnet: AiModelInfo[];
+  opus: AiModelInfo[];
+}
+
+export interface AiModelCatalogResponse {
+  catalog: AiModelCatalog;
+  fetchedAt: string;
+}
 
 export type AiStreamFrame =
   | { type: 'text'; text: string }
@@ -89,3 +113,4 @@ export const TOOL_LABELS: Record<string, string> = {
   query_expiration_curve: '📉 Mapping expirations',
   run_explore_query: '🔬 Running data query',
 };
+

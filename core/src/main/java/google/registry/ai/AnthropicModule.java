@@ -73,4 +73,20 @@ public final class AnthropicModule {
   static int provideAiRateLimitPerHour(@Config("anthropicRateLimitPerHour") int limit) {
     return limit;
   }
+
+  @Provides
+  @Named("modelCatalogTtlMinutes")
+  @SuppressWarnings("UseBinds")
+  static int provideModelCatalogTtlMinutes(
+      @Config("anthropicModelCatalogTtlMinutes") int ttlMinutes) {
+    return ttlMinutes;
+  }
+
+  @Provides
+  @Named("complexityRoutingEnabled")
+  @SuppressWarnings("UseBinds")
+  static boolean provideComplexityRoutingEnabled(
+      @Config("anthropicComplexityRoutingEnabled") boolean enabled) {
+    return enabled;
+  }
 }

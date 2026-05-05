@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "b435aa0b7d54da476df714311e85ab1ce46c5b9c",
+  "lastReviewedCommit": "PLACEHOLDER",
   "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "PR #134 SRE-1956 (modal interaction UX bundle: auto-scroll, queue, resize, input UX) + PR #130 admin prompt UX + date awareness. Adds tests 38-58 covering admin draft persistence, date awareness, auto-scroll/FAB, queue chip lifecycle (FIFO, edit, remove, Stop/Resume, error/Retry), resizable modal (drag, clamp, alt-tab abort, persistence), Shift+Enter newline + autogrow + wrap, send/stop icon swap, cancel-preserves-history."
+  "lastReviewerNote": "PR #134 SRE-1956 (modal interaction UX bundle: auto-scroll, queue, resize, input UX) merged with PR #132 SRE-1959 (dynamic Anthropic model catalog + complexity routing). PR #132 owns tests 38-41. PR #134 + PR #130 own tests 42-62: 42-46 admin draft persistence + date awareness + dateRange, 47-53 queue chip lifecycle (type-during, FIFO, edit, remove, Stop/Resume, error/Retry, drainGeneration race), 54-56 auto-scroll + Jump-to-latest FAB, 57-61 resizable modal (drag, clamp, alt-tab abort, default fallback, theme), 62 combined input UX smoke (Shift+Enter, autogrow, wrap, send/stop swap, cancel preserves history)."
 }

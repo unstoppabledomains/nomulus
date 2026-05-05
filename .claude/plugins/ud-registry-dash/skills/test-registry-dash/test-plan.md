@@ -441,8 +441,6 @@
 - No data from a TLD outside the user's access scope ever appears in the modal.
 - Final text is a clear "I don't have access" rather than a stack trace.
 
-
-
 ---
 
 ## Test 21: Add to AI Chat from Explore
@@ -746,7 +744,102 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 38: Admin Advanced panel visibility gating
+## Test 38: Dynamic Model Catalog — chat modal reads from server
+
+**Goal:** Verify the chat modal's model selector is driven by the live `AnthropicModelCatalog` served at `GET /console-api/registry-dash/ai/analyze`.
+
+### Steps:
+1. Open the analysis modal via any sparkle.
+2. With DevTools - Network open, capture the request to `GET /console-api/registry-dash/ai/analyze` issued on modal open.
+3. Response: `{ catalog: { opus: [...], sonnet: [...], haiku: [...] }, fetchedAt: "<ISO-8601>" }`. Each entry has `id` (e.g. `claude-sonnet-4-5-20250929`) and optional `displayName` / `createdAt`.
+4. Verify the model toggle group renders a tab for every family that has at least one entry — and only those.
+5. Click each visible tab; selection persists to localStorage + per-user settings.
+
+### Edge cases:
+- Family with no entries: tab in the chat modal must be hidden (not greyed out, not present).
+- Stale saved selection: if the saved family is no longer in the catalog, modal falls back to the first available family.
+
+### Expected:
+- Tabs match the families present in the GET response.
+- POST `/console-api/registry-dash/ai/analyze` still sends family shorthand (`haiku`/`sonnet`/`opus`) in `request.model` — server-side resolution unchanged.
+
+---
+
+## Test 39: Admin AI Models panel
+
+**Goal:** Verify the admin page renders the live model catalog and the fetched-at timestamp.
+
+### Prerequisites:
+- Logged in as an FTE/admin user (admin GET requires `MANAGE_COST_BASIS`).
+
+### Steps:
+1. Navigate to **Admin** (`/#/registry-dash/admin`).
+2. Verify a card titled **AI Models** appears near the top (above "My View").
+3. Subtitle: "Top 3 GA models per family fetched from Anthropic. Auto-refreshed lazily on read; click below to force-refresh now." followed by `Fetched: <ISO-8601>`.
+4. Body shows three columns labeled **Opus**, **Sonnet**, **Haiku**, each listing up to 3 entries. Each entry shows the model id in monospace; if `displayName` is present, it renders below in a smaller, muted style.
+5. **Refresh now** button below the grid is enabled by default.
+
+### Expected:
+- Catalog matches `GET /console-api/registry-dash/admin` (`aiModelCatalog` + `aiModelCatalogFetchedAt`).
+- Empty families render as italic "none".
+
+---
+
+## Test 40: Force-refresh AI model catalog
+
+**Goal:** Verify the **Refresh now** button re-fetches `/v1/models` from Anthropic and updates `fetchedAt`.
+
+### Steps:
+1. On the **Admin** page, note the current `Fetched:` value.
+2. Click **Refresh now**. Button label briefly changes to "Refreshing…" and is disabled in flight.
+3. Network tab shows a POST to `/console-api/registry-dash/admin` with body `{"action":"refreshAiModels"}` returning 200 with the new catalog payload.
+4. Within ~1-2 seconds the button returns to "Refresh now" and `Fetched:` advances.
+5. Open the chat modal — selector reflects any net-new model in the appropriate family.
+
+### Edge cases:
+- Anthropic 5xx: catalog falls back to a hardcoded seed and the admin request still returns 200; `fetchedAt` advances. Server log: `Anthropic model catalog refresh failed; falling back to seed.`.
+
+### Expected:
+- `Fetched:` timestamp strictly increases across clicks.
+- Other app instances/tabs pick up the change at their own next TTL expiry (not immediately) — cache is per-instance.
+
+---
+
+## Test 41: Complexity-based routing for background turns
+
+**Goal:** Confirm `AiOrchestrator` runs turn 0 on the user-selected model and routes post-tool synthesis turns to a cheaper model based on the max complexity of tools just executed.
+
+### Prerequisites:
+- Local-dev or alpha (so server logs are accessible).
+- `ai.complexityRoutingEnabled: true` (default).
+
+### Steps:
+1. On **Pricing**, open the AI modal.
+2. Pick **Opus** in the model selector.
+3. Ask: `What are our pricing rules for tld example?` — exercises `get_pricing_rules` (EASY).
+4. Tail the server log for `AiOrchestrator` lines.
+5. Repeat MEDIUM: on **Financials > Registry Revenue**, ask `Break down revenue for tld example over the last 6 months by operation` (`query_revenue_breakdown`, MEDIUM).
+6. Repeat COMPLEX on **Domain Activity**: ask `What is our average renewal price by registrar over the last quarter for tld example?` (`run_explore_query`, COMPLEX).
+
+### Expected (per server log):
+- Two `AI turn=...` log lines from `AiOrchestrator` per request:
+  - `turn=0` always logs `model=claude-opus-...` (user-selected) regardless of tool.
+  - `turn=1` model depends on prior turn's max complexity:
+    - EASY -> `model=claude-haiku-...`
+    - MEDIUM -> `model=claude-sonnet-...`
+    - COMPLEX -> `model=claude-opus-...` (no downgrade)
+- Each turn includes `inputTokens=N, outputTokens=N`.
+- The `RegistryDashAiAction` summary line logs `modelShorthand=opus` (user's selection), unchanged by routing.
+
+### Rollback verification:
+- Set `ai.complexityRoutingEnabled: false` in the local-stack config override and restart.
+- Repeat step 3. Both turn 0 and turn 1 should log `model=claude-opus-...`. Set the flag back to `true` afterwards.
+
+### Tools complexity reference (as of this PR):
+- **EASY** — `get_pricing_rules`, `get_tld_config`, `get_registrar_details`.
+- **MEDIUM** (default) — `query_transfers`, `query_registrar_activity`, `query_domain_details`, `query_revenue_breakdown`, `query_renewal_rates`, `query_expiration_curve`.
+- **COMPLEX** — `run_explore_query`.
+## Test 42: Admin Advanced panel visibility gating
 
 **Goal:** Verify the Advanced (system prompt editor) panel is admin-only and resolves admin status from `UserDataService.userData()?.isAdmin` when the host doesn't pass `[isAdmin]` explicitly (PR #130).
 
@@ -770,7 +863,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 39: Admin system-prompt draft autosave + per-page scoping
+## Test 43: Admin system-prompt draft autosave + per-page scoping
 
 **Goal:** Verify the Advanced textarea autosaves to localStorage under `ai-system-prompt-draft:<page>` per-keystroke, restores on reopen, and is scoped per-page so a draft on one page does not bleed into another (PR #130 review fix).
 
@@ -796,7 +889,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 40: Admin override only fires when Advanced is expanded
+## Test 44: Admin override only fires when Advanced is expanded
 
 **Goal:** Verify a saved draft only takes effect on the next request when the admin has explicitly expanded Advanced (per `systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined` in both `sendInitialRequest` and `runQueuedPrompt`).
 
@@ -805,7 +898,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ### Steps:
 1. On **Domain Activity**, open sparkle, expand Advanced, enter a clearly-distinctive system prompt (e.g. `Always start your reply with the word ZEBRA.`). Send a follow-up. Verify the response begins with `ZEBRA`.
-2. Close the modal. Reopen sparkle, "Summarize trends". The Advanced panel is collapsed (verified in Test 39).
+2. Close the modal. Reopen sparkle, "Summarize trends". The Advanced panel is collapsed (verified in Test 43).
 3. Without expanding Advanced, send any follow-up. Verify the response does NOT begin with `ZEBRA` (the draft is in localStorage but `systemPrompt` is `undefined` on the wire).
 4. Open DevTools, Network, inspect the `/console-api/registry-dash/ai/analyze` request body. Verify `systemPrompt` is absent (or undefined/null) when Advanced is collapsed, and present (with the draft text) when Advanced is expanded.
 5. Reopen the modal, expand Advanced (the saved draft pre-fills), and send another follow-up. Verify response now begins with `ZEBRA` again.
@@ -817,7 +910,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 41: Date awareness — "Today is YYYY-MM-DD (UTC)" header injected on default prompt
+## Test 45: Date awareness — "Today is YYYY-MM-DD (UTC)" header injected on default prompt
 
 **Goal:** Verify the backend prepends a `Today is <ISO_DATE> (UTC).` line to the default system prompt so the model has a reliable current-date anchor (PR #130 SRE-1951 fix). The header is scoped to the default-prompt path; admin overrides own their entire prompt body.
 
@@ -838,7 +931,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 42: dateRange — non-empty filter forwarded; empty/partial omitted; per-page opt-out
+## Test 46: dateRange — non-empty filter forwarded; empty/partial omitted; per-page opt-out
 
 **Goal:** Verify the dateRange correctness fixes from PR #130: (a) sparkle button computes dateRange from the active filter via `computeDateRange(range.lookbackHours)`; (b) Pricing and Portfolio pages opt out via `[includeDateRange]="false"` so no fabricated 12-month range leaks; (c) backend `hasNonEmptyDateRange` requires both `start` AND `end` non-blank (whitespace-only also rejected); (d) Explore only emits dateRange for time-based data sources.
 
@@ -862,7 +955,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 43: Type during AI response — input remains enabled; queue hint shown
+## Test 47: Type during AI response — input remains enabled; queue hint shown
 
 **Goal:** Verify SRE-1956 sub-feature 3: while a response is streaming, the follow-up textarea is editable, and a queue-hint line ("Will send after current response ...") appears whenever `streaming() && followUpText.trim().length > 0`.
 
@@ -884,7 +977,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 44: Prompt queue FIFO drain after current response
+## Test 48: Prompt queue FIFO drain after current response
 
 **Goal:** Verify queued prompts drain serially in FIFO order once the current response completes (auto-fire effect in `AiAnalysisModalComponent`).
 
@@ -909,12 +1002,12 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 45: Edit queued chip — text returns to input, chip removed
+## Test 49: Edit queued chip — text returns to input, chip removed
 
 **Goal:** Verify clicking on a queued chip body hoists its text back into the textarea and removes the chip (no duplicate after re-send).
 
 ### Steps:
-1. Continue from Test 44 setup: queue 3 prompts mid-stream.
+1. Continue from Test 48 setup: queue 3 prompts mid-stream.
 2. While the chips are still queued (current response still streaming), click on the BODY of chip B (not the cancel icon).
 3. Verify chip B is removed from the queue (only A and C remain).
 4. Verify the follow-up textarea now contains the full text of chip B.
@@ -927,12 +1020,12 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 46: Remove queued chip via cancel icon
+## Test 50: Remove queued chip via cancel icon
 
 **Goal:** Verify clicking the `cancel` icon on a queued chip removes only that chip without touching the input or the rest of the queue.
 
 ### Steps:
-1. Queue 3 prompts (A, B, C) mid-stream as in Test 44.
+1. Queue 3 prompts (A, B, C) mid-stream as in Test 48.
 2. Click the `cancel` (x) icon on chip B.
 3. Verify chip B is removed; chips A and C remain in order.
 4. Verify the follow-up textarea is unchanged (does NOT receive B's text).
@@ -945,7 +1038,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 47: Stop pauses queue; Resume drains
+## Test 51: Stop pauses queue; Resume drains
 
 **Goal:** Verify clicking Stop while streaming with queued prompts halts the stream cleanly, preserves the queue, surfaces a Resume button, and drains the queue when Resume is clicked.
 
@@ -960,11 +1053,11 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 ### Expected:
 - Stop halts cleanly; queue chips preserved.
 - Resume button only present while paused AND queue non-empty.
-- Resume drains FIFO (same path as Test 44).
+- Resume drains FIFO (same path as Test 48).
 
 ---
 
-## Test 48: Mid-stream error preserves queue + Retry queue button
+## Test 52: Mid-stream error preserves queue + Retry queue button
 
 **Goal:** Verify when a network/server error interrupts a streaming response with prompts queued, the queue is preserved and a "Retry queue" button appears.
 
@@ -986,7 +1079,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 49: Start new chat invalidates pending drain microtask
+## Test 53: Start new chat invalidates pending drain microtask
 
 **Goal:** Verify the `drainGeneration` guard: clicking "Start new chat" while a queue head was just popped (auto-fire effect ran but its microtask hasn't fired `runQueuedPrompt` yet) does NOT cause the stale head to fire into the new chat.
 
@@ -1004,7 +1097,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 50: Auto-scroll follows streaming output
+## Test 54: Auto-scroll follows streaming output
 
 **Goal:** Verify SRE-1956 sub-feature 1: when a long response streams, the conversation viewport auto-pins to the bottom as tokens arrive (per the modal's reactive `effect` watching `streamedText` + `conversationHistory`).
 
@@ -1020,12 +1113,12 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 51: User scroll-up pauses auto-scroll; Jump-to-latest FAB appears + works
+## Test 55: User scroll-up pauses auto-scroll; Jump-to-latest FAB appears + works
 
 **Goal:** Verify scrolling up mid-stream stops auto-scroll, surfaces the floating "Jump to latest" FAB, and clicking the FAB re-pins to bottom.
 
 ### Steps:
-1. Trigger a long streaming response as in Test 50.
+1. Trigger a long streaming response as in Test 54.
 2. Mid-stream, scroll UP within the conversation viewport (mouse wheel or trackpad).
 3. Verify auto-scroll stops; the viewport stays where you scrolled to, even as new tokens arrive at the bottom.
 4. Verify a `mat-mini-fab` button appears with icon `arrow_downward`, `aria-label="Jump to latest"`, `matTooltip="Jump to latest"`, anchored in the bottom-right corner of the conversation wrapper. The FAB shows ONLY while `!autoScrollEnabled() && streaming()`.
@@ -1040,7 +1133,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 52: Scroll-up after stream completes — FAB hidden
+## Test 56: Scroll-up after stream completes — FAB hidden
 
 **Goal:** Verify the FAB is gated by `streaming()`. Once the response is complete, scrolling up does NOT show the FAB (the user is in normal review mode).
 
@@ -1055,7 +1148,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 53: Resize via drag handle — live update + persistence
+## Test 57: Resize via drag handle — live update + persistence
 
 **Goal:** Verify SRE-1956 sub-feature 4: dragging the bottom-right handle resizes the modal in real time, the chosen size persists across modal reopens via localStorage, and both entry points (sparkle + Explore "Add to Chat") honor the saved size.
 
@@ -1076,7 +1169,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 54: Resize clamping — max 95vw/95vh, min 480x400
+## Test 58: Resize clamping — max 95vw/95vh, min 480x400
 
 **Goal:** Verify the directive clamps width/height to `[480, 0.95 * window.innerWidth]` and `[400, 0.95 * window.innerHeight]` per `AiModalResizeDirective.MIN_WIDTH/MIN_HEIGHT` and the `* 0.95` ceiling in `onMove`.
 
@@ -1094,7 +1187,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 55: Resize abort on alt-tab — body cursor restored, no commit
+## Test 59: Resize abort on alt-tab — body cursor restored, no commit
 
 **Goal:** Verify the `window.blur` ABORT path: if the user mousedowns the handle and alt-tabs away before mouseup, the body cursor is restored, listeners are detached, and NO `sizeCommit` fires (saved size unchanged).
 
@@ -1116,7 +1209,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 56: Default size on first open (localStorage cleared)
+## Test 60: Default size on first open (localStorage cleared)
 
 **Goal:** Verify `aiModalConfig()` falls back to defaults (`width: '960px'`, `height: '85vh'`) when localStorage values are missing, non-finite, or below the minimums.
 
@@ -1137,7 +1230,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 57: Theme switch — resize handle stripes still visible
+## Test 61: Theme switch — resize handle stripes still visible
 
 **Goal:** Verify the resize handle stripes use a theme-aware color so they remain visible against both light and dark dialog surfaces (post-review fix in SRE-1956 ph3).
 
@@ -1153,7 +1246,7 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 
 ---
 
-## Test 58: Textarea Shift+Enter newline + autogrow + send/stop swap + cancel preserves history
+## Test 62: Textarea Shift+Enter newline + autogrow + send/stop swap + cancel preserves history
 
 **Goal:** Verify SRE-1956 sub-features 2 (textarea + autosize) and 5 (Stop button + cancel); the multi-feature smoke for the input area: Shift+Enter inserts newline, Enter alone submits, autogrow caps at 6 rows then internally scrolls, long URLs wrap via overflow-wrap, the right icon swaps between `send` and `stop` based on `streaming()`, and clicking Stop mid-stream preserves the user turn but clears the partial assistant response.
 
