@@ -79,16 +79,21 @@
   height: 14px;
   cursor: nwse-resize;
   z-index: 3;
+  // Use a theme-aware token so the diagonal stripes are visible on both
+  // light and dark Material themes (hardcoded rgba(0,0,0,*) was invisible
+  // on dark backgrounds). `currentColor` lets the gradient pick up the
+  // color set on the element itself.
+  color: var(--ud-text-secondary);
   background: linear-gradient(
     135deg,
     transparent 0%,
     transparent 50%,
-    rgba(0, 0, 0, 0.3) 50%,
-    rgba(0, 0, 0, 0.3) 60%,
+    currentColor 50%,
+    currentColor 60%,
     transparent 60%,
     transparent 70%,
-    rgba(0, 0, 0, 0.3) 70%,
-    rgba(0, 0, 0, 0.3) 80%,
+    currentColor 70%,
+    currentColor 80%,
     transparent 80%
   );
 }

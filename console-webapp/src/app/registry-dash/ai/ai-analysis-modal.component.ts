@@ -38,11 +38,25 @@ export const AI_MODAL_HEIGHT_KEY = 'ai-modal-height-px';
  * Single source of truth for all three dialog open call sites
  * (sparkle button + 2x explore).
  */
+const MIN_W = 480;
+const MIN_H = 400;
+
+/**
+ * Parses a persisted dimension from localStorage. Rejects non-finite
+ * values (e.g. `Number('1e500') === Infinity`) and clamps below the
+ * minimum reasonable size to prevent the modal from re-opening at a
+ * sub-minimum value.
+ */
+function parseSavedDim(value: string | null, min: number): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min ? n : null;
+}
+
 export function aiModalConfig<T extends AiAnalysisModalData>(data: T): MatDialogConfig<T> {
-  const savedW = Number(localStorage.getItem(AI_MODAL_WIDTH_KEY));
-  const savedH = Number(localStorage.getItem(AI_MODAL_HEIGHT_KEY));
-  const width = savedW > 0 ? `${savedW}px` : '960px';
-  const height = savedH > 0 ? `${savedH}px` : '85vh';
+  const savedW = parseSavedDim(localStorage.getItem(AI_MODAL_WIDTH_KEY), MIN_W);
+  const savedH = parseSavedDim(localStorage.getItem(AI_MODAL_HEIGHT_KEY), MIN_H);
+  const width = savedW !== null ? `${savedW}px` : '960px';
+  const height = savedH !== null ? `${savedH}px` : '85vh';
   return {
     width,
     height,

@@ -149,6 +149,36 @@ describe('AiModalResizeDirective', () => {
     expect(host.changes.length).toBe(0);
   });
 
+  it('aborts drag on window blur: no sizeCommit, body cursor restored, subsequent mousemove inert', () => {
+    const handle = host.handle.nativeElement;
+    const prevBodyCursor = document.body.style.cursor;
+    const prevBodyUserSelect = document.body.style.userSelect;
+
+    dispatchMouse(handle, 'mousedown', 500, 500);
+    dispatchMouse(document, 'mousemove', 510, 510);
+    expect(host.changes.length).toBe(1);
+    // While dragging, body cursor should be set.
+    expect(document.body.style.cursor).toBe('nwse-resize');
+    expect(document.body.style.userSelect).toBe('none');
+
+    // User alt-tabs: window blur fires before any mouseup.
+    window.dispatchEvent(new Event('blur'));
+
+    // Abort semantics: blur is NOT a commit — distinct from mouseup.
+    expect(host.commits.length).toBe(0);
+    // Cleanup invariants: body cursor + userSelect restored.
+    expect(document.body.style.cursor).toBe(prevBodyCursor);
+    expect(document.body.style.userSelect).toBe(prevBodyUserSelect);
+
+    // After abort, document-level listeners must be detached: subsequent
+    // mousemove on document should NOT produce another sizeChange.
+    const changesBefore = host.changes.length;
+    dispatchMouse(document, 'mousemove', 600, 600);
+    dispatchMouse(document, 'mouseup', 600, 600);
+    expect(host.changes.length).toBe(changesBefore);
+    expect(host.commits.length).toBe(0);
+  });
+
   it('does not start drag on non-primary mouse button', () => {
     const handle = host.handle.nativeElement;
 

@@ -65,6 +65,8 @@ export class AiModalResizeDirective implements OnDestroy {
 
   private moveHandler = (e: MouseEvent) => this.onMove(e);
   private upHandler = () => this.onUp();
+  // Window blur is treated as an ABORT (no sizeCommit) — see onAbort().
+  private blurHandler = () => this.onAbort();
 
   constructor(private host: ElementRef<HTMLElement>) {}
 
@@ -88,6 +90,13 @@ export class AiModalResizeDirective implements OnDestroy {
 
     document.addEventListener('mousemove', this.moveHandler);
     document.addEventListener('mouseup', this.upHandler);
+    // If the user alt-tabs (or otherwise switches windows) mid-drag, the
+    // browser may swallow the eventual mouseup. Listen for window blur as
+    // an ABORT signal so we still restore body cursor/userSelect and
+    // detach listeners. (Option B — simpler than refactoring to Pointer
+    // Events API.) Abort intentionally does NOT emit sizeCommit; the
+    // partial drag is discarded.
+    window.addEventListener('blur', this.blurHandler);
 
     this.prevBodyCursor = document.body.style.cursor;
     this.prevBodyUserSelect = document.body.style.userSelect;
@@ -126,9 +135,22 @@ export class AiModalResizeDirective implements OnDestroy {
     this.lastSize = null;
   }
 
+  /**
+   * Abort path: window lost focus (e.g. alt-tab) mid-drag. Restore body
+   * styles and tear down listeners exactly like onUp(), but DO NOT emit
+   * sizeCommit — the user did not finish the drag.
+   */
+  private onAbort(): void {
+    if (!this.dragStart) return;
+    this.cleanupDragListeners();
+    this.dragStart = null;
+    this.lastSize = null;
+  }
+
   private cleanupDragListeners(): void {
     document.removeEventListener('mousemove', this.moveHandler);
     document.removeEventListener('mouseup', this.upHandler);
+    window.removeEventListener('blur', this.blurHandler);
     document.body.style.cursor = this.prevBodyCursor;
     document.body.style.userSelect = this.prevBodyUserSelect;
   }
