@@ -17,6 +17,7 @@ import { DialogModule } from '@angular/cdk/dialog';
 import { CdkMenuModule } from '@angular/cdk/menu';
 import { OverlayModule } from '@angular/cdk/overlay';
 import { CdkTableModule } from '@angular/cdk/table';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { CdkTreeModule } from '@angular/cdk/tree';
 import { NgModule } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -93,6 +94,7 @@ import { MatTreeModule } from '@angular/material/tree';
     MatChipsModule,
     MatAutocompleteModule,
     ReactiveFormsModule,
+    TextFieldModule,
   ],
 })
 export class MaterialModule {}

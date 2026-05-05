@@ -18,11 +18,13 @@ import { MaterialModule } from '../../../material.module';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { RegistryDashService, EffectiveFeeEntry } from '../../registry-dash.service';
+import { AiSparkleButtonComponent } from '../../ai/ai-sparkle-button.component';
+import { PRICING_PROMPTS } from '../../ai/ai-prompts';
 
 @Component({
   selector: 'app-effective-fees',
   standalone: true,
-  imports: [CommonModule, MaterialModule, MatSortModule],
+  imports: [CommonModule, MaterialModule, MatSortModule, AiSparkleButtonComponent],
   templateUrl: './effective-fees.component.html',
   styleUrls: ['./effective-fees.component.scss'],
 })
@@ -35,6 +37,9 @@ export class EffectiveFeesComponent implements AfterViewInit {
 
   fetchedAt = signal<string>('');
   filterSource = signal<string>('all');
+
+  /** Reuse the pricing page's prompt menu — effective fees are a pricing view. */
+  aiPrompts = PRICING_PROMPTS;
 
   filteredFees = computed(() => {
     let fees = this.dashService.filteredEffectiveFees();

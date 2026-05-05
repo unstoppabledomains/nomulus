@@ -40,63 +40,114 @@
   </div>
 
   <!-- Conversation -->
-  <div class="conversation">
-    <ng-container *ngFor="let msg of conversationHistory()">
-      <div *ngIf="msg.role === 'user'" class="message user-message">
-        <mat-icon class="message-icon">person</mat-icon>
-        <div class="message-content">{{ msg.content }}</div>
-      </div>
-      <div *ngIf="msg.role === 'assistant'" class="message assistant-message">
-        <mat-icon class="message-icon">auto_awesome</mat-icon>
-        <div class="message-content markdown-body" [innerHTML]="msg.content | markdown"></div>
-      </div>
-    </ng-container>
-
-    <!-- Streaming response -->
-    <div *ngIf="streaming()" class="message assistant-message streaming">
-      <mat-icon class="message-icon">auto_awesome</mat-icon>
-      <div class="message-content markdown-body">
-        <div [innerHTML]="streamedText() | markdown"></div>
-        <ng-container *ngFor="let t of toolsCompleted()">
-          <div *ngIf="chipFor(t) as chip" class="tool-status-chip"
-               [class.tool-status-chip--warn]="chip.tone === 'warn'"
-               [class.tool-status-chip--error]="chip.tone === 'error'"
-               [matTooltip]="t.diagnostic || ''"
-               [attr.data-tool]="t.tool"
-               [attr.data-status]="t.status"
-               tabindex="0"
-               role="status"
-               [attr.aria-label]="t.label + ' — ' + chip.text + (t.diagnostic ? ': ' + t.diagnostic : '')">
-            {{ t.label }} — {{ chip.text }}
-          </div>
-        </ng-container>
-        <div *ngFor="let t of toolsInFlight()" class="tool-indicator">
-          {{ t.label }}<span class="tool-indicator-dots">…</span>
+  <div class="conversation-wrapper">
+    <div #scrollContainer class="conversation" (scroll)="onConversationScroll()">
+      <ng-container *ngFor="let msg of conversationHistory()">
+        <div *ngIf="msg.role === 'user'" class="message user-message">
+          <mat-icon class="message-icon">person</mat-icon>
+          <div class="message-content">{{ msg.content }}</div>
         </div>
-        <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
+        <div *ngIf="msg.role === 'assistant'" class="message assistant-message">
+          <mat-icon class="message-icon">auto_awesome</mat-icon>
+          <div class="message-content markdown-body" [innerHTML]="msg.content | markdown"></div>
+        </div>
+      </ng-container>
+
+      <!-- Streaming response -->
+      <div *ngIf="streaming()" class="message assistant-message streaming">
+        <mat-icon class="message-icon">auto_awesome</mat-icon>
+        <div class="message-content markdown-body">
+          <div [innerHTML]="streamedText() | markdown"></div>
+          <ng-container *ngFor="let t of toolsCompleted()">
+            <div *ngIf="chipFor(t) as chip" class="tool-status-chip"
+                 [class.tool-status-chip--warn]="chip.tone === 'warn'"
+                 [class.tool-status-chip--error]="chip.tone === 'error'"
+                 [matTooltip]="t.diagnostic || ''"
+                 [attr.data-tool]="t.tool"
+                 [attr.data-status]="t.status"
+                 tabindex="0"
+                 role="status"
+                 [attr.aria-label]="t.label + ' — ' + chip.text + (t.diagnostic ? ': ' + t.diagnostic : '')">
+              {{ t.label }} — {{ chip.text }}
+            </div>
+          </ng-container>
+          <div *ngFor="let t of toolsInFlight()" class="tool-indicator">
+            {{ t.label }}<span class="tool-indicator-dots">…</span>
+          </div>
+          <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div *ngIf="error()" class="error-message">
+        <mat-icon>error</mat-icon>
+        {{ error() }}
       </div>
     </div>
 
-    <!-- Error -->
-    <div *ngIf="error()" class="error-message">
-      <mat-icon>error</mat-icon>
-      {{ error() }}
-    </div>
+    <button *ngIf="showJumpToLatest()"
+            mat-mini-fab
+            class="jump-to-latest-fab"
+            aria-label="Jump to latest"
+            matTooltip="Jump to latest"
+            (click)="jumpToLatest()">
+      <mat-icon>arrow_downward</mat-icon>
+    </button>
   </div>
 </mat-dialog-content>
 
 <mat-dialog-actions>
+  <div *ngIf="pendingCount() > 0" class="queue-row">
+    <span class="queue-label">Queued ({{ pendingCount() }}):</span>
+    <mat-chip-set class="queue-chips">
+      <mat-chip *ngFor="let item of pendingQueue(); let i = index"
+                [removable]="true"
+                (removed)="removeQueued(i)"
+                (click)="editQueued(i)"
+                matTooltip="Click to edit, x to remove">
+        {{ item.length > 50 ? (item.substring(0, 50) + '…') : item }}
+        <mat-icon matChipRemove>cancel</mat-icon>
+      </mat-chip>
+    </mat-chip-set>
+    <button *ngIf="isPaused() && pendingCount() > 0"
+            mat-stroked-button
+            color="primary"
+            class="queue-resume-btn"
+            (click)="resumeQueue()">
+      Resume
+    </button>
+    <button *ngIf="error() && pendingCount() > 0"
+            mat-stroked-button
+            color="warn"
+            class="queue-retry-btn"
+            (click)="retryAfterError()">
+      Retry queue
+    </button>
+  </div>
   <div class="follow-up-bar">
-    <input
-      type="text"
+    <textarea
+      cdkTextareaAutosize
+      cdkAutosizeMinRows="1"
+      cdkAutosizeMaxRows="6"
       [(ngModel)]="followUpText" name="followUp"
       (keydown)="onFollowUpKeydown($event)"
-      placeholder="Ask a follow-up question..."
-      [disabled]="streaming()"
-      class="follow-up-input" />
-    <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">
-      <mat-icon>send</mat-icon>
+      [placeholder]="isColdStart() ? 'Ask anything about this chart…' : 'Ask a follow-up question…'"
+      class="follow-up-input"></textarea>
+    <button mat-icon-button
+            [matTooltip]="streaming() ? 'Stop response' : 'Send'"
+            [disabled]="!streaming() && !followUpText.trim()"
+            (click)="streaming() ? onStop() : enqueueOrSend(followUpText)">
+      <mat-icon>{{ streaming() ? 'stop' : 'send' }}</mat-icon>
     </button>
+  </div>
+  <div *ngIf="streaming() && followUpText.trim().length > 0" class="queue-hint">
+    Will send after current response{{ pendingCount() > 0 ? ' (' + pendingCount() + ' queued)' : '' }}
   </div>
   <button mat-button mat-dialog-close>Close</button>
 </mat-dialog-actions>
+
+<div class="ai-modal-resize-handle"
+     appAiModalResize
+     aria-hidden="true"
+     (sizeChange)="onModalResize($event)"
+     (sizeCommit)="onModalResizeCommit($event)"></div>

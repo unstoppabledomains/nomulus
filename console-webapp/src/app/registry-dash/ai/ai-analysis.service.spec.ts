@@ -167,6 +167,110 @@ describe('AiAnalysisService', () => {
     expect(completed[0].diagnostic).toContain('Missing required arg');
   });
 
+  it('cancel aborts the in-flight stream and clears streaming', async () => {
+    // Build a stream that will be aborted mid-flight.
+    let abortFn: (() => void) | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(enc.encode('data: {"type":"text","text":"partial"}\n\n'));
+        // Hold the stream open; abort signal will close it via fetch.
+        abortFn = () => controller.close();
+      },
+    });
+    fetchSpy.and.callFake((_url: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      signal?.addEventListener('abort', () => abortFn?.());
+      return Promise.resolve(new Response(stream, { status: 200 }));
+    });
+
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+
+    const analyzePromise = service.analyze(req);
+    // Yield so analyze() captures the user turn into history.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const abortController = (service as unknown as { abortController: AbortController })
+      .abortController;
+    const abortSpy = spyOn(abortController, 'abort').and.callThrough();
+
+    service.cancel();
+
+    expect(abortSpy).toHaveBeenCalled();
+    await analyzePromise;
+    expect(service.streaming()).toBeFalse();
+  });
+
+  it('cancel does not mutate conversationHistory (preserves user turn)', async () => {
+    let abortFn: (() => void) | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(enc.encode('data: {"type":"text","text":"partial"}\n\n'));
+        abortFn = () => controller.close();
+      },
+    });
+    fetchSpy.and.callFake((_url: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      signal?.addEventListener('abort', () => abortFn?.());
+      return Promise.resolve(new Response(stream, { status: 200 }));
+    });
+
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+
+    const analyzePromise = service.analyze(req);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(service.conversationHistory().length).toBe(1);
+    service.cancel();
+    await analyzePromise;
+
+    const history = service.conversationHistory();
+    expect(history.length).toBe(1);
+    expect(history[0]).toEqual({ role: 'user', content: 'hi' });
+  });
+
+  it('cancel sets error to null', async () => {
+    let abortFn: (() => void) | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(enc.encode('data: {"type":"text","text":"partial"}\n\n'));
+        abortFn = () => controller.close();
+      },
+    });
+    fetchSpy.and.callFake((_url: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal;
+      signal?.addEventListener('abort', () => abortFn?.());
+      return Promise.resolve(new Response(stream, { status: 200 }));
+    });
+
+    const req = baseRequest();
+    req.conversationHistory = [{ role: 'user', content: 'hi' }];
+
+    const analyzePromise = service.analyze(req);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Pre-set an error to verify cancel clears it.
+    service.error.set('something');
+    service.cancel();
+    expect(service.error()).toBeNull();
+    await analyzePromise;
+    expect(service.error()).toBeNull();
+  });
+
+  it('clearError sets error to null', () => {
+    service.error.set('something went wrong');
+    expect(service.error()).toBe('something went wrong');
+    service.clearError();
+    expect(service.error()).toBeNull();
+  });
+
   it('analyze forwards request body with dateRange omitted when caller did not set it', async () => {
     fetchSpy.and.resolveTo(
       streamResponse(['data: {"type":"text","text":"x"}\n\n', 'data: [DONE]\n\n']),

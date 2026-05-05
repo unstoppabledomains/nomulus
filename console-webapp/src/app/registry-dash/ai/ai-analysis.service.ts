@@ -74,12 +74,33 @@ export class AiAnalysisService {
     this.toolsCompleted.set([]);
   }
 
+  /**
+   * Public setter for clearing the error signal. Consumers (e.g. the
+   * modal's retryAfterError flow) should use this rather than reaching
+   * into `error.set(null)` directly so the service retains ownership of
+   * its own state.
+   */
+  clearError(): void {
+    this.error.set(null);
+  }
+
   resetConversation(): void {
     this.abortController?.abort();
     this.abortController = null;
     this.conversationHistory.set([]);
     this.lastRequest.set(null);
     this.resetTransientState();
+  }
+
+  /**
+   * Cancel the in-flight stream without disturbing conversation state.
+   * Aborts the active request and clears any error signal so an
+   * intentional interrupt does not surface as an error to the user.
+   * The analyze() finally-block will set streaming to false cleanly.
+   */
+  cancel(): void {
+    this.abortController?.abort();
+    this.error.set(null);
   }
 
   async analyze(request: AiAnalyzeRequest): Promise<void> {

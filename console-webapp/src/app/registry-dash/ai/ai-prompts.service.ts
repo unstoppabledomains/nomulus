@@ -14,11 +14,26 @@
 
 import { Injectable } from '@angular/core';
 import { AiPromptOption } from './ai-analysis.models';
-import { FALLBACK_MENU } from './ai-prompts';
+import { ASK_ANYTHING_PROMPT, FALLBACK_MENU } from './ai-prompts';
 
 export interface AiPromptsResponse {
   version: string;
   menu: AiPromptOption[];
+}
+
+/**
+ * Append the cold-start "Ask anything…" entry as the last item if the menu
+ * doesn't already include it. The cold-start option is a frontend affordance
+ * (it opens the modal with no seeded prompt) — it intentionally lives outside
+ * the backend's `default-config.yaml` prompt menu so SRE-1957 can ship without
+ * a paired backend config change. If the backend later adds it explicitly,
+ * this guard prevents a duplicate entry.
+ */
+function withAskAnything(menu: AiPromptOption[]): AiPromptOption[] {
+  if (menu.some(p => p.promptType === ASK_ANYTHING_PROMPT.promptType)) {
+    return menu;
+  }
+  return [...menu, ASK_ANYTHING_PROMPT];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -36,10 +51,11 @@ export class AiPromptsService {
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as AiPromptsResponse;
-      this.cache.set(page, data);
-      return data;
+      const decorated = { ...data, menu: withAskAnything(data.menu) };
+      this.cache.set(page, decorated);
+      return decorated;
     } catch {
-      return { version: 'fallback', menu: FALLBACK_MENU[page] ?? [] };
+      return { version: 'fallback', menu: withAskAnything(FALLBACK_MENU[page] ?? []) };
     }
   }
 }
