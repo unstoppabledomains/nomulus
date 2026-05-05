@@ -24,6 +24,7 @@ import {
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiAnalysisModalData } from './ai-analysis-modal.component';
 import { RegistryDashService, RANGE_CONFIG } from '../registry-dash.service';
+import { UserDataService } from '../../shared/services/userData.service';
 
 function lastDialogData(spy: jasmine.SpyObj<MatDialog>): AiAnalysisModalData {
   const config = spy.open.calls.mostRecent().args[1] as { data: AiAnalysisModalData };
@@ -36,6 +37,7 @@ describe('AiSparkleButtonComponent', () => {
   let mockDialog: jasmine.SpyObj<MatDialog>;
   let mockAiService: jasmine.SpyObj<AiAnalysisService>;
   let mockDashService: any;
+  let mockUserDataService: any;
 
   beforeEach(async () => {
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
@@ -46,6 +48,9 @@ describe('AiSparkleButtonComponent', () => {
       selectedRegistrarIds: signal<string[]>(['reg-a']),
       settingsCache: signal<Record<string, any> | undefined>({ aiModel: 'sonnet' }),
     };
+    mockUserDataService = {
+      userData: signal<{ isAdmin: boolean } | null>({ isAdmin: false }),
+    };
 
     await TestBed.configureTestingModule({
       imports: [AiSparkleButtonComponent, NoopAnimationsModule],
@@ -53,6 +58,7 @@ describe('AiSparkleButtonComponent', () => {
         { provide: MatDialog, useValue: mockDialog },
         { provide: AiAnalysisService, useValue: mockAiService },
         { provide: RegistryDashService, useValue: mockDashService },
+        { provide: UserDataService, useValue: mockUserDataService },
       ],
     }).compileComponents();
 

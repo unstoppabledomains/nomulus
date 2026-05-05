@@ -85,7 +85,8 @@
             <app-ai-sparkle-button
               page="pricing"
               [prompts]="aiPromptsPricing"
-              [chartData]="feesByTldAiContext()">
+              [chartData]="feesByTldAiContext()"
+              [includeDateRange]="false">
             </app-ai-sparkle-button>
           </div>
           <p class="chart-description">Default fee amounts per TLD per operation from Nomulus TLD configuration.</p>
