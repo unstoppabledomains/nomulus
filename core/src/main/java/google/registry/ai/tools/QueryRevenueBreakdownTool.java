@@ -16,17 +16,19 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
 import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * AI tool: revenue breakdown for a TLD over a date range, grouped by operation or period.
@@ -42,8 +44,17 @@ public class QueryRevenueBreakdownTool implements AiTool {
   private static final ImmutableSet<String> ALLOWED_GROUP_BY =
       ImmutableSet.of("operation", "period");
 
+  private final Clock clock;
+
   @Inject
-  public QueryRevenueBreakdownTool() {}
+  public QueryRevenueBreakdownTool() {
+    this(Clock.systemUTC());
+  }
+
+  /** Test-friendly constructor. */
+  QueryRevenueBreakdownTool(Clock clock) {
+    this.clock = clock;
+  }
 
   @Override
   public String name() {
@@ -100,14 +111,26 @@ public class QueryRevenueBreakdownTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
-    String tld = stringArg(args, "tld");
-    String startDateStr = stringArg(args, "start_date");
-    String endDateStr = stringArg(args, "end_date");
-    String groupBy = stringArg(args, "group_by");
+  public ToolResult executeWithStatus(JsonObject args, User user) {
+    if (!args.has("tld") || args.get("tld").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: tld");
+    }
+    if (!args.has("start_date") || args.get("start_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: start_date");
+    }
+    if (!args.has("end_date") || args.get("end_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: end_date");
+    }
+    if (!args.has("group_by") || args.get("group_by").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: group_by");
+    }
+    String tld = args.get("tld").getAsString();
+    String startDateStr = args.get("start_date").getAsString();
+    String endDateStr = args.get("end_date").getAsString();
+    String groupBy = args.get("group_by").getAsString();
 
     if (!ALLOWED_GROUP_BY.contains(groupBy)) {
-      throw new AiToolException(
+      return ToolResult.invalidArgs(
           "Invalid group_by '" + groupBy + "'. Allowed: " + ALLOWED_GROUP_BY);
     }
 
@@ -117,16 +140,34 @@ public class QueryRevenueBreakdownTool implements AiTool {
       start = LocalDate.parse(startDateStr);
       end = LocalDate.parse(endDateStr);
     } catch (DateTimeParseException e) {
-      throw new AiToolException("Invalid date: " + e.getMessage());
+      return ToolResult.invalidArgs("Invalid date: " + e.getMessage());
     }
     if (end.isBefore(start)) {
-      throw new AiToolException("end_date must be on or after start_date");
+      return ToolResult.invalidArgs("end_date must be on or after start_date");
     }
     if (start.plus(MAX_RANGE).isBefore(end)) {
-      throw new AiToolException("Date range exceeds 2-year cap");
+      return ToolResult.invalidArgs("Date range exceeds 2-year cap");
     }
 
-    ToolJpaHelper.assertTldAccess(user, tld);
+    Instant now = clock.instant();
+    Instant parsedStart;
+    Instant parsedEnd;
+    try {
+      parsedStart = ToolJpaHelper.parseDateTime(startDateStr, false);
+      parsedEnd = ToolJpaHelper.parseDateTime(endDateStr, true);
+    } catch (Exception e) {
+      return ToolResult.invalidArgs("Invalid date: " + e.getMessage());
+    }
+    if (parsedStart.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDateStr + ".." + endDateStr + "; latest data: " + now);
+    }
+
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     ExploreQueryDescriptor desc =
@@ -142,14 +183,34 @@ public class QueryRevenueBreakdownTool implements AiTool {
             endDateStr);
 
     List<String> columns = List.of(groupBy, "amount_sum", "netAmountToRegistry_sum");
-    return ToolJpaHelper.runExplore(
-        ExploreDataSource.REVENUE, desc, effectiveTlds, columns, MAX_ROWS);
-  }
-
-  private static String stringArg(JsonObject args, String key) throws AiToolException {
-    if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.REVENUE, desc, effectiveTlds, columns, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
     }
-    return args.get(key).getAsString();
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    if (parsedEnd.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDateStr + ".." + endDateStr + "; latest data: " + now);
+    }
+    Optional<ToolJpaHelper.DataExtent> extent =
+        ToolJpaHelper.probeDataExtent(
+            "DomainHistory", "history_modification_time", null, ImmutableSet.of());
+    StringBuilder diag =
+        new StringBuilder("no revenue for tld=").append(tld);
+    diag.append(" between ").append(startDateStr).append(" and ").append(endDateStr);
+    if (extent.isPresent()) {
+      diag.append("; data exists ")
+          .append(extent.get().min())
+          .append(" to ")
+          .append(extent.get().max());
+    }
+    return ToolResult.emptyForRange(payload, diag.toString());
   }
 }

@@ -16,14 +16,16 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
 import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * AI tool: returns renewal rate stats (renewals, deletions, rate) for a TLD over a date range.
@@ -38,8 +40,17 @@ public class QueryRenewalRatesTool implements AiTool {
   private static final List<String> COLUMNS =
       List.of("tld", "renewals_sum", "deletions_sum", "renewalRate_sum");
 
+  private final Clock clock;
+
   @Inject
-  public QueryRenewalRatesTool() {}
+  public QueryRenewalRatesTool() {
+    this(Clock.systemUTC());
+  }
+
+  /** Test-friendly constructor. */
+  QueryRenewalRatesTool(Clock clock) {
+    this.clock = clock;
+  }
 
   @Override
   public String name() {
@@ -84,12 +95,39 @@ public class QueryRenewalRatesTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
-    String tld = stringArg(args, "tld");
-    String startDate = stringArg(args, "start_date");
-    String endDate = stringArg(args, "end_date");
+  public ToolResult executeWithStatus(JsonObject args, User user) {
+    if (!args.has("tld") || args.get("tld").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: tld");
+    }
+    if (!args.has("start_date") || args.get("start_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: start_date");
+    }
+    if (!args.has("end_date") || args.get("end_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: end_date");
+    }
+    String tld = args.get("tld").getAsString();
+    String startDate = args.get("start_date").getAsString();
+    String endDate = args.get("end_date").getAsString();
 
-    ToolJpaHelper.assertTldAccess(user, tld);
+    Instant now = clock.instant();
+    Instant parsedStart;
+    Instant parsedEnd;
+    try {
+      parsedStart = ToolJpaHelper.parseDateTime(startDate, false);
+      parsedEnd = ToolJpaHelper.parseDateTime(endDate, true);
+    } catch (Exception e) {
+      return ToolResult.invalidArgs("Invalid date: " + e.getMessage());
+    }
+    if (parsedStart.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
+
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     ExploreQueryDescriptor desc =
@@ -104,14 +142,33 @@ public class QueryRenewalRatesTool implements AiTool {
             startDate,
             endDate);
 
-    return ToolJpaHelper.runExplore(
-        ExploreDataSource.RENEWAL_RATES, desc, effectiveTlds, COLUMNS, MAX_ROWS);
-  }
-
-  private static String stringArg(JsonObject args, String key) throws AiToolException {
-    if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.RENEWAL_RATES, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
     }
-    return args.get(key).getAsString();
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    if (parsedEnd.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
+    Optional<ToolJpaHelper.DataExtent> extent =
+        ToolJpaHelper.probeDataExtent(
+            "DomainHistory", "history_modification_time", null, ImmutableSet.of());
+    StringBuilder diag = new StringBuilder("no renewal data for tld=").append(tld);
+    diag.append(" between ").append(startDate).append(" and ").append(endDate);
+    if (extent.isPresent()) {
+      diag.append("; data exists ")
+          .append(extent.get().min())
+          .append(" to ")
+          .append(extent.get().max());
+    }
+    return ToolResult.emptyForRange(payload, diag.toString());
   }
 }

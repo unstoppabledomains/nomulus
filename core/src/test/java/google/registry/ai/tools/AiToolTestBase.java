@@ -104,6 +104,25 @@ abstract class AiToolTestBase {
     throw new AssertionError("Expected AiToolException but no exception was thrown");
   }
 
+  /**
+   * Asserts that {@code result.status()} matches {@code expected}, failing with the diagnostic and
+   * data on mismatch (much more useful than a bare equality failure).
+   */
+  protected static void assertToolResultStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ", data="
+              + result.data()
+              + ")");
+    }
+  }
+
   /** Builds a JsonObject from inline key-value pairs. Strings only; arrays are JSON-encoded. */
   protected static JsonObject args(String json) {
     return GSON.fromJson(json, JsonObject.class);

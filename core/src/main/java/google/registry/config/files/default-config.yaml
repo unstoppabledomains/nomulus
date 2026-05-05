@@ -669,6 +669,9 @@ ai:
     toolsHeader: |
       ## Tools available
       You have tools to fetch additional registry data when the user's question needs detail beyond the snapshot above. Use a tool when you need specific domains, registrar-level data, or pricing rules. Prefer specific tools (query_transfers, get_pricing_rules, query_registrar_activity, query_domain_details) over the generic run_explore_query. Use run_explore_query only when no specific tool fits. Always cite the data the tool returned in your response.
+
+      ### Reading tool results
+      Tool results return `{status, data?, diagnostic?}`. `OK` means the call succeeded — use the data. `EMPTY_FOR_RANGE` means the query was valid but returned nothing; the diagnostic explains why (date range, filter, etc.) — rephrase the diagnostic to the user, do NOT retry the same query. `OUT_OF_RANGE` means the requested date is beyond available data; tell the user, do NOT retry. `INVALID_ARGS` and `PERMISSION_DENIED` are terminal — surface them honestly to the user without retrying. `INTERNAL_ERROR` is opaque; apologize and offer to try a different query.
     promptTypes:
       summarize_trends: "Summarize the key trends in this data. Identify growth or decline patterns, compare across TLDs, and highlight the most significant changes."
       find_anomalies: "Identify anomalies, outliers, and unusual patterns in this data. Look for unexpected spikes, drops, or ratios that warrant investigation."

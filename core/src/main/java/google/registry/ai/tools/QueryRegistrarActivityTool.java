@@ -16,15 +16,17 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
 import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * AI tool: returns lifecycle activity (creates, renews, transfers, deletes) attributed to a
@@ -40,8 +42,17 @@ public class QueryRegistrarActivityTool implements AiTool {
   private static final List<String> COLUMNS =
       List.of("period", "tld", "activity_type", "registrar", "count_value");
 
+  private final Clock clock;
+
   @Inject
-  public QueryRegistrarActivityTool() {}
+  public QueryRegistrarActivityTool() {
+    this(Clock.systemUTC());
+  }
+
+  /** Test-friendly constructor. */
+  QueryRegistrarActivityTool(Clock clock) {
+    this.clock = clock;
+  }
 
   @Override
   public String name() {
@@ -89,14 +100,42 @@ public class QueryRegistrarActivityTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
-    String registrarId = stringArg(args, "registrar_id");
+  public ToolResult executeWithStatus(JsonObject args, User user) {
+    if (!args.has("registrar_id") || args.get("registrar_id").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: registrar_id");
+    }
+    String registrarId = args.get("registrar_id").getAsString();
     String tld = optionalString(args, "tld");
     String startDate = optionalString(args, "start_date");
     String endDate = optionalString(args, "end_date");
 
+    Instant now = clock.instant();
+    if (startDate != null) {
+      try {
+        Instant parsedStart = ToolJpaHelper.parseDateTime(startDate, false);
+        if (parsedStart.isAfter(now)) {
+          return ToolResult.outOfRange(
+              "requested " + startDate + ".." + endDate + "; latest data: " + now);
+        }
+      } catch (Exception e) {
+        return ToolResult.invalidArgs("Invalid start_date: " + e.getMessage());
+      }
+    }
+    Instant parsedEnd = null;
+    if (endDate != null) {
+      try {
+        parsedEnd = ToolJpaHelper.parseDateTime(endDate, true);
+      } catch (Exception e) {
+        return ToolResult.invalidArgs("Invalid end_date: " + e.getMessage());
+      }
+    }
+
     if (tld != null) {
-      ToolJpaHelper.assertTldAccess(user, tld);
+      try {
+        ToolJpaHelper.assertTldAccess(user, tld);
+      } catch (AiToolException e) {
+        return ToolResult.permissionDenied(e.getMessage());
+      }
     }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
@@ -118,31 +157,40 @@ public class QueryRegistrarActivityTool implements AiTool {
             startDate,
             endDate);
 
-    JsonObject result =
-        ToolJpaHelper.runExplore(
-            ExploreDataSource.DOMAIN_ACTIVITY, desc, effectiveTlds, COLUMNS, MAX_ROWS);
-
-    // Post-filter rows that don't match the registrar (DOMAIN_ACTIVITY doesn't natively filter
-    // by registrar in WHERE; the dimension is the current_sponsor_registrar_id).
-    JsonArray filtered = new JsonArray();
-    for (JsonElement row : result.getAsJsonArray("rows")) {
-      JsonObject obj = row.getAsJsonObject();
-      if (obj.has("registrar")
-          && !obj.get("registrar").isJsonNull()
-          && obj.get("registrar").getAsString().equals(registrarId)) {
-        filtered.add(obj);
-      }
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.DOMAIN_ACTIVITY, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
     }
-    result.add("rows", filtered);
-    result.addProperty("rowCount", filtered.size());
-    return result;
-  }
 
-  private static String stringArg(JsonObject args, String key) throws AiToolException {
-    if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
     }
-    return args.get(key).getAsString();
+    if (parsedEnd != null && parsedEnd.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
+    Optional<ToolJpaHelper.DataExtent> extent =
+        ToolJpaHelper.probeDataExtent(
+            "DomainHistory", "history_modification_time", null, ImmutableSet.of());
+    StringBuilder diag = new StringBuilder("no activity for registrar=").append(registrarId);
+    if (tld != null) {
+      diag.append(", tld=").append(tld);
+    }
+    if (startDate != null || endDate != null) {
+      diag.append(" between ").append(startDate).append(" and ").append(endDate);
+    }
+    if (extent.isPresent()) {
+      diag.append("; data exists ")
+          .append(extent.get().min())
+          .append(" to ")
+          .append(extent.get().max());
+    }
+    return ToolResult.emptyForRange(payload, diag.toString());
   }
 
   private static String optionalString(JsonObject args, String key) {

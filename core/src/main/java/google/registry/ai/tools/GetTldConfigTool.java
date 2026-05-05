@@ -16,7 +16,6 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
@@ -85,21 +84,23 @@ public class GetTldConfigTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
+  public ToolResult executeWithStatus(JsonObject args, User user) {
     if (!args.has("tld") || args.get("tld").isJsonNull()) {
-      throw new AiToolException("Missing required arg: tld");
+      return ToolResult.invalidArgs("Missing required arg: tld");
     }
     String tldStr = args.get("tld").getAsString();
 
-    ToolJpaHelper.assertTldAccess(user, tldStr);
+    try {
+      ToolJpaHelper.assertTldAccess(user, tldStr);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
 
     Tld tld;
     try {
       tld = Tld.get(tldStr);
     } catch (Tld.TldNotFoundException e) {
-      JsonObject err = new JsonObject();
-      err.addProperty("error", "TLD not found: " + tldStr);
-      return err;
+      return ToolResult.invalidArgs("TLD not found: " + tldStr);
     }
 
     JsonObject out = new JsonObject();
@@ -143,7 +144,7 @@ public class GetTldConfigTool implements AiTool {
     out.addProperty("allowed_registrars_count", allowedIds.size());
     out.addProperty("allowed_registrars_truncated", allowedIds.size() > MAX_REGISTRARS);
 
-    return out;
+    return ToolResult.ok(out);
   }
 
   private DateTime now() {

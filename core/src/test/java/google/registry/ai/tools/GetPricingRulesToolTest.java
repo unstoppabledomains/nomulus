@@ -44,27 +44,43 @@ class GetPricingRulesToolTest extends AiToolTestBase {
   }
 
   @Test
-  void execute_missingTld_throws() {
+  void execute_missingTld_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = new JsonObject();
-    assertAiToolException(() -> tool.execute(argsJson, user), "tld");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("tld");
   }
 
   @Test
-  void execute_emptyTld_throws() {
+  void execute_emptyTld_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = new JsonObject();
     argsJson.addProperty("tld", "");
-    assertAiToolException(() -> tool.execute(argsJson, user), "tld");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("tld");
   }
 
   @Test
-  void execute_tldOutsideUserScope_throwsPermissionDenied() {
+  void execute_tldOutsideUserScope_returnsPermissionDenied() {
     createTld("other-tld");
     User user = createRoUser("ro@example.com");
     mapUserToTld("ro@example.com", "other-tld");
     JsonObject argsJson = new JsonObject();
     argsJson.addProperty("tld", "tld");
-    assertAiToolException(() -> tool.execute(argsJson, user), "Permission denied");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).ignoringCase().contains("permission denied");
+  }
+
+  @Test
+  void execute_emptyForRange_returnsEmptyStatusWithDiagnostic() {
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("tld", "tld");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    assertThat(result.diagnostic()).contains("tld");
   }
 }

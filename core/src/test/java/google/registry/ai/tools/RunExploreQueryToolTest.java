@@ -69,47 +69,57 @@ class RunExploreQueryToolTest extends AiToolTestBase {
   }
 
   @Test
-  void execute_missingDataSource_throws() {
+  void execute_missingDataSource_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
     argsJson.remove("data_source");
-    assertAiToolException(() -> tool.execute(argsJson, user), "data_source");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("data_source");
   }
 
   @Test
-  void execute_missingTld_throws() {
+  void execute_missingTld_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
     argsJson.remove("tld");
-    assertAiToolException(() -> tool.execute(argsJson, user), "tld");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("tld");
   }
 
   @Test
-  void execute_missingMetrics_throws() {
+  void execute_missingMetrics_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
     argsJson.remove("metrics");
-    assertAiToolException(() -> tool.execute(argsJson, user), "metrics");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("metrics");
   }
 
   @Test
-  void execute_emptyMetrics_throws() {
+  void execute_emptyMetrics_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
     argsJson.add("metrics", new com.google.gson.JsonArray());
-    assertAiToolException(() -> tool.execute(argsJson, user), "non-empty");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("non-empty");
   }
 
   @Test
-  void execute_unknownDataSource_throws() {
+  void execute_unknownDataSource_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
     argsJson.addProperty("data_source", "NOT_A_REAL_SOURCE");
-    assertAiToolException(() -> tool.execute(argsJson, user), "unknown data_source");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).ignoringCase().contains("unknown data_source");
   }
 
   @Test
-  void execute_invalidMetricForSource_throws() {
+  void execute_invalidMetricForSource_returnsInvalidArgs() {
     // REVENUE allows {amount, netAmountToRegistry}. "count" is invalid.
     createTld("tld");
     User user = createFteUser("admin@example.com");
@@ -118,11 +128,13 @@ class RunExploreQueryToolTest extends AiToolTestBase {
     com.google.gson.JsonArray metrics = new com.google.gson.JsonArray();
     metrics.add("count");
     argsJson.add("metrics", metrics);
-    assertAiToolException(() -> tool.execute(argsJson, user), "Unknown metric");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Unknown metric");
   }
 
   @Test
-  void execute_invalidDimensionForSource_throws() {
+  void execute_invalidDimensionForSource_returnsInvalidArgs() {
     // REVENUE allows dimensions {tld, operation, period}. "registrar" is invalid.
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = baseArgs();
@@ -133,17 +145,21 @@ class RunExploreQueryToolTest extends AiToolTestBase {
     com.google.gson.JsonArray dims = new com.google.gson.JsonArray();
     dims.add("registrar");
     argsJson.add("dimensions", dims);
-    assertAiToolException(() -> tool.execute(argsJson, user), "Unknown dimension");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Unknown dimension");
   }
 
   @Test
-  void execute_tldOutsideUserScope_throwsPermissionDenied() {
+  void execute_tldOutsideUserScope_returnsPermissionDenied() {
     // Non-admin user mapped only to "other-tld" — querying "tld" must fail.
     createTld("other-tld");
     User user = createRoUser("ro@example.com");
     mapUserToTld("ro@example.com", "other-tld");
     JsonObject argsJson = baseArgs();
-    assertAiToolException(() -> tool.execute(argsJson, user), "Permission denied");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).ignoringCase().contains("permission denied");
   }
 
   /** Minimal valid args for DOMAIN_ACTIVITY. */

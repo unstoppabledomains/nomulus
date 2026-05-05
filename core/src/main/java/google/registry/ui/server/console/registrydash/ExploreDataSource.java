@@ -26,7 +26,7 @@ public enum ExploreDataSource {
   DOMAIN_ACTIVITY(
       ImmutableSet.of("count"),
       ImmutableSet.of("tld", "activity_type", "period", "registrar"),
-      ImmutableSet.of("tlds", "activityTypes", "dateRange")),
+      ImmutableSet.of("tlds", "activityTypes", "dateRange", "registrarIds")),
 
   REVENUE(
       ImmutableSet.of("amount", "netAmountToRegistry"),

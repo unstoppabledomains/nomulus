@@ -19,11 +19,8 @@ import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import google.registry.ai.tools.AiTool.AiToolException;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
@@ -84,47 +81,62 @@ class QueryExpirationCurveToolTest {
     return obj;
   }
 
+  private static void assertStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ")");
+    }
+  }
+
   @Test
-  void execute_admin_returnsRows() throws Exception {
+  void execute_admin_emptyForRange() {
     User user = createFteUser("admin@example.com");
 
-    JsonElement result = tool.execute(args("tld", 12), user);
+    ToolResult result = tool.executeWithStatus(args("tld", 12), user);
 
-    JsonObject obj = result.getAsJsonObject();
+    assertStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    JsonObject obj = result.data().getAsJsonObject();
     assertThat(obj.has("rows")).isTrue();
-    assertThat(obj.has("rowCount")).isTrue();
   }
 
   @Test
-  void execute_unmappedNonAdmin_throwsPermissionDenied() {
+  void execute_unmappedNonAdmin_returnsPermissionDenied() {
     User user = createNonAdminUser("stranger@example.com");
 
-    AiToolException ex =
-        assertThrows(AiToolException.class, () -> tool.execute(args("tld", 12), user));
+    ToolResult result = tool.executeWithStatus(args("tld", 12), user);
 
-    assertThat(ex).hasMessageThat().contains("Permission denied");
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).contains("Permission denied");
   }
 
   @Test
-  void execute_monthsAheadClamped_runsWithoutError() throws Exception {
+  void execute_monthsAheadClamped_runsWithoutError() {
     User user = createFteUser("admin@example.com");
 
     // Below min: 0 → clamped to 1.
-    tool.execute(args("tld", 0), user);
+    ToolResult low = tool.executeWithStatus(args("tld", 0), user);
+    assertThat(low.status()).isAnyOf(ToolResult.Status.OK, ToolResult.Status.EMPTY_FOR_RANGE);
     // Above max: 120 → clamped to 60.
-    tool.execute(args("tld", 120), user);
+    ToolResult high = tool.executeWithStatus(args("tld", 120), user);
+    assertThat(high.status()).isAnyOf(ToolResult.Status.OK, ToolResult.Status.EMPTY_FOR_RANGE);
   }
 
   @Test
-  void execute_missingArg_throws() {
+  void execute_missingArg_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex1 =
-        assertThrows(AiToolException.class, () -> tool.execute(args(null, 12), user));
-    assertThat(ex1).hasMessageThat().contains("Missing required arg: tld");
+    ToolResult missingTld = tool.executeWithStatus(args(null, 12), user);
+    assertStatus(missingTld, ToolResult.Status.INVALID_ARGS);
+    assertThat(missingTld.diagnostic()).contains("Missing required arg: tld");
 
-    AiToolException ex2 =
-        assertThrows(AiToolException.class, () -> tool.execute(args("tld", null), user));
-    assertThat(ex2).hasMessageThat().contains("Missing required arg: months_ahead");
+    ToolResult missingMonths = tool.executeWithStatus(args("tld", null), user);
+    assertStatus(missingMonths, ToolResult.Status.INVALID_ARGS);
+    assertThat(missingMonths.diagnostic()).contains("Missing required arg: months_ahead");
   }
 }

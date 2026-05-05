@@ -19,16 +19,16 @@ import static google.registry.testing.DatabaseHelper.allowRegistrarAccess;
 import static google.registry.testing.DatabaseHelper.createTld;
 import static google.registry.testing.DatabaseHelper.persistNewRegistrar;
 import static google.registry.testing.DatabaseHelper.persistResource;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import google.registry.ai.tools.AiTool.AiToolException;
 import google.registry.model.console.GlobalRole;
 import google.registry.model.console.User;
 import google.registry.model.console.UserRoles;
 import google.registry.persistence.transaction.JpaTestExtensions;
 import google.registry.testing.FakeClock;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +38,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 class QueryRenewalRatesToolTest {
 
   private final FakeClock clock = new FakeClock(DateTime.parse("2026-04-30T00:00:00.000Z"));
+  private final Clock javaClock =
+      Clock.fixed(Instant.parse("2026-04-30T00:00:00Z"), ZoneOffset.UTC);
 
   @RegisterExtension
   final JpaTestExtensions.JpaIntegrationTestExtension jpa =
       new JpaTestExtensions.Builder().withClock(clock).buildIntegrationTestExtension();
 
-  private final QueryRenewalRatesTool tool = new QueryRenewalRatesTool();
+  private final QueryRenewalRatesTool tool = new QueryRenewalRatesTool(javaClock);
 
   @BeforeEach
   void setUp() {
@@ -82,38 +84,59 @@ class QueryRenewalRatesToolTest {
     return obj;
   }
 
-  @Test
-  void execute_admin_returnsRows() throws Exception {
-    User user = createFteUser("admin@example.com");
-
-    JsonElement result = tool.execute(args("tld", "2026-01-01", "2026-04-30"), user);
-
-    JsonObject obj = result.getAsJsonObject();
-    assertThat(obj.has("rows")).isTrue();
-    assertThat(obj.has("rowCount")).isTrue();
+  private static void assertStatus(ToolResult result, ToolResult.Status expected) {
+    if (result.status() != expected) {
+      throw new AssertionError(
+          "Expected status "
+              + expected
+              + " but got "
+              + result.status()
+              + " (diagnostic="
+              + result.diagnostic()
+              + ")");
+    }
   }
 
   @Test
-  void execute_unmappedNonAdmin_throwsPermissionDenied() {
+  void execute_admin_emptyForRange() {
+    User user = createFteUser("admin@example.com");
+
+    ToolResult result = tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29"), user);
+
+    // No history rows persisted in this test → EMPTY_FOR_RANGE.
+    assertStatus(result, ToolResult.Status.EMPTY_FOR_RANGE);
+    JsonObject obj = result.data().getAsJsonObject();
+    assertThat(obj.has("rows")).isTrue();
+  }
+
+  @Test
+  void execute_unmappedNonAdmin_returnsPermissionDenied() {
     User user = createNonAdminUser("stranger@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args("tld", "2026-01-01", "2026-04-30"), user));
+    ToolResult result =
+        tool.executeWithStatus(args("tld", "2026-01-01", "2026-04-29"), user);
 
-    assertThat(ex).hasMessageThat().contains("Permission denied");
+    assertStatus(result, ToolResult.Status.PERMISSION_DENIED);
+    assertThat(result.diagnostic()).contains("Permission denied");
   }
 
   @Test
-  void execute_missingArg_throws() {
+  void execute_missingArg_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
 
-    AiToolException ex =
-        assertThrows(
-            AiToolException.class,
-            () -> tool.execute(args(null, "2026-01-01", "2026-04-30"), user));
+    ToolResult result =
+        tool.executeWithStatus(args(null, "2026-01-01", "2026-04-29"), user);
 
-    assertThat(ex).hasMessageThat().contains("Missing required arg: tld");
+    assertStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Missing required arg: tld");
+  }
+
+  @Test
+  void execute_futureDateRange_returnsOutOfRange() {
+    User user = createFteUser("admin@example.com");
+
+    ToolResult result = tool.executeWithStatus(args("tld", "2027-01-01", "2027-03-31"), user);
+
+    assertStatus(result, ToolResult.Status.OUT_OF_RANGE);
   }
 }

@@ -64,16 +64,53 @@ export interface AiPromptOption {
 
 export type AiModelChoice = 'haiku' | 'sonnet' | 'opus';
 
+export type ToolStatus =
+  | 'OK'
+  | 'EMPTY_FOR_RANGE'
+  | 'INVALID_ARGS'
+  | 'OUT_OF_RANGE'
+  | 'PERMISSION_DENIED'
+  | 'INTERNAL_ERROR';
+
 export type AiStreamFrame =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; tool: string; args: Record<string, unknown> }
-  | { type: 'tool_result'; tool: string; ok: boolean }
+  | {
+      type: 'tool_result';
+      tool: string;
+      ok: boolean;
+      status: ToolStatus;
+      diagnostic?: string;
+    }
   | { type: 'done' };
 
 export interface ToolInFlight {
   tool: string;
   label: string;
 }
+
+export interface ToolCompleted {
+  tool: string;
+  label: string;
+  status: ToolStatus;
+  diagnostic?: string;
+  ok: boolean;
+}
+
+/**
+ * Short chip text shown next to a completed tool when its status is not OK.
+ * `null` means render no chip (silent success). The diagnostic from the frame
+ * is surfaced separately as a tooltip.
+ */
+export const TOOL_STATUS_CHIPS: Record<ToolStatus, { text: string; tone: 'warn' | 'error' } | null> =
+  {
+    OK: null,
+    EMPTY_FOR_RANGE: { text: 'No data', tone: 'warn' },
+    OUT_OF_RANGE: { text: 'Out of range', tone: 'warn' },
+    INVALID_ARGS: { text: 'Invalid args', tone: 'error' },
+    PERMISSION_DENIED: { text: 'No access', tone: 'error' },
+    INTERNAL_ERROR: { text: 'Tool error', tone: 'error' },
+  };
 
 export const TOOL_LABELS: Record<string, string> = {
   query_transfers: '🔍 Searching transfers',

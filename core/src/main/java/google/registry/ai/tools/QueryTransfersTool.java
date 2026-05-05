@@ -15,14 +15,16 @@
 package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
 import google.registry.ui.server.console.registrydash.ExploreQueryDescriptor;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * AI tool: returns domain-level transfer activity for a TLD over a date range.
@@ -45,8 +47,17 @@ public class QueryTransfersTool implements AiTool {
           "net_amount_to_registry",
           "currency");
 
+  private final Clock clock;
+
   @Inject
-  public QueryTransfersTool() {}
+  public QueryTransfersTool() {
+    this(Clock.systemUTC());
+  }
+
+  /** Test-friendly constructor. */
+  QueryTransfersTool(Clock clock) {
+    this.clock = clock;
+  }
 
   @Override
   public String name() {
@@ -91,12 +102,39 @@ public class QueryTransfersTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
-    String tld = stringArg(args, "tld");
-    String startDate = stringArg(args, "start_date");
-    String endDate = stringArg(args, "end_date");
+  public ToolResult executeWithStatus(JsonObject args, User user) {
+    if (!args.has("tld") || args.get("tld").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: tld");
+    }
+    if (!args.has("start_date") || args.get("start_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: start_date");
+    }
+    if (!args.has("end_date") || args.get("end_date").isJsonNull()) {
+      return ToolResult.invalidArgs("Missing required arg: end_date");
+    }
+    String tld = args.get("tld").getAsString();
+    String startDate = args.get("start_date").getAsString();
+    String endDate = args.get("end_date").getAsString();
 
-    ToolJpaHelper.assertTldAccess(user, tld);
+    Instant now = clock.instant();
+    Instant parsedStart;
+    Instant parsedEnd;
+    try {
+      parsedStart = ToolJpaHelper.parseDateTime(startDate, false);
+      parsedEnd = ToolJpaHelper.parseDateTime(endDate, true);
+    } catch (Exception e) {
+      return ToolResult.invalidArgs("Invalid date: " + e.getMessage());
+    }
+    if (parsedStart.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
+
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     ExploreQueryDescriptor desc =
@@ -111,14 +149,42 @@ public class QueryTransfersTool implements AiTool {
             startDate,
             endDate);
 
-    return ToolJpaHelper.runExplore(
-        ExploreDataSource.TRANSACTIONS, desc, effectiveTlds, COLUMNS, MAX_ROWS);
-  }
-
-  private static String stringArg(JsonObject args, String key) throws AiToolException {
-    if (!args.has(key) || args.get(key).isJsonNull()) {
-      throw new AiToolException("Missing required arg: " + key);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.TRANSACTIONS, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
     }
-    return args.get(key).getAsString();
+
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    if (parsedEnd.isAfter(now)) {
+      return ToolResult.outOfRange(
+          "requested " + startDate + ".." + endDate + "; latest data: " + now);
+    }
+    Optional<ToolJpaHelper.DataExtent> extent =
+        ToolJpaHelper.probeDataExtent(
+            "DomainHistory", "history_modification_time", null, ImmutableSet.of());
+    String diag;
+    if (extent.isPresent()) {
+      diag =
+          "no transfers for tld="
+              + tld
+              + " between "
+              + startDate
+              + " and "
+              + endDate
+              + "; data exists "
+              + extent.get().min()
+              + " to "
+              + extent.get().max();
+    } else {
+      diag = "no transfers for tld=" + tld + " between " + startDate + " and " + endDate;
+    }
+    return ToolResult.emptyForRange(payload, diag);
   }
 }

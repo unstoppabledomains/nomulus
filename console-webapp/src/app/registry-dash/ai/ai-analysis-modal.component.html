@@ -55,6 +55,16 @@
       <mat-icon class="message-icon">auto_awesome</mat-icon>
       <div class="message-content markdown-body">
         <div [innerHTML]="streamedText() | markdown"></div>
+        <ng-container *ngFor="let t of toolsCompleted()">
+          <div *ngIf="chipFor(t) as chip" class="tool-status-chip"
+               [class.tool-status-chip--warn]="chip.tone === 'warn'"
+               [class.tool-status-chip--error]="chip.tone === 'error'"
+               [matTooltip]="t.diagnostic || ''"
+               [attr.data-tool]="t.tool"
+               [attr.data-status]="t.status">
+            {{ t.label }} — {{ chip.text }}
+          </div>
+        </ng-container>
         <div *ngFor="let t of toolsInFlight()" class="tool-indicator">
           {{ t.label }}<span class="tool-indicator-dots">…</span>
         </div>

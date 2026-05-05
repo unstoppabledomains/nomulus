@@ -17,7 +17,6 @@ package google.registry.ai.tools;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.testing.DatabaseHelper.createTld;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,20 +44,21 @@ class QueryDomainDetailsToolTest extends AiToolTestBase {
   }
 
   @Test
-  void execute_missingDomainName_throws() {
+  void execute_missingDomainName_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = new JsonObject();
-    assertAiToolException(() -> tool.execute(argsJson, user), "domain_name");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("domain_name");
   }
 
   @Test
-  void execute_unknownDomain_returnsErrorObject() throws Exception {
+  void execute_unknownDomain_returnsInvalidArgs() {
     User user = createFteUser("admin@example.com");
     JsonObject argsJson = new JsonObject();
     argsJson.addProperty("domain_name", "no-such-domain.tld");
-    JsonElement result = tool.execute(argsJson, user);
-    assertThat(result.getAsJsonObject().has("error")).isTrue();
-    assertThat(result.getAsJsonObject().get("error").getAsString())
-        .contains("Domain not found");
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("Domain not found");
   }
 }

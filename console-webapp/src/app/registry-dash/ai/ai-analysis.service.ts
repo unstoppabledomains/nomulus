@@ -18,6 +18,7 @@ import {
   AiStreamFrame,
   ConversationMessage,
   TOOL_LABELS,
+  ToolCompleted,
   ToolInFlight,
 } from './ai-analysis.models';
 
@@ -33,6 +34,12 @@ export class AiAnalysisService {
   error = signal<string | null>(null);
   toolsInFlight = signal<ToolInFlight[]>([]);
   toolsUsed = signal<string[]>([]);
+  /**
+   * Completed tool calls in arrival order, with disambiguated status. The
+   * modal renders chips for non-OK statuses; OK tools are kept in the list
+   * but are silent (chip text is null).
+   */
+  toolsCompleted = signal<ToolCompleted[]>([]);
 
   conversationHistory = signal<ConversationMessage[]>([]);
   lastRequest = signal<LastRequestShape | null>(null);
@@ -46,6 +53,7 @@ export class AiAnalysisService {
     this.error.set(null);
     this.toolsInFlight.set([]);
     this.toolsUsed.set([]);
+    this.toolsCompleted.set([]);
   }
 
   /**
@@ -63,6 +71,7 @@ export class AiAnalysisService {
     this.error.set(null);
     this.toolsInFlight.set([]);
     this.toolsUsed.set([]);
+    this.toolsCompleted.set([]);
   }
 
   resetConversation(): void {
@@ -83,6 +92,7 @@ export class AiAnalysisService {
     this.error.set(null);
     this.toolsInFlight.set([]);
     this.toolsUsed.set([]);
+    this.toolsCompleted.set([]);
 
     // The incoming request carries the authoritative conversation up to and
     // including the new user turn. Capture it now so the modal renders the
@@ -166,9 +176,21 @@ export class AiAnalysisService {
               this.toolsInFlight.update(list => [...list, { tool: typed.tool, label }]);
               this.toolsUsed.update(list => [...list, typed.tool]);
             } else if (typed.type === 'tool_result') {
+              const label = TOOL_LABELS[typed.tool] ?? `🔧 ${typed.tool}`;
+              // Defensive defaults: older backends (or replayed fixtures) may
+              // omit `status`; treat missing status as OK iff `ok` is true.
+              const status = typed.status ?? (typed.ok ? 'OK' : 'INTERNAL_ERROR');
+              const completed: ToolCompleted = {
+                tool: typed.tool,
+                label,
+                status,
+                diagnostic: typed.diagnostic,
+                ok: typed.ok,
+              };
               this.toolsInFlight.update(list =>
                 removeFirst(list, t => t.tool === typed.tool),
               );
+              this.toolsCompleted.update(list => [...list, completed]);
             }
             // 'done' is informational; the [DONE] sentinel still terminates the loop.
           } catch {

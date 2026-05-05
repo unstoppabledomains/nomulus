@@ -16,7 +16,6 @@ package google.registry.ai.tools;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import google.registry.model.console.User;
 import google.registry.ui.server.console.registrydash.ExploreDataSource;
@@ -25,6 +24,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * AI tool: future-expiration curve for a TLD bucketed by month.
@@ -90,23 +90,27 @@ public class QueryExpirationCurveTool implements AiTool {
   }
 
   @Override
-  public JsonElement execute(JsonObject args, User user) throws AiToolException {
+  public ToolResult executeWithStatus(JsonObject args, User user) {
     if (!args.has("tld") || args.get("tld").isJsonNull()) {
-      throw new AiToolException("Missing required arg: tld");
+      return ToolResult.invalidArgs("Missing required arg: tld");
     }
     String tld = args.get("tld").getAsString();
     if (!args.has("months_ahead") || args.get("months_ahead").isJsonNull()) {
-      throw new AiToolException("Missing required arg: months_ahead");
+      return ToolResult.invalidArgs("Missing required arg: months_ahead");
     }
     int monthsAhead;
     try {
       monthsAhead = args.get("months_ahead").getAsInt();
     } catch (NumberFormatException | UnsupportedOperationException e) {
-      throw new AiToolException("months_ahead must be an integer");
+      return ToolResult.invalidArgs("months_ahead must be an integer");
     }
     monthsAhead = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, monthsAhead));
 
-    ToolJpaHelper.assertTldAccess(user, tld);
+    try {
+      ToolJpaHelper.assertTldAccess(user, tld);
+    } catch (AiToolException e) {
+      return ToolResult.permissionDenied(e.getMessage());
+    }
     ImmutableSet<String> effectiveTlds = ToolJpaHelper.effectiveTlds(user, tld);
 
     LocalDate today = LocalDate.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);
@@ -124,7 +128,30 @@ public class QueryExpirationCurveTool implements AiTool {
             today.toString(),
             endDate.toString());
 
-    return ToolJpaHelper.runExplore(
-        ExploreDataSource.EXPIRATION_CURVE, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    JsonObject payload;
+    try {
+      payload =
+          ToolJpaHelper.runExplore(
+              ExploreDataSource.EXPIRATION_CURVE, desc, effectiveTlds, COLUMNS, MAX_ROWS);
+    } catch (AiToolException e) {
+      return ToolResult.invalidArgs(e.getMessage());
+    }
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    if (rowCount > 0) {
+      return ToolResult.ok(payload);
+    }
+    Optional<ToolJpaHelper.DataExtent> extent =
+        ToolJpaHelper.probeDataExtent(
+            "Domain", "registration_expiration_time", null, ImmutableSet.of());
+    StringBuilder diag =
+        new StringBuilder("no expiring domains for tld=").append(tld);
+    diag.append(" between ").append(today).append(" and ").append(endDate);
+    if (extent.isPresent()) {
+      diag.append("; expirations exist ")
+          .append(extent.get().min())
+          .append(" to ")
+          .append(extent.get().max());
+    }
+    return ToolResult.emptyForRange(payload, diag.toString());
   }
 }

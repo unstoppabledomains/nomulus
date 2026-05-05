@@ -118,7 +118,12 @@ class RegistryDashAiActionTest {
               com.google.gson.JsonObject args = new com.google.gson.JsonObject();
               args.addProperty("tld", "example");
               sink.accept(new AiOrchestrator.ToolUseEvent("query_transfers", args));
-              sink.accept(new AiOrchestrator.ToolResultEvent("query_transfers", true));
+              sink.accept(
+                  new AiOrchestrator.ToolResultEvent(
+                      "query_transfers",
+                      true,
+                      google.registry.ai.tools.ToolResult.Status.OK,
+                      null));
               sink.accept(new AiOrchestrator.TextEvent("done"));
               sink.accept(new AiOrchestrator.DoneEvent());
               return ImmutableList.of("query_transfers");
@@ -136,6 +141,66 @@ class RegistryDashAiActionTest {
     assertThat(written).contains("\"tool\":\"query_transfers\"");
     assertThat(written).contains("\"type\":\"tool_result\"");
     assertThat(written).contains("\"ok\":true");
+    // OK frames must carry status=OK so the frontend can tell happy-path
+    // results apart from non-OK ones (which render disambiguated chips).
+    assertThat(written).contains("\"status\":\"OK\"");
+    // No diagnostic on OK frames — keep the wire format quiet on the happy
+    // path. (If this assertion ever fails, double-check we aren't leaking
+    // empty diagnostics through the orchestrator.)
+    assertThat(written).doesNotContain("\"diagnostic\"");
+  }
+
+  @Test
+  void testToolResult_outOfRange_emitsStatusAndDiagnostic() throws Exception {
+    // Verifies the frame plumbing for non-OK statuses end-to-end: the
+    // orchestrator emits a ToolResultEvent with status=OUT_OF_RANGE and a
+    // diagnostic, and the action serializes both onto the SSE wire so the
+    // modal can render a chip + tooltip. This is the loop-prevention seam
+    // — the LLM's actual behavior when receiving the status is a system
+    // prompt concern (covered by the toolsHeader addendum, not this test).
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":["
+            + "{\"role\":\"user\",\"content\":\"any transfers in March 2027?\"}"
+            + "]}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    String diagnostic =
+        "requested 2027-03 is past the latest record (2026-05-04)";
+    doAnswer(
+            invocation -> {
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              com.google.gson.JsonObject args = new com.google.gson.JsonObject();
+              args.addProperty("startDate", "2027-03-01");
+              args.addProperty("endDate", "2027-03-31");
+              sink.accept(new AiOrchestrator.ToolUseEvent("query_transfers", args));
+              sink.accept(
+                  new AiOrchestrator.ToolResultEvent(
+                      "query_transfers",
+                      false,
+                      google.registry.ai.tools.ToolResult.Status.OUT_OF_RANGE,
+                      diagnostic));
+              sink.accept(
+                  new AiOrchestrator.TextEvent(
+                      "That date range is past available data."));
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of("query_transfers");
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig());
+    action.run();
+
+    String written = response.getStringWriter().toString();
+    assertThat(written).contains("\"type\":\"tool_result\"");
+    assertThat(written).contains("\"tool\":\"query_transfers\"");
+    assertThat(written).contains("\"status\":\"OUT_OF_RANGE\"");
+    assertThat(written).contains("\"diagnostic\":");
+    assertThat(written).contains("past the latest record");
+    assertThat(written).contains("\"ok\":false");
   }
 
   @Test
