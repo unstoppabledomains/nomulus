@@ -19,6 +19,7 @@ import { MaterialModule } from '../../material.module';
 import {
   AiAnalysisModalComponent,
   AiAnalysisModalData,
+  aiModalConfig,
 } from './ai-analysis-modal.component';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AiPromptOption, AiAnalyzeRequest, AiModelChoice } from './ai-analysis.models';
@@ -87,11 +88,7 @@ export class AiSparkleButtonComponent {
       savedModel,
     };
 
-    this.dialog.open(AiAnalysisModalComponent, {
-      width: '800px',
-      maxHeight: '90vh',
-      data,
-    });
+    this.dialog.open(AiAnalysisModalComponent, aiModalConfig(data));
     // Note: we deliberately do NOT subscribe to afterClosed() to reset state.
     // afterClosed() fires after the dialog's close animation (~300ms), which
     // creates a race with rapid close-then-open: the prior dialog's

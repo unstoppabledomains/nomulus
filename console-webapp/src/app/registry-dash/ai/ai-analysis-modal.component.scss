@@ -1,5 +1,18 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+// Override Material's default max-height: 65vh so the conversation grows
+// to fill whatever vertical space the user has dragged the modal to.
+mat-dialog-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
 }
 
 .modal-title-row {
@@ -61,10 +74,54 @@
   }
 }
 
-.conversation {
-  max-height: 60vh;
-  overflow-y: auto;
+.conversation-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   margin-bottom: 16px;
+}
+
+.conversation {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ai-modal-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  z-index: 3;
+  // Use a theme-aware token so the diagonal stripes are visible on both
+  // light and dark Material themes (hardcoded rgba(0,0,0,*) was invisible
+  // on dark backgrounds). `currentColor` lets the gradient pick up the
+  // color set on the element itself.
+  color: var(--ud-text-secondary);
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    currentColor 50%,
+    currentColor 60%,
+    transparent 60%,
+    transparent 70%,
+    currentColor 70%,
+    currentColor 80%,
+    transparent 80%
+  );
+}
+
+.jump-to-latest-fab {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  z-index: 2;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
 }
 
 .message {
@@ -124,8 +181,44 @@
 
 mat-dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.queue-row {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: var(--ud-text-secondary);
+}
+
+.queue-label {
+  font-weight: 500;
+  color: var(--ud-text-secondary);
+  white-space: nowrap;
+}
+
+.queue-chips {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  mat-chip {
+    cursor: pointer;
+    font-size: 12px;
+  }
+}
+
+.queue-hint {
+  flex-basis: 100%;
+  padding: 2px 4px 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ud-text-secondary);
 }
 
 .follow-up-bar {
@@ -140,7 +233,11 @@ mat-dialog-actions {
     border: 1px solid var(--ud-border);
     border-radius: var(--ud-radius-sm);
     font-size: 14px;
+    font-family: inherit;
     outline: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    resize: none;
 
     &:focus {
       border-color: var(--ud-accent);
