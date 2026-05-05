@@ -25,7 +25,7 @@ describe('AiPromptsService', () => {
     fetchSpy = spyOn(window, 'fetch');
   });
 
-  it('fetches and returns the menu for a page', async () => {
+  it('fetches the menu for a page and appends Ask anything as the last entry', async () => {
     fetchSpy.and.resolveTo(
       new Response(
         JSON.stringify({
@@ -43,11 +43,31 @@ describe('AiPromptsService', () => {
     );
     const result = await service.getMenu('portfolio');
     expect(result.version).toBe('v1');
-    expect(result.menu.length).toBe(1);
+    // Service appends ASK_ANYTHING_PROMPT so the cold-start entry is always
+    // available even when the backend menu doesn't include it.
+    expect(result.menu.length).toBe(2);
+    expect(result.menu[result.menu.length - 1].promptType).toBe('ask_anything');
     expect(fetchSpy).toHaveBeenCalledWith(
       '/console-api/registry-dash/ai/prompts?page=portfolio',
       jasmine.objectContaining({ credentials: 'include' }),
     );
+  });
+
+  it('does not duplicate Ask anything when the backend already includes it', async () => {
+    fetchSpy.and.resolveTo(
+      new Response(
+        JSON.stringify({
+          version: 'v2',
+          menu: [
+            { promptType: 'summarize_trends', label: 'Summarize trends', icon: 'bar_chart', userMessage: '...' },
+            { promptType: 'ask_anything', label: 'Ask anything…', icon: 'chat', userMessage: '' },
+          ],
+        }),
+      ),
+    );
+    const result = await service.getMenu('portfolio');
+    const askAnythingCount = result.menu.filter(p => p.promptType === 'ask_anything').length;
+    expect(askAnythingCount).toBe(1);
   });
 
   it('caches results so the second call does not refetch', async () => {
