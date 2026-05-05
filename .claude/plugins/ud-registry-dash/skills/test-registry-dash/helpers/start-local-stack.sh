@@ -31,7 +31,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../.." && pwd)"
 LOG_DIR="${REPO_ROOT}/.context/test-registry-dash"
 mkdir -p "$LOG_DIR"
 TEST_SERVER_LOG="$LOG_DIR/test-server.log"
