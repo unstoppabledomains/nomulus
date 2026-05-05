@@ -38,7 +38,7 @@
   </div>
 
   <!-- Conversation -->
-  <div class="conversation">
+  <div #scrollContainer class="conversation" (scroll)="onConversationScroll()">
     <ng-container *ngFor="let msg of conversationHistory()">
       <div *ngIf="msg.role === 'user'" class="message user-message">
         <mat-icon class="message-icon">person</mat-icon>
@@ -68,6 +68,14 @@
       {{ error() }}
     </div>
   </div>
+
+  <button *ngIf="showJumpToLatest()"
+          mat-mini-fab
+          class="jump-to-latest-fab"
+          matTooltip="Jump to latest"
+          (click)="jumpToLatest()">
+    <mat-icon>arrow_downward</mat-icon>
+  </button>
 </mat-dialog-content>
 
 <mat-dialog-actions>

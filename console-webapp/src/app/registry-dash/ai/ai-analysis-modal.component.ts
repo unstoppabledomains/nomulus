@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Inject, computed, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
+import { Component, ElementRef, Inject, ViewChild, computed, effect, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -53,6 +53,8 @@ export interface AiAnalysisModalData {
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
 export class AiAnalysisModalComponent implements OnInit {
+  @ViewChild('scrollContainer') scrollContainer!: ElementRef<HTMLDivElement>;
+
   selectedModel = signal<AiModelChoice>('sonnet');
   conversationHistory = computed(() => this.aiService.conversationHistory());
   followUpText = '';
@@ -64,6 +66,11 @@ export class AiAnalysisModalComponent implements OnInit {
   error = computed(() => this.aiService.error());
   toolsInFlight = computed(() => this.aiService.toolsInFlight());
 
+  autoScrollEnabled = signal(true);
+  showJumpToLatest = computed(() => !this.autoScrollEnabled() && this.streaming());
+  private programmaticScrollGuard = false;
+  private wasStreaming = false;
+
   constructor(
     public dialogRef: MatDialogRef<AiAnalysisModalComponent>,
     @Inject(MAT_DIALOG_DATA) public data: AiAnalysisModalData,
@@ -73,6 +80,34 @@ export class AiAnalysisModalComponent implements OnInit {
     if (data.savedModel) {
       this.selectedModel.set(data.savedModel);
     }
+
+    // Reactively follow streaming output: when streamedText or
+    // conversationHistory changes, scroll to bottom if user hasn't
+    // scrolled away. Guarded against running before the view is ready.
+    effect(() => {
+      // Track these signals so the effect re-runs on change.
+      this.streamedText();
+      this.conversationHistory();
+      if (!this.scrollContainer) return;
+      if (this.autoScrollEnabled()) {
+        requestAnimationFrame(() => this.scrollToBottom());
+      }
+    });
+
+    // Re-engage auto-scroll naturally on streaming → idle transition.
+    effect(() => {
+      const isStreaming = this.streaming();
+      if (this.wasStreaming && !isStreaming) {
+        if (!this.scrollContainer) {
+          this.wasStreaming = isStreaming;
+          return;
+        }
+        if (this.autoScrollEnabled()) {
+          requestAnimationFrame(() => this.scrollToBottom());
+        }
+      }
+      this.wasStreaming = isStreaming;
+    });
   }
 
   ngOnInit() {
@@ -155,5 +190,28 @@ export class AiAnalysisModalComponent implements OnInit {
     if (this.showAdvanced() && !this.editableSystemPrompt) {
       this.editableSystemPrompt = this.data.systemPrompt ?? '';
     }
+  }
+
+  onConversationScroll(): void {
+    if (this.programmaticScrollGuard) return;
+    if (!this.scrollContainer) return;
+    const el = this.scrollContainer.nativeElement;
+    const atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) <= 40;
+    this.autoScrollEnabled.set(atBottom);
+  }
+
+  jumpToLatest(): void {
+    this.autoScrollEnabled.set(true);
+    this.scrollToBottom();
+  }
+
+  private scrollToBottom(): void {
+    if (!this.scrollContainer) return;
+    this.programmaticScrollGuard = true;
+    const el = this.scrollContainer.nativeElement;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      this.programmaticScrollGuard = false;
+    });
   }
 }
