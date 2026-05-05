@@ -175,18 +175,17 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
-    String body;
+    // Admin per-request override is for prompt experimentation in non-prod; the admin owns
+    // the entire prompt body in that path (including date instructions if they want them).
     if (!isProduction
         && isAdmin
         && request.systemPrompt != null
         && !request.systemPrompt.isEmpty()) {
-      body = request.systemPrompt;
-    } else {
-      body =
-          getDefaultSystemPrompt(
-              request.page, request.promptType, request.chartData, request.metadata);
+      return request.systemPrompt;
     }
-    return todayHeader() + body;
+    return todayHeader()
+        + getDefaultSystemPrompt(
+            request.page, request.promptType, request.chartData, request.metadata);
   }
 
   private String todayHeader() {
@@ -235,10 +234,10 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       return false;
     }
     JsonObject obj = dateRange.getAsJsonObject();
-    return isNonEmptyString(obj.get("start")) || isNonEmptyString(obj.get("end"));
+    return isNonBlankString(obj.get("start")) && isNonBlankString(obj.get("end"));
   }
 
-  private static boolean isNonEmptyString(JsonElement el) {
-    return el != null && el.isJsonPrimitive() && !el.getAsString().isEmpty();
+  private static boolean isNonBlankString(JsonElement el) {
+    return el != null && el.isJsonPrimitive() && !el.getAsString().isBlank();
   }
 }

@@ -276,6 +276,61 @@ class RegistryDashAiActionTest {
   }
 
   @Test
+  void testSystemPrompt_omitsPartialDateRange() throws Exception {
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[],"
+            + "\"metadata\":{\"dateRange\":{\"start\":\"2025-05-04\",\"end\":\"\"}}}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    String[] capturedPrompt = new String[1];
+    doAnswer(
+            invocation -> {
+              capturedPrompt[0] = invocation.getArgument(0);
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
+    action.run();
+
+    assertThat(capturedPrompt[0]).doesNotContain("Date range:");
+  }
+
+  @Test
+  void testSystemPrompt_adminOverride_doesNotPrependTodayHeader() throws Exception {
+    String adminPrompt = "ADMIN_CUSTOM_PROMPT_BODY";
+    String payload =
+        "{\"page\":\"domain-activity\",\"promptType\":\"summarize_trends\","
+            + "\"chartData\":{},\"conversationHistory\":[],"
+            + "\"systemPrompt\":\"" + adminPrompt + "\"}";
+    JsonElement json = JsonParser.parseString(payload);
+
+    String[] capturedPrompt = new String[1];
+    doAnswer(
+            invocation -> {
+              capturedPrompt[0] = invocation.getArgument(0);
+              Consumer<AiOrchestrator.OrchestratorEvent> sink = invocation.getArgument(4);
+              sink.accept(new AiOrchestrator.DoneEvent());
+              return ImmutableList.of();
+            })
+        .when(orchestrator)
+        .run(any(), any(), any(), any(), any());
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params, Optional.of(json), orchestrator, rateLimiter, defaultPromptConfig(), clock);
+    action.run();
+
+    assertThat(capturedPrompt[0]).isEqualTo(adminPrompt);
+  }
+
+  @Test
   void testRateLimitExceeded() {
     AiRateLimiter strictLimiter = new AiRateLimiter(clock, 0);
     String payload =
