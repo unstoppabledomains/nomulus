@@ -743,3 +743,448 @@ Goal: confirm query_expiration_curve fires for forward-looking expiration questi
 - DevTools → Headers → Response Headers shows `content-type: text/event-stream;charset=utf-8` (charset present, lowercase or uppercase fine).
 - Server log is clean — no `Unsupported encoding` or `MalformedInput` warnings.
 - (Optional sanity) Repeat against an environment that does NOT have PR #128 — e.g. a stale alpha pre-deploy — and confirm the same prompt produces `?` substitutions there. This is the regression baseline.
+
+---
+
+## Test 38: Admin Advanced panel visibility gating
+
+**Goal:** Verify the Advanced (system prompt editor) panel is admin-only and resolves admin status from `UserDataService.userData()?.isAdmin` when the host doesn't pass `[isAdmin]` explicitly (PR #130).
+
+### Prerequisites:
+- Two test users: one FTE/admin (`userData.isAdmin === true`) and one non-admin.
+- Local-dev or alpha. Sparkle reachable on any page.
+
+### Steps:
+1. Log in as the **admin** user. Navigate to **Domain Activity**, click sparkle and choose "Summarize trends".
+2. In the open modal, locate the "Advanced" toggle button (with `expand_more` chevron) directly under the model switcher.
+3. Click the Advanced toggle. Verify a multiline `<textarea class="system-prompt-editor">` appears with placeholder `"System prompt (editable in dev mode; saved drafts persist across reloads for FTE)"`.
+4. Click the toggle again. Verify the textarea collapses and the chevron flips between `expand_less` and `expand_more`.
+5. Close the modal. Sign out and sign in as the **non-admin** user.
+6. Navigate to **Domain Activity**, click sparkle and choose "Summarize trends".
+7. Inspect the modal DOM (DevTools). Verify there is **no** `.advanced-section`, no Advanced toggle, no system-prompt textarea.
+
+### Expected:
+- Admin: Advanced toggle visible, textarea reveals on click, hides on second click.
+- Non-admin: Advanced section absent from the DOM entirely (gated by `*ngIf="data.isAdmin"`).
+- The sparkle button does not require an explicit `[isAdmin]` attribute on its host template; admin status falls through to `UserDataService` (verify by `grep` for `[isAdmin]` on the host page template — should be absent).
+
+---
+
+## Test 39: Admin system-prompt draft autosave + per-page scoping
+
+**Goal:** Verify the Advanced textarea autosaves to localStorage under `ai-system-prompt-draft:<page>` per-keystroke, restores on reopen, and is scoped per-page so a draft on one page does not bleed into another (PR #130 review fix).
+
+### Prerequisites:
+- Admin user. Local-dev or alpha.
+
+### Steps:
+1. On **Domain Activity**, open sparkle, choose "Summarize trends", expand Advanced.
+2. Type a sentinel string into the textarea, e.g. `DRAFT-DOMAIN-ACTIVITY-12345`.
+3. Open DevTools, Application, Local Storage. Verify a key `ai-system-prompt-draft:domain-activity` exists with the sentinel value (autosave is per-keystroke via `onSystemPromptChange`).
+4. Close the modal **without** sending. Reopen sparkle, "Summarize trends" on the same page.
+5. Verify the Advanced panel is **collapsed** by default (it must NOT auto-open even when a saved draft exists; this is the post-review "stale experiment silently runs" guard).
+6. Click Advanced to expand. Verify the textarea is pre-filled with the sentinel value from step 2.
+7. Close the modal. Navigate to **Pricing**. Open sparkle, "Summarize trends", expand Advanced.
+8. Verify the textarea on Pricing is **empty** (or showing the Pricing-specific draft, not the Domain Activity one). Verify localStorage now has a separate key `ai-system-prompt-draft:pricing` if you type a different sentinel here.
+9. Clear the textarea on Domain Activity (delete all text). Verify `ai-system-prompt-draft:domain-activity` is removed from localStorage (empty value triggers `removeItem`).
+
+### Expected:
+- Per-keystroke autosave under per-page key `ai-system-prompt-draft:<page>`.
+- Advanced panel does NOT auto-open on reopen even when a draft is present.
+- Drafts are scoped per-page; no bleed-through between Domain Activity / Pricing / Forecasting.
+- Clearing the textarea removes the localStorage key entirely.
+
+---
+
+## Test 40: Admin override only fires when Advanced is expanded
+
+**Goal:** Verify a saved draft only takes effect on the next request when the admin has explicitly expanded Advanced (per `systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined` in both `sendInitialRequest` and `runQueuedPrompt`).
+
+### Prerequisites:
+- Admin user. Local-dev preferred (server log inspection).
+
+### Steps:
+1. On **Domain Activity**, open sparkle, expand Advanced, enter a clearly-distinctive system prompt (e.g. `Always start your reply with the word ZEBRA.`). Send a follow-up. Verify the response begins with `ZEBRA`.
+2. Close the modal. Reopen sparkle, "Summarize trends". The Advanced panel is collapsed (verified in Test 39).
+3. Without expanding Advanced, send any follow-up. Verify the response does NOT begin with `ZEBRA` (the draft is in localStorage but `systemPrompt` is `undefined` on the wire).
+4. Open DevTools, Network, inspect the `/console-api/registry-dash/ai/analyze` request body. Verify `systemPrompt` is absent (or undefined/null) when Advanced is collapsed, and present (with the draft text) when Advanced is expanded.
+5. Reopen the modal, expand Advanced (the saved draft pre-fills), and send another follow-up. Verify response now begins with `ZEBRA` again.
+
+### Expected:
+- Saved drafts are PASSIVE until the admin explicitly expands Advanced.
+- Network payload's `systemPrompt` field is omitted when Advanced is collapsed, populated when expanded.
+- No regression of the "stale experiment silently runs" trap.
+
+---
+
+## Test 41: Date awareness — "Today is YYYY-MM-DD (UTC)" header injected on default prompt
+
+**Goal:** Verify the backend prepends a `Today is <ISO_DATE> (UTC).` line to the default system prompt so the model has a reliable current-date anchor (PR #130 SRE-1951 fix). The header is scoped to the default-prompt path; admin overrides own their entire prompt body.
+
+### Prerequisites:
+- Local-dev or alpha. Ability to enable FINE-level logging on `RegistryDashAiAction` is helpful but not required (a behavioral check works too).
+
+### Steps:
+1. Open sparkle on **Forecasting**, choose "Identify risks". Wait for the response.
+2. In follow-up, ask: `What is today's date according to your context? Reply with just the date in YYYY-MM-DD form.`
+3. Verify the response is the actual current UTC date (not "I don't have a current date" and not a date inferred from on-screen expiration data; a regression symptom of the bug PR #130 fixed).
+4. (Optional, local-dev with FINE logging) Tail the test server log for the system prompt that was sent. Verify the first line begins with `Today is YYYY-MM-DD (UTC).` matching today's UTC date.
+5. Repeat steps 1-3 as an **admin** user with Advanced expanded and a custom system prompt entered (e.g. `You are a helpful assistant.`). Ask the same date question.
+6. Verify the assistant does **not** know today's date in this case (no header injected; admin override owns the entire prompt body, per the post-review fix).
+
+### Expected:
+- Default-prompt path: response cites today's actual UTC date.
+- Admin-override path (Advanced expanded with custom prompt): assistant is unaware of today's date unless the admin's custom prompt mentions it. No double-stamping of the header.
+
+---
+
+## Test 42: dateRange — non-empty filter forwarded; empty/partial omitted; per-page opt-out
+
+**Goal:** Verify the dateRange correctness fixes from PR #130: (a) sparkle button computes dateRange from the active filter via `computeDateRange(range.lookbackHours)`; (b) Pricing and Portfolio pages opt out via `[includeDateRange]="false"` so no fabricated 12-month range leaks; (c) backend `hasNonEmptyDateRange` requires both `start` AND `end` non-blank (whitespace-only also rejected); (d) Explore only emits dateRange for time-based data sources.
+
+### Prerequisites:
+- Local-dev or alpha. DevTools available.
+
+### Steps:
+1. **Filter-aware page:** Navigate to **Domain Activity**. Set the global time filter to "Last 30 days". Open sparkle, "Summarize trends".
+2. In DevTools, Network, click the `/ai/analyze` request, Payload. Verify `metadata.dateRange.start` and `metadata.dateRange.end` are populated, non-empty ISO dates roughly 30 days apart and matching the filter.
+3. **Filter-less page:** Navigate to **Pricing**. Open sparkle, "Summarize trends". Inspect the request payload. Verify `metadata.dateRange` is **absent** (key omitted entirely; Pricing opts out via `[includeDateRange]="false"`).
+4. Repeat step 3 on **Portfolio**. Verify `metadata.dateRange` is also absent.
+5. **Explore time vs non-time:** Navigate to **Data Exploration**. Run a query with Source = `Domain Activity` (time-based). Click sparkle, trigger an analyze. Verify `metadata.dateRange` is present in the payload along with `granularity`.
+6. Run a query with Source = `Domain Counts` or `Pricing Rules` (non-time, static). Click sparkle. Verify `metadata.dateRange` is absent and `metadata.granularity` is also absent (only emitted for DOMAIN_ACTIVITY / REVENUE / RENEWAL_RATES / EXPIRATION_CURVE / TRANSACTIONS).
+7. **Backend whitespace rejection (manual):** In DevTools console, fire a request with `metadata.dateRange = {start: "  ", end: "2026-01-01"}`. Confirm via server log (or via a query like "what date range did you receive?") that the LLM was not handed the partial range; it should be skipped server-side.
+
+### Expected:
+- Step 2: real, populated dateRange forwarded.
+- Steps 3-4: dateRange key entirely absent from payload on Pricing/Portfolio.
+- Steps 5-6: dateRange + granularity present only for time-based Explore data sources.
+- Step 7: whitespace-only or partial ranges are dropped server-side; no `{start: "", end: "..."}` ever reaches the LLM.
+
+---
+
+## Test 43: Type during AI response — input remains enabled; queue hint shown
+
+**Goal:** Verify SRE-1956 sub-feature 3: while a response is streaming, the follow-up textarea is editable, and a queue-hint line ("Will send after current response ...") appears whenever `streaming() && followUpText.trim().length > 0`.
+
+### Prerequisites:
+- Local-dev or alpha. Any page with sparkle.
+
+### Steps:
+1. Open sparkle on **Domain Activity**, "Summarize trends". As soon as the assistant text begins streaming, click into the follow-up textarea.
+2. Type: `Tell me about TLD example growth`. Verify each keystroke registers (textarea is **not** disabled; this differs from pre-SRE-1956 behavior).
+3. Verify the line `Will send after current response` appears below the input row while you type and the stream continues.
+4. Press Enter (no Shift). Verify the textarea clears, a chip with truncated text "Tell me about TLD example growth" appears in the queue row above the input, and the queue hint updates to `Will send after current response (1 queued)`.
+5. Type a second prompt while still streaming. Verify the hint updates to `(1 queued)` while typing (only existing chips count) and to `(2 queued)` after submitting the second.
+
+### Expected:
+- Textarea remains editable mid-stream.
+- Queue hint visible only when streaming AND non-empty input.
+- Queue hint count reflects current `pendingQueue.length` (chips already submitted).
+- Submitting Enter while streaming pushes onto `pendingQueue` instead of firing immediately.
+
+---
+
+## Test 44: Prompt queue FIFO drain after current response
+
+**Goal:** Verify queued prompts drain serially in FIFO order once the current response completes (auto-fire effect in `AiAnalysisModalComponent`).
+
+### Prerequisites:
+- Local-dev or alpha. A prompt that produces a slow / long response.
+
+### Steps:
+1. Open sparkle on **Domain Activity**, "Summarize trends" (long response).
+2. While streaming, queue three prompts in order:
+   - `A: how many TLDs are above 1k domains?`
+   - `B: which registrar is top?`
+   - `C: any anomalies?`
+3. Verify three chips appear in order A, B, C with truncated previews if longer than 50 chars.
+4. Wait for the current response to complete. Verify chip A disappears first; the assistant fires for prompt A; then chip B; then C, in order. Only one chip drains at a time (no parallel fire).
+5. After all four turns complete (initial + A + B + C), scroll the conversation. Verify exactly 4 user turns and 4 assistant turns are present in `conversationHistory()`.
+
+### Expected:
+- FIFO order preserved across drain.
+- Exactly one prompt fires at a time (the auto-fire effect re-runs only after `streaming()` flips back to false).
+- Final history has all 4 user + 4 assistant turns; no missing or duplicated turns.
+- No "drain entire queue at once" regression (the `firingInProgress` synchronous guard prevents this).
+
+---
+
+## Test 45: Edit queued chip — text returns to input, chip removed
+
+**Goal:** Verify clicking on a queued chip body hoists its text back into the textarea and removes the chip (no duplicate after re-send).
+
+### Steps:
+1. Continue from Test 44 setup: queue 3 prompts mid-stream.
+2. While the chips are still queued (current response still streaming), click on the BODY of chip B (not the cancel icon).
+3. Verify chip B is removed from the queue (only A and C remain).
+4. Verify the follow-up textarea now contains the full text of chip B.
+5. Optionally edit the text and press Enter. Verify a new chip with the edited text appears at the END of the queue (after C; FIFO append), not in B's old position.
+
+### Expected:
+- Click on chip body sends text to input, chip removed.
+- No duplicate chip if user re-submits.
+- Re-submitted prompt is appended to the end of the queue.
+
+---
+
+## Test 46: Remove queued chip via cancel icon
+
+**Goal:** Verify clicking the `cancel` icon on a queued chip removes only that chip without touching the input or the rest of the queue.
+
+### Steps:
+1. Queue 3 prompts (A, B, C) mid-stream as in Test 44.
+2. Click the `cancel` (x) icon on chip B.
+3. Verify chip B is removed; chips A and C remain in order.
+4. Verify the follow-up textarea is unchanged (does NOT receive B's text).
+5. Verify the queue label updates from `Queued (3):` to `Queued (2):`.
+
+### Expected:
+- Removal is surgical; only the targeted chip leaves the queue.
+- Input not affected.
+- Pending count signal updates immediately.
+
+---
+
+## Test 47: Stop pauses queue; Resume drains
+
+**Goal:** Verify clicking Stop while streaming with queued prompts halts the stream cleanly, preserves the queue, surfaces a Resume button, and drains the queue when Resume is clicked.
+
+### Steps:
+1. Open sparkle, trigger a long response. While streaming, queue 2 prompts (A, B).
+2. Click the **Stop** icon button (right side of the textarea; it shows the `stop` icon with tooltip "Stop response" while streaming, not the regular send arrow).
+3. Verify the stream halts immediately. Partial assistant response disappears (no orphan turn). The 2 chips remain in the queue.
+4. Verify a **Resume** button (`mat-stroked-button color="primary"`, label "Resume") appears next to the queue label.
+5. Verify the queue does NOT auto-drain; the auto-fire effect short-circuits while `isPaused()` is true.
+6. Click Resume. Verify chip A fires, then chip B, in order. Verify the Resume button disappears once the queue is empty (or stays only if `isPaused() && pendingCount() > 0`).
+
+### Expected:
+- Stop halts cleanly; queue chips preserved.
+- Resume button only present while paused AND queue non-empty.
+- Resume drains FIFO (same path as Test 44).
+
+---
+
+## Test 48: Mid-stream error preserves queue + Retry queue button
+
+**Goal:** Verify when a network/server error interrupts a streaming response with prompts queued, the queue is preserved and a "Retry queue" button appears.
+
+### Prerequisites:
+- Local-dev preferred (kill the Anthropic backend or set a bogus admin system prompt to force a 502). Alpha works if you can inject an error reliably.
+
+### Steps:
+1. (Local-dev) As an admin, expand Advanced and paste an obviously broken system prompt that will 502 (or block the `/ai/analyze` endpoint via DevTools Network throttling, Offline, mid-stream). Trigger sparkle, response begins, fails.
+2. While the failed response is still arriving (or just before), queue 2 prompts (A, B).
+3. After the error surfaces (red error message in the conversation area), verify:
+   - The queue chips for A and B are STILL visible.
+   - A `Retry queue` button (`mat-stroked-button color="warn"`, scoped to `*ngIf="error() && pendingCount() > 0"`) appears.
+4. Click **Retry queue**. Verify `error()` clears, `isPaused` clears, and the queue drains starting with A.
+
+### Expected:
+- Errors do not nuke the queue.
+- Retry queue button only present when `error() && pendingCount() > 0`.
+- Retry path clears both error and pause gates so the auto-fire effect can proceed.
+
+---
+
+## Test 49: Start new chat invalidates pending drain microtask
+
+**Goal:** Verify the `drainGeneration` guard: clicking "Start new chat" while a queue head was just popped (auto-fire effect ran but its microtask hasn't fired `runQueuedPrompt` yet) does NOT cause the stale head to fire into the new chat.
+
+### Steps:
+1. Trigger sparkle on Domain Activity, wait for initial response.
+2. Queue 2 prompts (A, B). Wait for current response to complete. Verify drain begins (chip A starts firing, becomes the new active stream).
+3. While chip A is in flight (so chip B is the new head and the auto-fire effect has already popped it into a pending microtask), click **Start new chat** in the modal header.
+4. Verify the conversation resets to the seed prompt; the queue clears (`pendingQueue` becomes empty); chip B does **not** fire into the new chat (would corrupt the fresh conversation).
+5. Verify only the new initial-request stream is running; no stale head appears in the conversation.
+
+### Expected:
+- Start new chat resets queue, clears pause, bumps `drainGeneration`, and resets conversation.
+- Any in-flight microtask captured the old `drainGeneration` and becomes a no-op (`gen !== this.drainGeneration`).
+- No stale prompt corrupts the fresh chat.
+
+---
+
+## Test 50: Auto-scroll follows streaming output
+
+**Goal:** Verify SRE-1956 sub-feature 1: when a long response streams, the conversation viewport auto-pins to the bottom as tokens arrive (per the modal's reactive `effect` watching `streamedText` + `conversationHistory`).
+
+### Steps:
+1. Open sparkle on **Domain Activity**, choose a prompt that produces a long, multi-line response (e.g. "Summarize trends" with Opus selected).
+2. As tokens arrive, do not scroll. Verify the viewport stays pinned to the bottom; newest content always visible without manual intervention.
+3. After the response completes, verify the viewport is still scrolled to the bottom (no jump-back).
+
+### Expected:
+- Viewport remains pinned to bottom for the full duration of the stream.
+- `autoScrollEnabled` signal stays true; no Jump-to-latest FAB visible (next test verifies the FAB).
+- No jitter or visible double-scroll on each chunk arrival (the rAF in `scrollToBottom` debounces this).
+
+---
+
+## Test 51: User scroll-up pauses auto-scroll; Jump-to-latest FAB appears + works
+
+**Goal:** Verify scrolling up mid-stream stops auto-scroll, surfaces the floating "Jump to latest" FAB, and clicking the FAB re-pins to bottom.
+
+### Steps:
+1. Trigger a long streaming response as in Test 50.
+2. Mid-stream, scroll UP within the conversation viewport (mouse wheel or trackpad).
+3. Verify auto-scroll stops; the viewport stays where you scrolled to, even as new tokens arrive at the bottom.
+4. Verify a `mat-mini-fab` button appears with icon `arrow_downward`, `aria-label="Jump to latest"`, `matTooltip="Jump to latest"`, anchored in the bottom-right corner of the conversation wrapper. The FAB shows ONLY while `!autoScrollEnabled() && streaming()`.
+5. Click the FAB. Verify the viewport jumps to the bottom and `autoScrollEnabled` flips back to true (FAB disappears).
+6. Verify auto-scroll resumes for subsequent tokens.
+
+### Expected:
+- `onConversationScroll` detects scroll-up (>40px from bottom) and flips `autoScrollEnabled` to false.
+- FAB visible only mid-stream when not at bottom.
+- FAB click calls `jumpToLatest()` which sets `autoScrollEnabled=true` and scrolls to bottom.
+- The `programmaticScrollGuard` prevents the auto-scroll itself from being mistaken for user-scroll.
+
+---
+
+## Test 52: Scroll-up after stream completes — FAB hidden
+
+**Goal:** Verify the FAB is gated by `streaming()`. Once the response is complete, scrolling up does NOT show the FAB (the user is in normal review mode).
+
+### Steps:
+1. Trigger a long streaming response, let it complete.
+2. Scroll up within the conversation.
+3. Verify NO Jump-to-latest FAB appears (since `streaming()` is false, `showJumpToLatest` is false).
+
+### Expected:
+- FAB only appears mid-stream; not after stream completion.
+- User can freely scroll old turns without UI clutter.
+
+---
+
+## Test 53: Resize via drag handle — live update + persistence
+
+**Goal:** Verify SRE-1956 sub-feature 4: dragging the bottom-right handle resizes the modal in real time, the chosen size persists across modal reopens via localStorage, and both entry points (sparkle + Explore "Add to Chat") honor the saved size.
+
+### Steps:
+1. Clear `ai-modal-width-px` and `ai-modal-height-px` from localStorage.
+2. Open sparkle on **Domain Activity**, "Summarize trends". Verify the modal opens at default 960px x 85vh.
+3. Locate the resize handle: 14x14 striped element (`.ai-modal-resize-handle`) in the bottom-right corner of the modal surface.
+4. Mousedown on the handle, drag the cursor down-right. Verify the modal frame resizes LIVE (per `dialogRef.updateSize` on each `sizeChange` emission). Verify the body cursor switches to `nwse-resize` during the drag.
+5. Release. Verify body cursor returns to default.
+6. Open DevTools, Application, Local Storage. Verify `ai-modal-width-px` and `ai-modal-height-px` now hold the new pixel values (rounded integers).
+7. Close the modal. Reopen via sparkle. Verify the modal opens at the saved size.
+8. Close. Open via the Explore page's **Add to AI Chat** menu (run a query first). Verify it also opens at the saved size (single source of truth via `aiModalConfig`).
+
+### Expected:
+- Live resize during drag (no preview rectangle; the actual modal resizes).
+- localStorage updated only on `mouseup` (`onModalResizeCommit`), not on every move.
+- Both entry points use `aiModalConfig(data)` and honor the saved size.
+
+---
+
+## Test 54: Resize clamping — max 95vw/95vh, min 480x400
+
+**Goal:** Verify the directive clamps width/height to `[480, 0.95 * window.innerWidth]` and `[400, 0.95 * window.innerHeight]` per `AiModalResizeDirective.MIN_WIDTH/MIN_HEIGHT` and the `* 0.95` ceiling in `onMove`.
+
+### Steps:
+1. Open the modal. Drag the handle as far down-right as possible (off-screen).
+2. Verify the modal stops growing at roughly 95% of the viewport width and height. It does not exceed either ceiling.
+3. With the modal still open, try to shrink it by dragging the handle as far up-left as possible.
+4. Verify the modal stops at width=480 and height=400 (cannot go smaller).
+5. Verify localStorage values written on commit also fall within the clamped range.
+
+### Expected:
+- Maxima: ~95vw, ~95vh.
+- Minima: 480x400.
+- No way to push the modal off-screen or below a usable size.
+
+---
+
+## Test 55: Resize abort on alt-tab — body cursor restored, no commit
+
+**Goal:** Verify the `window.blur` ABORT path: if the user mousedowns the handle and alt-tabs away before mouseup, the body cursor is restored, listeners are detached, and NO `sizeCommit` fires (saved size unchanged).
+
+### Steps:
+1. Open the modal. Note the current saved size in localStorage (e.g. 960, 800).
+2. Mousedown on the resize handle. Begin dragging slightly so a new size is briefly applied (e.g. 1100, 900).
+3. WITHOUT releasing the mouse, alt-tab to a different application window.
+4. Alt-tab back to the browser.
+5. Click anywhere outside the handle.
+6. Verify body cursor is normal (not stuck on `nwse-resize`).
+7. Verify no phantom drag is active (moving the mouse over the modal does NOT continue resizing).
+8. Verify localStorage `ai-modal-width-px` / `ai-modal-height-px` are UNCHANGED from step 1 (the abort path does not commit).
+
+### Expected:
+- Body cursor and userSelect restored on `window.blur`.
+- Mousemove and mouseup listeners detached.
+- No `sizeCommit` event fired, so no localStorage write.
+- Reopening the modal restores the pre-abort saved size (not the partial drag size).
+
+---
+
+## Test 56: Default size on first open (localStorage cleared)
+
+**Goal:** Verify `aiModalConfig()` falls back to defaults (`width: '960px'`, `height: '85vh'`) when localStorage values are missing, non-finite, or below the minimums.
+
+### Steps:
+1. In DevTools, remove `ai-modal-width-px` and `ai-modal-height-px` from localStorage.
+2. Open the modal via sparkle. Measure the rendered modal: should be ~960px wide x 85vh tall (matches `width: '960px'`, `height: '85vh'`).
+3. Set `ai-modal-width-px` to `'Infinity'` or `'1e500'` in localStorage. Reopen the modal.
+4. Verify it falls back to defaults (the `parseSavedDim` Number.isFinite guard).
+5. Set `ai-modal-width-px` to `'200'` (below MIN_W=480). Reopen.
+6. Verify it falls back to default 960 (clamp guard rejects sub-minimum).
+7. Set both to valid values (e.g. `'1100'` and `'700'`). Reopen. Verify modal honors them.
+
+### Expected:
+- Missing values return defaults.
+- Non-finite values return defaults.
+- Below-minimum values return defaults (no sub-minimum modal).
+- Valid values are honored exactly (with `px` suffix).
+
+---
+
+## Test 57: Theme switch — resize handle stripes still visible
+
+**Goal:** Verify the resize handle stripes use a theme-aware color so they remain visible against both light and dark dialog surfaces (post-review fix in SRE-1956 ph3).
+
+### Steps:
+1. Open the modal in light mode. Locate the 14x14 striped handle in the bottom-right corner. Verify the stripes are clearly visible against the light surface.
+2. Switch the app to dark mode (whatever toggle the console exposes; typically a settings menu).
+3. Reopen the modal. Verify the stripes are still clearly visible against the dark surface (not invisible-on-dark, not low-contrast).
+4. Drag the handle in dark mode and verify resize works identically.
+
+### Expected:
+- Handle remains visually discoverable in both themes.
+- No regression to a hard-coded light-only color.
+
+---
+
+## Test 58: Textarea Shift+Enter newline + autogrow + send/stop swap + cancel preserves history
+
+**Goal:** Verify SRE-1956 sub-features 2 (textarea + autosize) and 5 (Stop button + cancel); the multi-feature smoke for the input area: Shift+Enter inserts newline, Enter alone submits, autogrow caps at 6 rows then internally scrolls, long URLs wrap via overflow-wrap, the right icon swaps between `send` and `stop` based on `streaming()`, and clicking Stop mid-stream preserves the user turn but clears the partial assistant response.
+
+### Steps — Shift+Enter newline + Enter submit:
+1. Open the modal. Click into the follow-up textarea.
+2. Type `line one`, press **Shift+Enter** (do not release Shift before Enter).
+3. Verify a newline is inserted; the textarea now shows two lines and autogrows to ~2 rows.
+4. Type `line two`. Press **Enter** (no Shift).
+5. Verify the prompt submits (a 2-line user turn appears in the conversation; textarea clears).
+
+### Steps — autogrow + autowrap:
+6. Paste an 8-line block (e.g. a code snippet) via Shift+Enter or paste-with-newlines. Verify the textarea grows to ~6 rows (`cdkAutosizeMaxRows="6"`) then internally scrolls; does NOT push the entire modal apart.
+7. Paste a single 200-character URL with no spaces. Verify the URL wraps within the textarea (via `overflow-wrap: anywhere`) and does not overflow horizontally.
+
+### Steps — send/stop icon swap:
+8. With the textarea empty and no stream active, verify the right-side `mat-icon-button` shows the `send` icon, tooltip = `Send`, and is **disabled**.
+9. Type any text. Verify the button is now **enabled**, still showing `send`.
+10. Submit. Verify the icon changes to `stop`, tooltip = `Stop response`, and the button is **enabled even when the textarea is empty** (the `[disabled]="!streaming() && !followUpText.trim()"` evaluates false because `streaming()` is true).
+11. Wait for the stream to complete. Verify the icon reverts to `send`, tooltip back to `Send`, disabled when input is empty.
+
+### Steps — cancel preserves history:
+12. Submit a follow-up. Mid-stream, click the Stop icon button (or `onStop()` via Esc shortcut if exposed).
+13. Verify the partial assistant response (the streaming text + tool indicators + progress bar) disappears. No orphan assistant turn is appended to history.
+14. The user turn submitted in step 12 remains visible in the conversation.
+15. Verify `conversationHistory().length` equals (pre-send count) + 1 (just the user turn; no assistant turn for the cancelled stream).
+16. Submit a new follow-up. Verify the new request fires cleanly, references the prior context (since the user turn was preserved), and appends a fresh assistant turn on completion.
+
+### Expected:
+- Shift+Enter inserts a literal newline; Enter alone submits.
+- Textarea grows up to 6 rows then scrolls internally; long unbroken strings wrap.
+- Icon swap mirrors `streaming()` exactly: `send` <-> `stop`.
+- Stop tooltip says `Stop response`; Send tooltip says `Send`.
+- Stop button is enabled even with empty input while streaming.
+- After Stop: user turn preserved in history; partial assistant response NOT appended; subsequent prompts continue the conversation cleanly.
