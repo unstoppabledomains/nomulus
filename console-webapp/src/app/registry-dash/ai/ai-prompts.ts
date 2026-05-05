@@ -14,6 +14,19 @@
 
 import { AiPromptOption } from './ai-analysis.models';
 
+/**
+ * Cold-start "Ask anything" entry. Empty `userMessage` signals the modal to skip
+ * its auto-fired initial request and wait for the user to type their first turn.
+ * Appended to every page's menu so users can fall back to free-form when none
+ * of the presets fit.
+ */
+export const ASK_ANYTHING_PROMPT: AiPromptOption = {
+  icon: 'chat',
+  label: 'Ask anything…',
+  promptType: 'ask_anything',
+  userMessage: '',
+};
+
 export const DOMAIN_ACTIVITY_PROMPTS: AiPromptOption[] = [
   {
     icon: 'bar_chart',
@@ -36,6 +49,7 @@ export const DOMAIN_ACTIVITY_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Based on this domain activity data, suggest specific actions for retention and growth.',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const REVENUE_BILLING_PROMPTS: AiPromptOption[] = [
@@ -60,6 +74,7 @@ export const REVENUE_BILLING_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Based on this revenue data, suggest pricing adjustments, registrar outreach, or growth opportunities.',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const FORECASTING_PROMPTS: AiPromptOption[] = [
@@ -84,6 +99,7 @@ export const FORECASTING_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Suggest retention strategies, pricing recommendations, and proactive outreach based on this forecast data.',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const EXPLORE_PROMPTS: AiPromptOption[] = [
@@ -105,6 +121,7 @@ export const EXPLORE_PROMPTS: AiPromptOption[] = [
     promptType: 'suggest_actions',
     userMessage: 'Based on this data, what actions would you recommend?',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const OVERVIEW_PROMPTS: AiPromptOption[] = [
@@ -128,6 +145,7 @@ export const OVERVIEW_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Based on these overview metrics, what should the registry team focus on?',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const PORTFOLIO_PROMPTS: AiPromptOption[] = [
@@ -152,6 +170,7 @@ export const PORTFOLIO_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Based on this portfolio data, suggest registrar outreach or partnership opportunities.',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 export const PRICING_PROMPTS: AiPromptOption[] = [
@@ -176,6 +195,7 @@ export const PRICING_PROMPTS: AiPromptOption[] = [
     userMessage:
       'Based on this pricing data, suggest pricing adjustments or registrar negotiations.',
   },
+  ASK_ANYTHING_PROMPT,
 ];
 
 /**

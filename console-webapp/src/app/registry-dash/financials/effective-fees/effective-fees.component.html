@@ -1,6 +1,13 @@
 <div class="effective-fees">
   <div class="effective-fees-header">
-    <h3>Effective Fees by Registrar</h3>
+    <div class="chart-title-row">
+      <h3>Effective Fees by Registrar</h3>
+      <app-ai-sparkle-button
+        page="pricing"
+        [prompts]="aiPrompts"
+        [chartData]="filteredFees()">
+      </app-ai-sparkle-button>
+    </div>
     <p class="effective-fees-description">
       What each registrar is actually paying per TLD per operation. Default TLD prices are shown unless overridden by an active custom pricing rule.<span *ngIf="fetchedAt()"> Data active as of {{ fetchedAt() }}.</span>
     </p>

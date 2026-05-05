@@ -76,7 +76,7 @@
       type="text"
       [(ngModel)]="followUpText" name="followUp"
       (keydown)="onFollowUpKeydown($event)"
-      placeholder="Ask a follow-up question..."
+      [placeholder]="isColdStart() ? 'Ask anything about this chart…' : 'Ask a follow-up question…'"
       [disabled]="streaming()"
       class="follow-up-input" />
     <button mat-icon-button (click)="sendFollowUp()" [disabled]="streaming() || !followUpText">

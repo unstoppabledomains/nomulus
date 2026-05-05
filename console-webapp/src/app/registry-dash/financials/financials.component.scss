@@ -21,6 +21,12 @@
   margin-bottom: 16px;
 }
 
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 // Summary metric cards
 .metric-cards {
   display: flex;

@@ -27,6 +27,8 @@ import { LongPressDirective } from '../drilldown/long-press.directive';
 import { ForecastingComponent } from './forecasting/forecasting.component';
 import { EffectiveFeesComponent } from './effective-fees/effective-fees.component';
 import { FilterPanelComponent } from '../filter-panel/filter-panel.component';
+import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
+import { REVENUE_BILLING_PROMPTS, PRICING_PROMPTS } from '../ai/ai-prompts';
 
 const OPERATION_COLORS: Record<string, string> = {
   CREATE: '#0D67FE',
@@ -38,7 +40,7 @@ const OPERATION_COLORS: Record<string, string> = {
 @Component({
   selector: 'app-registry-dash-financials',
   standalone: true,
-  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, LongPressDirective, FilterPanelComponent],
+  imports: [CommonModule, MaterialModule, NgxEchartsDirective, RevenueBillingComponent, ForecastingComponent, EffectiveFeesComponent, LongPressDirective, FilterPanelComponent, AiSparkleButtonComponent],
   providers: [UD_ECHARTS_PROVIDER],
   templateUrl: './financials.component.html',
   styleUrls: ['./financials.component.scss'],
@@ -47,6 +49,12 @@ export class FinancialsComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   lastHoveredOverviewRevenueByOp: any = null;
   selectedTab = signal(0);
+
+  /** Prompt menus surfaced on this page's ✨ buttons. Reused from the dedicated
+   * revenue-billing and pricing pages so we don't fan out the backend prompt
+   * menu for Financials sub-areas (see SRE-1957 plan). */
+  aiPromptsRevenue = REVENUE_BILLING_PROMPTS;
+  aiPromptsPricing = PRICING_PROMPTS;
 
   timeRelevantTab = computed(() => {
     const tab = this.selectedTab();
@@ -60,6 +68,14 @@ export class FinancialsComponent implements OnInit {
   tldFeeEntries = computed(() => this.dashService.filteredTldFees());
 
   feesTableColumns = ['tld', 'operation', 'defaultPrice', 'currency'];
+
+  /** Chart-context payload sent to the LLM when ✨ is clicked on the Default
+   * Fees by TLD chart/table. Includes both the per-TLD aggregated bar data and
+   * the raw fee entries so the model can reason about either view. */
+  feesByTldAiContext = computed(() => ({
+    feesByTld: this.feesByOperationChartData(),
+    tldFeeEntries: this.tldFeeEntries(),
+  }));
 
   /** Chart: Default fees per TLD per operation. Segments = operations, bar = sum of defaultPrice. */
   feesByOperationChartData = computed(() => {
@@ -108,6 +124,12 @@ export class FinancialsComponent implements OnInit {
     if (!d || d.renewalRates.length === 0) return 0;
     return d.renewalRates.reduce((s, r) => s + r.renewalRate, 0) / d.renewalRates.length;
   });
+
+  /** Chart-context payload for the Overview "Registry Revenue by Operation"
+   * ✨ button. Mirrors what the Registry Revenue tab passes (the whole
+   * revenue-billing dataset) so the LLM has the same context regardless of
+   * which entry point the user clicked from. */
+  overviewRevenueAiContext = computed(() => this.dashService.revenueBilling());
 
   /** Registry revenue by operation (Net to Registry per operation). */
   overviewRevenueByOpOptions = computed(() => {

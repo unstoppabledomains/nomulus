@@ -45,7 +45,14 @@
           <!-- Registry Revenue by Operation chart -->
           <div class="charts-row" *ngIf="overviewRevenueByOpOptions()">
             <div class="chart-container">
-              <h3>Registry Revenue by Operation</h3>
+              <div class="chart-title-row">
+                <h3>Registry Revenue by Operation</h3>
+                <app-ai-sparkle-button
+                  page="revenue-billing"
+                  [prompts]="aiPromptsRevenue"
+                  [chartData]="overviewRevenueAiContext()">
+                </app-ai-sparkle-button>
+              </div>
               <p class="chart-description">Net registry revenue by operation type — CREATE, RENEW, TRANSFER, and RESTORE amounts after RSP fees.</p>
               <div appLongPress (longPress)="onOverviewRevenueByOpLongPress()">
                 <div echarts [options]="overviewRevenueByOpOptions()!" [theme]="'ud-brand'" class="chart"
@@ -73,7 +80,14 @@
 
         <!-- Chart: Default Fees per TLD per operation -->
         <div class="bar-chart" *ngIf="feesByOperationChartData().length > 0">
-          <h3 class="chart-title">Default Fees per TLD per Operation</h3>
+          <div class="chart-title-row">
+            <h3 class="chart-title">Default Fees per TLD per Operation</h3>
+            <app-ai-sparkle-button
+              page="pricing"
+              [prompts]="aiPromptsPricing"
+              [chartData]="feesByTldAiContext()">
+            </app-ai-sparkle-button>
+          </div>
           <p class="chart-description">Default fee amounts per TLD per operation from Nomulus TLD configuration.</p>
           <div class="chart-legend">
             <span class="legend-item" *ngFor="let op of ['CREATE', 'RENEW', 'TRANSFER', 'RESTORE']">
