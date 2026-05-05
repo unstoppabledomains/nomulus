@@ -203,7 +203,11 @@ public final class ExploreQueryBuilder {
     if (!f.getRegistrarIds().isEmpty()) {
       whereClauses.add("d.current_sponsor_registrar_id IN (:registrarIds)");
     }
-    return assembleQuery(selectCols, "\"Domain\" d", whereClauses, groupByCols, null);
+    // Order by count_value desc so a LIMIT applied at the SQL layer returns the largest groups,
+    // not arbitrary ones. Required for correctness of `query_domain_footprint`'s "top N" usage
+    // when the true (tld, registrar) cardinality exceeds the limit.
+    return assembleQuery(
+        selectCols, "\"Domain\" d", whereClauses, groupByCols, "count_value DESC");
   }
 
   private static String buildRenewalRates(

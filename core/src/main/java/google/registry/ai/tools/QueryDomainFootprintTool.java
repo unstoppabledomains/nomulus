@@ -27,7 +27,6 @@ import google.registry.ui.server.console.registrydash.RegistryDashAccessUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -179,58 +178,32 @@ public class QueryDomainFootprintTool implements AiTool {
     List<String> columns = new ArrayList<>(dimensions);
     columns.add("count");
 
+    // The DOMAIN_COUNTS SQL is `ORDER BY count_value DESC LIMIT :maxRows`, so the rows we get
+    // back are already the top-N groups even when the true cardinality exceeds the limit. We pass
+    // `limit` directly so the SQL returns at most that many groups.
     JsonObject payload;
     try {
       payload =
           ToolJpaHelper.runExplore(
-              ExploreDataSource.DOMAIN_COUNTS, desc, effectiveTlds, columns, MAX_LIMIT);
+              ExploreDataSource.DOMAIN_COUNTS, desc, effectiveTlds, columns, limit);
     } catch (AiToolException e) {
       return ToolResult.invalidArgs(e.getMessage());
     }
 
-    JsonArray rows = payload.getAsJsonArray("rows");
-    JsonArray sorted = sortAndLimitByCount(rows, limit);
-    long total = sumCounts(rows);
-    payload.add("rows", sorted);
-    payload.addProperty("rowCount", sorted.size());
+    // Authoritative total — independent of row truncation. Computed via a separate ungrouped
+    // COUNT(*) so we don't under-report when there are more groups than `limit`.
+    long total =
+        ToolJpaHelper.countActiveDomains(effectiveTlds, ImmutableSet.copyOf(registrarIds));
     payload.addProperty("totalDomains", total);
-    payload.addProperty("truncated", rows.size() > sorted.size());
+    // `truncated` is true when the SQL hit the limit (more groups exist than were returned).
+    int rowCount = payload.has("rowCount") ? payload.get("rowCount").getAsInt() : 0;
+    payload.addProperty("truncated", rowCount >= limit);
 
-    if (sorted.size() == 0) {
+    if (rowCount == 0) {
       return ToolResult.emptyForRange(
           payload, "no domains under management for the requested filters");
     }
     return ToolResult.ok(payload);
-  }
-
-  private static JsonArray sortAndLimitByCount(JsonArray rows, int limit) {
-    List<JsonElement> list = new ArrayList<>(rows.size());
-    rows.forEach(list::add);
-    list.sort(
-        Comparator.comparingLong(
-                (JsonElement el) -> {
-                  JsonObject obj = el.getAsJsonObject();
-                  return obj.has("count") && !obj.get("count").isJsonNull()
-                      ? obj.get("count").getAsLong()
-                      : 0L;
-                })
-            .reversed());
-    JsonArray out = new JsonArray();
-    for (int i = 0; i < Math.min(limit, list.size()); i++) {
-      out.add(list.get(i));
-    }
-    return out;
-  }
-
-  private static long sumCounts(JsonArray rows) {
-    long total = 0;
-    for (JsonElement el : rows) {
-      JsonObject obj = el.getAsJsonObject();
-      if (obj.has("count") && !obj.get("count").isJsonNull()) {
-        total += obj.get("count").getAsLong();
-      }
-    }
-    return total;
   }
 
   private static List<String> optionalStringArrayArg(JsonObject args, String key) {
