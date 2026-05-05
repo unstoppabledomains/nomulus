@@ -118,7 +118,7 @@
       cdkAutosizeMaxRows="6"
       [(ngModel)]="followUpText" name="followUp"
       (keydown)="onFollowUpKeydown($event)"
-      placeholder="Ask a follow-up question..."
+      [placeholder]="isColdStart() ? 'Ask anything about this chart…' : 'Ask a follow-up question…'"
       class="follow-up-input"></textarea>
     <button mat-icon-button
             [matTooltip]="streaming() ? 'Stop response' : 'Send'"

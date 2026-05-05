@@ -248,7 +248,11 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
         this.selectedModel.set(families[0]);
       }
     });
-    if (!this.aiService.hasActiveConversation()) {
+    // Cold-start "Ask anything" entries open with an empty `userMessage`.
+    // In that case, do not auto-fire — the user types their first turn into
+    // the follow-up input, which becomes the initial-request submitter via
+    // `sendFollowUp()` (it builds the user turn from an empty history).
+    if (!this.aiService.hasActiveConversation() && this.data.userMessage) {
       this.sendInitialRequest();
     }
   }
@@ -265,6 +269,9 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
       requestAnimationFrame(() => this.scrollToBottom());
     }
   }
+
+  /** True when the modal is open with no conversation yet — drives placeholder copy. */
+  isColdStart = computed(() => this.conversationHistory().length === 0 && !this.streaming());
 
   /** Per-page draft key so a draft saved on one page never leaks into another. */
   private draftKey(): string {
@@ -394,7 +401,11 @@ export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
     this.firingInProgress = false;
     this.drainGeneration++;
     this.aiService.resetConversation();
-    this.sendInitialRequest();
+    // For cold-start "Ask anything" entries (empty seed), restart leaves the
+    // modal idle so the user can type a fresh first turn.
+    if (this.data.userMessage) {
+      this.sendInitialRequest();
+    }
   }
 
   onModelChange(model: AiModelChoice) {
