@@ -24,9 +24,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.testing.TestLogHandler;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonObject;
 import google.registry.ai.AiOrchestrator;
 import google.registry.ai.AiRateLimiter;
 import google.registry.ai.AnthropicModelCatalog;
+import google.registry.ai.AnthropicModelCatalog.ModelInfo;
 import google.registry.config.RegistryConfigSettings;
 import google.registry.model.console.User;
 import google.registry.persistence.transaction.JpaTestExtensions;
@@ -36,6 +38,7 @@ import google.registry.testing.DatabaseHelper;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
 import google.registry.ui.server.console.ConsoleApiParams;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -502,6 +505,38 @@ class RegistryDashAiActionTest {
     action.run();
 
     assertThat(response.getStatus()).isEqualTo(429);
+  }
+
+  @Test
+  void testGet_serializesCatalogEntryFields() throws Exception {
+    when(params.request().getMethod()).thenReturn("GET");
+    when(modelCatalog.currentCatalog())
+        .thenReturn(
+            ImmutableMap.of(
+                "opus",
+                ImmutableList.of(
+                    new ModelInfo("claude-opus-4-7-20260101", "Opus 4.7", "2026-01-01"))));
+    when(modelCatalog.lastFetchedAt()).thenReturn(Instant.parse("2026-05-05T00:00:00Z"));
+
+    RegistryDashAiAction action =
+        new RegistryDashAiAction(
+            params,
+            Optional.empty(),
+            orchestrator,
+            rateLimiter,
+            defaultPromptConfig(),
+            modelCatalog,
+            clock);
+    action.run();
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    JsonObject body = JsonParser.parseString(response.getPayload()).getAsJsonObject();
+    JsonObject entry =
+        body.getAsJsonObject("catalog").getAsJsonArray("opus").get(0).getAsJsonObject();
+    assertThat(entry.get("id").getAsString()).isEqualTo("claude-opus-4-7-20260101");
+    assertThat(entry.get("displayName").getAsString()).isEqualTo("Opus 4.7");
+    assertThat(entry.get("createdAt").getAsString()).isEqualTo("2026-01-01");
+    assertThat(body.get("fetchedAt").getAsString()).isNotEmpty();
   }
 
   private RegistryConfigSettings.Prompts defaultPromptConfig() {
