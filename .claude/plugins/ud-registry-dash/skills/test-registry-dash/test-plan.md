@@ -26,16 +26,16 @@
 9. Navigate to **Overview** (`/#/registry-dash/overview`).
 10. Verify three sparkle icons appear, one per chart: "Registrar Market Share", "Domain Activity Trend", "Renewal Rate by TLD".
 11. Navigate to **Data Exploration** (`/#/registry-dash/explore`).
-12. Before running a query, verify NO sparkle icon is visible (the button is conditional on chart data existing).
+12. Before running a query, verify exactly one `auto_awesome` icon is visible on the page — the page-level **Add to AI Chat** button next to the Run controls — and that button is **disabled**.
 13. Configure a query (Source: Domain Activity, Metric: Count, Group By: TLD) and click "Run Query".
-14. Verify a sparkle icon appears above the rendered chart.
+14. Verify a second `auto_awesome` icon appears above the rendered chart (per-chart sparkle), and the page-level **Add to AI Chat** button becomes enabled.
 15. Navigate to **Portfolio** (`/#/registry-dash/portfolio`).
 16. Verify a single sparkle icon appears in the page header row, to the right of the "Registrar Portfolio" heading.
 17. Navigate to **Pricing** (`/#/registry-dash/pricing`).
 18. Verify a single sparkle icon appears in the page header row, between the "Registrar Custom Pricing Rules" heading and the "Add Rule" button.
 
 ### Expected:
-- Sparkle icons visible on every page and every Financials sub-tab (after query runs on Explore). No tab/chart that renders meaningful data is missing a sparkle.
+- Sparkle icons visible on every page and every Financials sub-tab. On Explore there are two sparkles: a page-level **Add to AI Chat** button (always present, disabled pre-query, enabled after first query) and a per-chart sparkle that appears above the chart once a query runs. No tab/chart that renders meaningful data is missing a sparkle.
 - Icons are subtle (slightly transparent, opacity ~0.6) and become fully opaque on hover.
 - Charts also have an "open in new" explore button alongside the sparkle on the pages that pre-date SRE-1957 (Portfolio + Pricing have only the sparkle, no explore button; the new Financials Overview/Default Fees/Effective Fees sparkles are sparkle-only).
 
