@@ -77,10 +77,33 @@ Smoke tier targets ~15–25 min on alpha and covers DOM-only checks (sparkle vis
 
 When the skill is invoked, parse any `--tier=<value>` argument from the user's message before Phase 3. Carry the resolved tier filter into Phase 3 and apply it when reading `test-plan.md`.
 
+### Phase 2d — Capability detection
+
+Before kicking off Phase 3, probe the chosen environment for capabilities that gate certain tests. Currently:
+
+- **admin-page**: navigate to `/#/registry-dash/admin` and check whether the URL stays on `admin` or redirects to `/overview` (the route guard rejects non-admin users by silently redirecting). Equivalent JS check from any registry-dash page:
+
+  ```js
+  (async () => {
+    const before = location.hash;
+    location.hash = '#/registry-dash/admin';
+    await new Promise(r => setTimeout(r, 1500));
+    const ok = location.hash.includes('/admin');
+    if (!ok) location.hash = before;
+    return ok;
+  })()
+  ```
+
+  Returns `true` if the admin page is visible to this user, `false` otherwise.
+
+When a capability check fails, mark every test tagged `**Requires:** <capability>` in the test plan as `🚫 Skipped — <capability> unavailable in this environment`. This is distinct from `⏭️ Skipped` (out-of-tier) and from `❌ Failed`.
+
+Add new capabilities by repeating the same pattern: tag tests with `**Requires:** <name>`, and add a probe + skip rule here.
+
 ### Phase 3 — Test execution
 
 1. Read `test-plan.md`.
-2. Use `TaskCreate` to create one task per numbered test in the plan **whose `**Tier:**` line matches the active tier filter** (smoke / full / all). Tests outside the active tier are skipped silently — do not create tasks for them and do not list them as `⏭️ Skipped` in the report; the tier filter is the explicit user choice.
+2. Use `TaskCreate` to create one task per numbered test in the plan **whose `**Tier:**` line matches the active tier filter AND whose `**Requires:**` capabilities are all available** (per Phase 2d). Tests outside the active tier are skipped silently — do not create tasks for them and do not list them as `⏭️ Skipped` in the report; the tier filter is the explicit user choice. Tests skipped by capability are not surfaced as TaskCreate items either, but they DO appear in the Phase 4 report under a `🚫 Skipped (env)` row so the user knows what was deferred.
 3. Open Chrome MCP, navigate to the chosen environment, log in if needed (the user's session should already be valid).
 4. Execute each test in sequence. For each:
    - Mark `in_progress` via `TaskUpdate`.
@@ -90,7 +113,7 @@ When the skill is invoked, parse any `--tier=<value>` argument from the user's m
 
 ### Phase 4 — Reporting
 
-Print a summary table with one row per test: ✅ Passed / ⚠️ Partial / ❌ Failed / ⏭️ Skipped. For any non-pass, include a one-line root cause and a file path or URL pointer.
+Print a summary table with one row per test using one of these states: ✅ Passed / ⚠️ Partial / ❌ Failed / ⏭️ Skipped (out-of-tier) / 🚫 Skipped (env-gated). For any non-pass, include a one-line root cause and a file path or URL pointer.
 
 If any new bugs are discovered, offer to log them as Linear tickets in the RSP project, Registry Dashboard milestone, with `bug` label.
 

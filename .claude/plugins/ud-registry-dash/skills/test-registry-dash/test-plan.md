@@ -820,6 +820,7 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 **Goal:** Verify the admin page renders the live model catalog and the fetched-at timestamp.
 **Tier:** smoke
+**Requires:** admin-page
 
 ### Prerequisites:
 - Logged in as an FTE/admin user (admin GET requires `MANAGE_COST_BASIS`).
@@ -841,6 +842,7 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 **Goal:** Verify the **Refresh now** button re-fetches `/v1/models` from Anthropic and updates `fetchedAt`.
 **Tier:** full
+**Requires:** admin-page
 **Tier rationale:** Triggers a server-side POST to refresh the catalog (admin-required state change, not pure UI render).
 
 ### Steps:
@@ -898,6 +900,7 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 **Goal:** Verify the Advanced (system prompt editor) panel is admin-only and resolves admin status from `UserDataService.userData()?.isAdmin` when the host doesn't pass `[isAdmin]` explicitly (PR #130).
 **Tier:** smoke
+**Requires:** admin-page
 
 ### Prerequisites:
 - Two test users: one FTE/admin (`userData.isAdmin === true`) and one non-admin.
@@ -923,6 +926,7 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 **Goal:** Verify the Advanced textarea autosaves to localStorage under `ai-system-prompt-draft:<page>` per-keystroke, restores on reopen, and is scoped per-page so a draft on one page does not bleed into another (PR #130 review fix).
 **Tier:** smoke
+**Requires:** admin-page
 **Tier rationale:** Pure localStorage + DOM state — opens modal, types, inspects keys, no streaming required.
 
 ### Prerequisites:
@@ -951,6 +955,7 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 **Goal:** Verify a saved draft only takes effect on the next request when the admin has explicitly expanded Advanced (per `systemPrompt: this.showAdvanced() ? this.editableSystemPrompt : undefined` in both `sendInitialRequest` and `runQueuedPrompt`).
 **Tier:** full
+**Requires:** admin-page
 
 ### Prerequisites:
 - Admin user. Local-dev preferred (server log inspection).
