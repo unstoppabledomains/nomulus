@@ -18,11 +18,20 @@ import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { catchError, debounceTime, EMPTY, filter, switchMap } from 'rxjs';
 import { MaterialModule } from '../../material.module';
-import { RegistryDashService } from '../registry-dash.service';
+import { RegistryDashService, computeDateRange } from '../registry-dash.service';
 import { ExploreService } from './explore.service';
 import { ExploreBuilderComponent } from './explore-builder/explore-builder.component';
 import { ExploreChartComponent } from './explore-chart/explore-chart.component';
-import { ChartType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
+import { ChartType, DataSourceType, DEFAULT_QUERY, ExploreQuery } from './explore.models';
+
+/** Data sources whose results are scoped by time, so a `dateRange` is meaningful for the LLM. */
+const TIME_BASED_SOURCES: ReadonlySet<DataSourceType> = new Set<DataSourceType>([
+  'DOMAIN_ACTIVITY',
+  'REVENUE',
+  'RENEWAL_RATES',
+  'EXPIRATION_CURVE',
+  'TRANSACTIONS',
+]);
 import { AiSparkleButtonComponent } from '../ai/ai-sparkle-button.component';
 import { EXPLORE_PROMPTS } from '../ai/ai-prompts';
 import { AiAnalysisService } from '../ai/ai-analysis.service';
@@ -31,6 +40,7 @@ import {
   AiAnalysisModalData,
 } from '../ai/ai-analysis-modal.component';
 import { EXPLORE_AI_ROW_CAP, AiModelChoice } from '../ai/ai-analysis.models';
+import { UserDataService } from '../../shared/services/userData.service';
 
 @Component({
   selector: 'app-explore',
@@ -43,6 +53,7 @@ export class ExploreComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private dashService = inject(RegistryDashService);
   private dialog = inject(MatDialog);
+  private userDataService = inject(UserDataService);
   exploreService = inject(ExploreService);
   aiService = inject(AiAnalysisService);
   readonly aiPrompts = EXPLORE_PROMPTS;
@@ -135,9 +146,11 @@ export class ExploreComponent implements OnInit {
 
   private buildMetadata(): AiAnalysisModalData['metadata'] {
     const range = this.dashService.selectedRangeConfig();
+    const isTimeBased = TIME_BASED_SOURCES.has(this.query().dataSource);
+    const dateRange = isTimeBased && range ? computeDateRange(range.lookbackHours) : undefined;
     return {
-      dateRange: { start: '', end: '' },
-      granularity: range?.granularity,
+      ...(dateRange ? { dateRange } : {}),
+      granularity: isTimeBased ? range?.granularity : undefined,
       filteredTlds: this.dashService.selectedTlds(),
       filteredRegistrars: this.dashService.selectedRegistrarIds(),
       exploreDescriptor: this.query(),
@@ -161,7 +174,7 @@ export class ExploreComponent implements OnInit {
       userMessage: EXPLORE_PROMPTS[0].userMessage,
       metadata: this.buildMetadata(),
       chartData: truncated,
-      isAdmin: false,
+      isAdmin: this.userDataService.userData()?.isAdmin ?? false,
       savedModel: this.savedAiModel(),
     };
 
@@ -198,7 +211,7 @@ export class ExploreComponent implements OnInit {
       userMessage: EXPLORE_PROMPTS[0].userMessage,
       metadata: this.buildMetadata(),
       chartData: truncated,
-      isAdmin: false,
+      isAdmin: this.userDataService.userData()?.isAdmin ?? false,
       savedModel: this.savedAiModel(),
     };
     this.dialog.open(AiAnalysisModalComponent, {

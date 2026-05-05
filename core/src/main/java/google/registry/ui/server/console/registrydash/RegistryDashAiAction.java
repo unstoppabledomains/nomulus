@@ -39,11 +39,13 @@ import google.registry.request.Parameter;
 import google.registry.request.auth.Auth;
 import google.registry.ui.server.console.ConsoleApiAction;
 import google.registry.ui.server.console.ConsoleApiParams;
+import google.registry.util.Clock;
 import google.registry.util.RegistryEnvironment;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Optional;
+import org.joda.time.DateTimeZone;
 
 @Action(
     service = Service.CONSOLE,
@@ -63,6 +65,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
   private final AiRateLimiter rateLimiter;
   private final Gson gson;
   private final RegistryConfigSettings.Prompts promptConfig;
+  private final Clock clock;
 
   @Inject
   public RegistryDashAiAction(
@@ -70,13 +73,15 @@ public class RegistryDashAiAction extends ConsoleApiAction {
       @Parameter("aiAnalyzePayload") Optional<JsonElement> payload,
       AiOrchestrator orchestrator,
       AiRateLimiter rateLimiter,
-      @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig) {
+      @Config("anthropicPromptConfig") RegistryConfigSettings.Prompts promptConfig,
+      Clock clock) {
     super(consoleApiParams);
     this.payload = payload;
     this.orchestrator = orchestrator;
     this.rateLimiter = rateLimiter;
     this.gson = consoleApiParams.gson();
     this.promptConfig = promptConfig;
+    this.clock = clock;
   }
 
   @Override
@@ -179,15 +184,22 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     boolean isProduction = RegistryEnvironment.get() == RegistryEnvironment.PRODUCTION;
     boolean isAdmin = user.getUserRoles().getGlobalRole() == GlobalRole.FTE;
 
+    // Admin per-request override is for prompt experimentation in non-prod; the admin owns
+    // the entire prompt body in that path (including date instructions if they want them).
     if (!isProduction
         && isAdmin
         && request.systemPrompt != null
         && !request.systemPrompt.isEmpty()) {
       return request.systemPrompt;
     }
+    return todayHeader()
+        + getDefaultSystemPrompt(
+            request.page, request.promptType, request.chartData, request.metadata);
+  }
 
-    return getDefaultSystemPrompt(
-        request.page, request.promptType, request.chartData, request.metadata);
+  private String todayHeader() {
+    String today = clock.nowUtc().toDateTime(DateTimeZone.UTC).toLocalDate().toString();
+    return "Today is " + today + " (UTC).\n\n";
   }
 
   private String getDefaultSystemPrompt(
@@ -208,7 +220,7 @@ public class RegistryDashAiAction extends ConsoleApiAction {
 
     sb.append("\n## Context\n");
     if (metadata != null) {
-      if (metadata.has("dateRange")) {
+      if (metadata.has("dateRange") && hasNonEmptyDateRange(metadata.get("dateRange"))) {
         sb.append("Date range: ").append(metadata.get("dateRange")).append("\n");
       }
       if (metadata.has("filteredTlds") && metadata.getAsJsonArray("filteredTlds").size() > 0) {
@@ -224,5 +236,17 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     }
 
     return sb.toString();
+  }
+
+  private static boolean hasNonEmptyDateRange(JsonElement dateRange) {
+    if (dateRange == null || !dateRange.isJsonObject()) {
+      return false;
+    }
+    JsonObject obj = dateRange.getAsJsonObject();
+    return isNonBlankString(obj.get("start")) && isNonBlankString(obj.get("end"));
+  }
+
+  private static boolean isNonBlankString(JsonElement el) {
+    return el != null && el.isJsonPrimitive() && !el.getAsString().isBlank();
   }
 }
