@@ -16,9 +16,11 @@ package google.registry.ui.server.console.registrydash;
 
 import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.FluentLogger;
+import com.google.common.net.MediaType;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -115,11 +117,18 @@ public class RegistryDashAiAction extends ConsoleApiAction {
     String resolvedModel = AnthropicClient.resolveModelId(model != null ? model : "sonnet");
 
     try {
-      PrintWriter writer = consoleApiParams.response().getWriter();
-      consoleApiParams.response().setHeader("Content-Type", "text/event-stream");
+      // Set Content-Type (with charset) before getWriter(): the writer's encoding is fixed at the
+      // moment getWriter() is called. Without this, Jetty defaults the writer to ISO-8859-1 and
+      // any non-Latin-1 characters from Anthropic (em-dash, smart quotes, emoji) get substituted
+      // with '?' on the way out. setContentType() is the canonical Jakarta Servlet API for both
+      // header and writer encoding (vs. setHeader, which is container-dependent).
+      consoleApiParams
+          .response()
+          .setContentType(MediaType.create("text", "event-stream").withCharset(UTF_8));
       consoleApiParams.response().setHeader("Cache-Control", "no-cache");
       consoleApiParams.response().setHeader("Connection", "keep-alive");
       consoleApiParams.response().setStatus(200);
+      PrintWriter writer = consoleApiParams.response().getWriter();
 
       ImmutableList<String> toolsUsed =
           orchestrator.run(

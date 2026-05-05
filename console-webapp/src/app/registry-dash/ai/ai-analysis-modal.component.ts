@@ -87,6 +87,16 @@ export class AiAnalysisModalComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Clear any leftover transient state (e.g. an "interrupted" error from a
+    // prior session) so a freshly opened modal never renders stale errors.
+    // Conversation history is preserved here so a continued session can resume.
+    // Use the stream-safe variant: `addToCurrentChat()` kicks off `analyze()`
+    // (which sets `streaming=true`) BEFORE opening this dialog, so an
+    // unconditional reset would flip `streaming` back to false mid-stream and
+    // re-enable the follow-up input. A full reset (including pre-existing
+    // history) on the sparkle-button path runs in that component's pre-open
+    // `resetConversation()` call instead of via `afterClosed()`.
+    this.aiService.clearStaleDisplayState();
     if (!this.aiService.hasActiveConversation()) {
       this.sendInitialRequest();
     }
