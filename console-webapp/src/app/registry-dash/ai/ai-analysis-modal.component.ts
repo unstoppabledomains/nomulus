@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, ElementRef, Inject, ViewChild, computed, effect, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Inject, ViewChild, computed, effect, signal, OnInit, Pipe, PipeTransform } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogConfig, MatDialogRef } from '@angular/material/dialog';
@@ -95,7 +95,7 @@ export interface AiAnalysisModalData {
   templateUrl: './ai-analysis-modal.component.html',
   styleUrls: ['./ai-analysis-modal.component.scss'],
 })
-export class AiAnalysisModalComponent implements OnInit {
+export class AiAnalysisModalComponent implements OnInit, AfterViewInit {
   static readonly SYSTEM_PROMPT_DRAFT_PREFIX = 'ai-system-prompt-draft:';
 
   @ViewChild('scrollContainer') scrollContainer!: ElementRef<HTMLDivElement>;
@@ -228,6 +228,19 @@ export class AiAnalysisModalComponent implements OnInit {
     }
   }
 
+  ngAfterViewInit(): void {
+    // The auto-scroll effect runs once at construction time, before
+    // @ViewChild('scrollContainer') resolves, and exits early. If the
+    // dialog is opened around an already-active chat (e.g. addToCurrentChat
+    // — which calls analyze() and may have populated conversationHistory
+    // before the modal mounts), the effect won't re-run until the next
+    // streamedText/conversationHistory tick, leaving the user looking at
+    // the top of the transcript. Pin to bottom now that the view is ready.
+    if (this.conversationHistory().length > 0 || this.streamedText()) {
+      requestAnimationFrame(() => this.scrollToBottom());
+    }
+  }
+
   /** Per-page draft key so a draft saved on one page never leaks into another. */
   private draftKey(): string {
     return AiAnalysisModalComponent.SYSTEM_PROMPT_DRAFT_PREFIX + this.data.page;
@@ -343,6 +356,11 @@ export class AiAnalysisModalComponent implements OnInit {
   startNewChat() {
     this.pendingQueue.set([]);
     this.isPaused.set(false);
+    // Re-engage auto-scroll for the fresh conversation. Without this, a
+    // chat where the user had scrolled up before clicking "Start new chat"
+    // would inherit `autoScrollEnabled === false`, and streaming output
+    // for the new conversation would not pin to the bottom.
+    this.autoScrollEnabled.set(true);
     // Invalidate any in-flight auto-fire microtask: the effect already
     // synchronously popped a queue head and scheduled a microtask before
     // we got here. Bumping drainGeneration (and clearing firingInProgress

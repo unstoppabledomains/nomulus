@@ -1,5 +1,18 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+// Override Material's default max-height: 65vh so the conversation grows
+// to fill whatever vertical space the user has dragged the modal to.
+mat-dialog-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
 }
 
 .modal-title-row {
@@ -63,12 +76,17 @@
 
 .conversation-wrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 16px;
 }
 
 .conversation {
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  margin-bottom: 16px;
 }
 
 .ai-modal-resize-handle {
