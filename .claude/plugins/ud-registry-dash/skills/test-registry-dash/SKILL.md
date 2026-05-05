@@ -41,22 +41,16 @@ If Docker isn't running, the script exits with a clear message — surface it to
 
 Show the user the drift summary, then offer three options:
 
-**a) Recommended: Update the test plan in a new worktree, PR to master.**
-- Ask the user: "What branch should the test-plan update branch off?"
-  - Default suggestion: `master` (clean baseline, use when not actively developing)
-  - Alternative: current branch (use when feature work is what's driving the test update)
-- Use the `superpowers:using-git-worktrees` skill to create the worktree.
-- Inside the worktree: read the diff for watched paths, propose updates to `test-plan.md`, propose updates to `metadata.json` (advance `lastReviewedCommit` to current HEAD, set `lastReviewer` to the git user).
-- Commit and open a PR against `master`. Title prefix `chore(registry-dash):`.
-- After PR is opened: stop. Tell the user "merge the PR, then re-run /test-registry-dash on a clean branch."
+**a) Update the test plan now.** Ask the user where to make the update:
+- **In the current branch** — bundle the test-plan update into the active feature branch. Use this when the drifting commits are part of the work the user is currently developing/reviewing; the test-plan changes ride along in the same PR.
+- **In a separate branch / worktree** — create a new branch (or use the `superpowers:using-git-worktrees` skill) off `master`, commit the test-plan update there, and open a standalone `chore(registry-dash):` PR against `master`. Use this when the drifting commits already merged and the user just needs to bump the metadata.
+- **Defer — handle separately later** — record the drift in the report and proceed to Phase 2 with a warning. Use this when the user wants to deal with the test-plan update on their own time.
 
-**b) Skip the update — proceed anyway.**
-- Require the user to type the **exact** phrase `proceed-without-test-updates` in their next message. Anything else (even close paraphrases) means abort.
-- If they type it correctly: log a warning into the test report ("⚠️ Tests run against drifted code; results may not reflect the current code state."), and continue to Phase 2.
-- This path exists for emergencies. Discourage it.
+In either of the first two paths, read the diff for watched paths, propose updates to `test-plan.md`, propose updates to `metadata.json` (advance `lastReviewedCommit` to current HEAD, set `lastReviewer` to the git user). Commit; if a standalone PR, open it against `master` with title prefix `chore(registry-dash):`. Then continue to Phase 2 (or stop, depending on how disruptive the test-plan changes were — ask the user).
 
-**c) Cancel.**
-- Stop and exit cleanly.
+**b) Skip the update — proceed anyway.** Confirm with the user (a normal yes/confirm is enough; no verbatim phrase). On confirmation: log a warning into the test report ("⚠️ Tests run against drifted code; results may not reflect the current code state."), and continue to Phase 2.
+
+**c) Cancel.** Stop and exit cleanly.
 
 ### Phase 2 — Environment selection
 
@@ -113,7 +107,6 @@ Only if all three confirm a real failure is this an app bug worth filing.
 
 - Do not modify `metadata.json` outside of an open PR. Local edits to it are not authoritative.
 - Do not run tests against production under any circumstance.
-- The override phrase `proceed-without-test-updates` must match **verbatim**. Do not accept paraphrases or partial matches.
 - Browser automation requires Chrome MCP tools (`mcp__claude-in-chrome__*`); load them via ToolSearch before driving the browser.
 
 ## When NOT to use
