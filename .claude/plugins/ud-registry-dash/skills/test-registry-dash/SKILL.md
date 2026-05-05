@@ -69,10 +69,18 @@ The default test-server `Fixture.java` data covers tests 1-6, 15: 2 TLDs (`examp
 
 For tests that need richer data — Test 14 (Pricing analysis) needs at least one `RegistrarPricing` row, Test 7-8 are more meaningful with multi-TLD revenue history — run `bash .claude/plugins/ud-registry-dash/skills/test-registry-dash/helpers/seed-test-data.sh` after the test server is up. The script is idempotent. If a richer dataset is available locally (e.g. `local-test-data-setup.sql` from a prior session), prefer that.
 
+### Phase 2c — Tier filter
+
+Each test in `test-plan.md` is tagged `**Tier:** smoke` or `**Tier:** full`. By default, the skill runs all tests. If invoked with `--tier=smoke`, run only smoke-tagged tests; with `--tier=full`, run only full-tagged tests; with no flag (or `--tier=all`), run everything.
+
+Smoke tier targets ~15–25 min on alpha and covers DOM-only checks (sparkle visibility, prompt menus, API smoke endpoints, admin-panel render, modal chrome / resize / localStorage). Full tier includes AI streaming, tool use, conversation, queue, and is the canonical pre-release sweep (~2–3 hours on alpha).
+
+When the skill is invoked, parse any `--tier=<value>` argument from the user's message before Phase 3. Carry the resolved tier filter into Phase 3 and apply it when reading `test-plan.md`.
+
 ### Phase 3 — Test execution
 
 1. Read `test-plan.md`.
-2. Use `TaskCreate` to create one task per numbered test in the plan.
+2. Use `TaskCreate` to create one task per numbered test in the plan **whose `**Tier:**` line matches the active tier filter** (smoke / full / all). Tests outside the active tier are skipped silently — do not create tasks for them and do not list them as `⏭️ Skipped` in the report; the tier filter is the explicit user choice.
 3. Open Chrome MCP, navigate to the chosen environment, log in if needed (the user's session should already be valid).
 4. Execute each test in sequence. For each:
    - Mark `in_progress` via `TaskUpdate`.
