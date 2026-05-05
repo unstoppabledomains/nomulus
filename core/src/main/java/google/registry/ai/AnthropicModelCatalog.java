@@ -84,7 +84,8 @@ public class AnthropicModelCatalog {
   private final long cacheTtlMillis;
 
   /** Memoized supplier; rebuilt on each {@link #forceRefresh}. */
-  private final AtomicReference<Supplier<CatalogSnapshot>> snapshotSupplier = new AtomicReference<>();
+  private final AtomicReference<Supplier<CatalogSnapshot>> snapshotSupplier =
+      new AtomicReference<>();
 
   @Inject
   public AnthropicModelCatalog(
