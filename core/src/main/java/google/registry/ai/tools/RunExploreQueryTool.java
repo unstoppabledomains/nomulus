@@ -62,6 +62,11 @@ public class RunExploreQueryTool implements AiTool {
   }
 
   @Override
+  public Complexity complexity() {
+    return Complexity.COMPLEX;
+  }
+
+  @Override
   public String description() {
     StringBuilder sb = new StringBuilder();
     sb.append(

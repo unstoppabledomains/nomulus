@@ -30,6 +30,20 @@ export class AdminComponent implements OnInit {
 
   registries = computed(() => this.dashService.adminData()?.registries || []);
   systemInfo = computed(() => this.dashService.adminData()?.systemInfo);
+  aiModelCatalog = computed(() => this.dashService.adminData()?.aiModelCatalog);
+  aiModelCatalogFetchedAt = computed(
+    () => this.dashService.adminData()?.aiModelCatalogFetchedAt
+  );
+  aiCatalogRefreshing = signal(false);
+
+  refreshAiModels() {
+    if (this.aiCatalogRefreshing()) return;
+    this.aiCatalogRefreshing.set(true);
+    this.dashService.adminAction({ action: 'refreshAiModels' }).subscribe({
+      next: () => this.aiCatalogRefreshing.set(false),
+      error: () => this.aiCatalogRefreshing.set(false),
+    });
+  }
 
   selectedRegistry = signal<RoRegistry | undefined>(undefined);
 

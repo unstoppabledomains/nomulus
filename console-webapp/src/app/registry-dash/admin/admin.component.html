@@ -9,6 +9,55 @@
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
+  <!-- AI Models — dynamic catalog of Claude models served to the chat selector -->
+  <mat-card class="admin-card">
+    <mat-card-header>
+      <mat-card-title>AI Models</mat-card-title>
+      <mat-card-subtitle>
+        Top 3 GA models per family fetched from Anthropic. Auto-refreshed lazily on read;
+        click below to force-refresh now.
+        <span *ngIf="aiModelCatalogFetchedAt()">
+          Fetched: {{ aiModelCatalogFetchedAt() }}
+        </span>
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="ai-models-grid" *ngIf="aiModelCatalog() as cat">
+        <div class="ai-models-family">
+          <h4>Opus</h4>
+          <div *ngIf="cat.opus.length === 0" class="ai-models-empty">none</div>
+          <div *ngFor="let m of cat.opus" class="ai-models-row">
+            <code>{{ m.id }}</code>
+            <span *ngIf="m.displayName" class="ai-models-name">{{ m.displayName }}</span>
+          </div>
+        </div>
+        <div class="ai-models-family">
+          <h4>Sonnet</h4>
+          <div *ngIf="cat.sonnet.length === 0" class="ai-models-empty">none</div>
+          <div *ngFor="let m of cat.sonnet" class="ai-models-row">
+            <code>{{ m.id }}</code>
+            <span *ngIf="m.displayName" class="ai-models-name">{{ m.displayName }}</span>
+          </div>
+        </div>
+        <div class="ai-models-family">
+          <h4>Haiku</h4>
+          <div *ngIf="cat.haiku.length === 0" class="ai-models-empty">none</div>
+          <div *ngFor="let m of cat.haiku" class="ai-models-row">
+            <code>{{ m.id }}</code>
+            <span *ngIf="m.displayName" class="ai-models-name">{{ m.displayName }}</span>
+          </div>
+        </div>
+      </div>
+      <button
+        mat-stroked-button
+        (click)="refreshAiModels()"
+        [disabled]="aiCatalogRefreshing()">
+        <mat-icon>refresh</mat-icon>
+        {{ aiCatalogRefreshing() ? 'Refreshing…' : 'Refresh now' }}
+      </button>
+    </mat-card-content>
+  </mat-card>
+
   <!-- My View — FTE session-only column visibility -->
   <mat-card class="admin-card">
     <mat-card-header>

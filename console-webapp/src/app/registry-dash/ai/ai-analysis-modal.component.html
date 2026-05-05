@@ -16,9 +16,9 @@
   <div class="context-bar">
     <span class="context-model">Model:</span>
     <mat-button-toggle-group [value]="selectedModel()" (change)="onModelChange($event.value)">
-      <mat-button-toggle value="haiku">Haiku</mat-button-toggle>
-      <mat-button-toggle value="sonnet">Sonnet</mat-button-toggle>
-      <mat-button-toggle value="opus">Opus</mat-button-toggle>
+      <mat-button-toggle *ngIf="availableFamilies().includes('haiku')" value="haiku">Haiku</mat-button-toggle>
+      <mat-button-toggle *ngIf="availableFamilies().includes('sonnet')" value="sonnet">Sonnet</mat-button-toggle>
+      <mat-button-toggle *ngIf="availableFamilies().includes('opus')" value="opus">Opus</mat-button-toggle>
     </mat-button-toggle-group>
   </div>
 
@@ -30,9 +30,11 @@
     </button>
     <div *ngIf="showAdvanced()" class="advanced-content">
       <textarea
-        [(ngModel)]="editableSystemPrompt" name="systemPrompt"
+        [ngModel]="editableSystemPrompt"
+        (ngModelChange)="onSystemPromptChange($event)"
+        name="systemPrompt"
         class="system-prompt-editor"
-        placeholder="System prompt (editable in dev mode)"
+        placeholder="System prompt (editable in dev mode; saved drafts persist across reloads for FTE)"
         rows="6"></textarea>
     </div>
   </div>

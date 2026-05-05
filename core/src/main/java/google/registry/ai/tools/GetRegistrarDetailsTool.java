@@ -45,6 +45,11 @@ public class GetRegistrarDetailsTool implements AiTool {
   }
 
   @Override
+  public Complexity complexity() {
+    return Complexity.EASY;
+  }
+
+  @Override
   public String description() {
     return "Returns a registrar's profile: type (REAL/OTE/PDT/...), state (ACTIVE/SUSPENDED/...),"
         + " IANA identifier, allowed TLDs, and contacts. Use when the user asks about a specific"

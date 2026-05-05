@@ -21,6 +21,7 @@ import static jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 
+import google.registry.ai.AnthropicModelCatalog;
 import google.registry.model.console.ConsolePermission;
 import google.registry.model.console.User;
 import google.registry.model.registrar.Registrar;
@@ -66,13 +67,16 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       "SELECT r FROM Registrar r WHERE r.type = :type ORDER BY r.registrarId";
 
   private final Optional<AdminPayload> adminPayload;
+  private final AnthropicModelCatalog modelCatalog;
 
   @Inject
   public RegistryDashAdminAction(
       ConsoleApiParams consoleApiParams,
-      @Parameter("registryDashAdmin") Optional<AdminPayload> adminPayload) {
+      @Parameter("registryDashAdmin") Optional<AdminPayload> adminPayload,
+      AnthropicModelCatalog modelCatalog) {
     super(consoleApiParams);
     this.adminPayload = adminPayload;
+    this.modelCatalog = modelCatalog;
   }
 
   @Override
@@ -81,6 +85,12 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       consoleApiParams.response().setStatus(SC_FORBIDDEN);
       return;
     }
+
+    // Resolve the model catalog OUTSIDE the JPA transaction: a TTL-expired catalog
+    // triggers a synchronous Anthropic fetch, and we don't want to hold a DB
+    // connection open while waiting on an external service.
+    Object catalogSnapshot = modelCatalog.currentCatalog();
+    String catalogFetchedAt = modelCatalog.lastFetchedAt().toString();
 
     tm().transact(
         () -> {
@@ -158,6 +168,8 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
           Map<String, Object> response = new HashMap<>();
           response.put("registries", registryList);
           response.put("systemInfo", systemInfo);
+          response.put("aiModelCatalog", catalogSnapshot);
+          response.put("aiModelCatalogFetchedAt", catalogFetchedAt);
 
           consoleApiParams.response().setPayload(
               consoleApiParams.gson().toJson(response));
@@ -190,8 +202,18 @@ public class RegistryDashAdminAction extends ConsoleApiAction {
       case "addUser" -> handleAddUser(payload);
       case "removeUser" -> handleRemoveUser(payload);
       case "updateSettings" -> handleUpdateSettings(payload);
+      case "refreshAiModels" -> handleRefreshAiModels();
       default -> setFailedResponse("Unknown action: " + action, SC_BAD_REQUEST);
     }
+  }
+
+  private void handleRefreshAiModels() {
+    modelCatalog.forceRefresh();
+    Map<String, Object> response = new HashMap<>();
+    response.put("aiModelCatalog", modelCatalog.currentCatalog());
+    response.put("aiModelCatalogFetchedAt", modelCatalog.lastFetchedAt().toString());
+    consoleApiParams.response().setPayload(consoleApiParams.gson().toJson(response));
+    consoleApiParams.response().setStatus(SC_OK);
   }
 
   private void handleCreateRegistry(AdminPayload payload) {

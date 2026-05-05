@@ -1474,6 +1474,21 @@ public final class RegistryConfig {
     }
 
     @Provides
+    @Config("anthropicModelCatalogTtlMinutes")
+    public static int provideAnthropicModelCatalogTtlMinutes(RegistryConfigSettings config) {
+      if (config.ai != null && config.ai.modelCatalogTtlMinutes > 0) {
+        return config.ai.modelCatalogTtlMinutes;
+      }
+      return 60;
+    }
+
+    @Provides
+    @Config("anthropicComplexityRoutingEnabled")
+    public static boolean provideAnthropicComplexityRoutingEnabled(RegistryConfigSettings config) {
+      return config.ai == null || config.ai.complexityRoutingEnabled;
+    }
+
+    @Provides
     @Config("aiToolsMaxRows")
     public static int provideAiToolsMaxRows(RegistryConfigSettings config) {
       if (config.ai != null && config.ai.tools != null && config.ai.tools.maxRows > 0) {

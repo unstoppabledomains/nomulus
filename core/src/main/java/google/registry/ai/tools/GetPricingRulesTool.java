@@ -46,6 +46,11 @@ public class GetPricingRulesTool implements AiTool {
   }
 
   @Override
+  public Complexity complexity() {
+    return Complexity.EASY;
+  }
+
+  @Override
   public String description() {
     return "Returns the current pricing rules (per-tld, per-registrar, per-operation prices). Use"
         + " when the user asks about pricing, fees, or rate cards.";

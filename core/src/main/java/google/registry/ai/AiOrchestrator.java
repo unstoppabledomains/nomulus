@@ -15,6 +15,7 @@
 package google.registry.ai;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.flogger.FluentLogger;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -23,6 +24,7 @@ import google.registry.ai.tools.AiToolRegistry;
 import google.registry.ai.tools.ToolResult;
 import google.registry.model.console.User;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,19 +48,35 @@ public class AiOrchestrator {
 
   private static final int MAX_TURNS = 5;
   private static final Gson GSON = new Gson();
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private final AnthropicClient anthropicClient;
   private final AiToolRegistry registry;
+  private final AnthropicModelCatalog catalog;
+  private final String defaultModelShorthand;
+  private final boolean complexityRoutingEnabled;
 
   @Inject
-  public AiOrchestrator(AnthropicClient anthropicClient, AiToolRegistry registry) {
+  public AiOrchestrator(
+      AnthropicClient anthropicClient,
+      AiToolRegistry registry,
+      AnthropicModelCatalog catalog,
+      @Named("anthropicDefaultModel") String defaultModelShorthand,
+      @Named("complexityRoutingEnabled") boolean complexityRoutingEnabled) {
     this.anthropicClient = anthropicClient;
     this.registry = registry;
+    this.catalog = catalog;
+    this.defaultModelShorthand = defaultModelShorthand;
+    this.complexityRoutingEnabled = complexityRoutingEnabled;
   }
 
   /**
    * Runs a multi-turn conversation and returns the ordered list of tool names that were invoked.
    * Caller's {@link Consumer} sees every {@link OrchestratorEvent} in order.
+   *
+   * <p>Turn 0 always runs on the user-selected model (so the initial user-facing reply uses what
+   * the user picked). Subsequent turns may be routed to a cheaper model based on the max
+   * complexity of tools executed in the prior turn (see {@link AiTool#complexity}).
    */
   public ImmutableList<String> run(
       String systemPrompt,
@@ -81,13 +99,28 @@ public class AiOrchestrator {
     JsonArray tools = registry.anthropicToolDefinitions();
     List<String> toolsUsed = new ArrayList<>();
 
+    String userSelectedShorthand = modelOverride != null ? modelOverride : defaultModelShorthand;
+    String userSelectedModelId =
+        catalog
+            .resolveModelId(userSelectedShorthand)
+            .or(() -> catalog.resolveModelId(defaultModelShorthand))
+            .orElseThrow(
+                () -> new IllegalStateException("No usable Anthropic model available in catalog"));
+
+    AiTool.Complexity prevTurnMaxComplexity = null;
+
     for (int turn = 0; turn < MAX_TURNS; turn++) {
+      String turnModelId =
+          (turn == 0 || prevTurnMaxComplexity == null)
+              ? userSelectedModelId
+              : routeForComplexity(prevTurnMaxComplexity, userSelectedModelId);
+
       List<PendingToolCall> pending = new ArrayList<>();
       AnthropicClient.StreamResult result =
           anthropicClient.streamMessageWithTools(
               systemPrompt,
               messages,
-              modelOverride,
+              turnModelId,
               tools,
               event -> {
                 if (event instanceof AnthropicClient.TextDelta td) {
@@ -99,6 +132,17 @@ public class AiOrchestrator {
                   pending.add(new PendingToolCall(tu.toolUseId(), tu.name(), argsObj));
                 }
               });
+
+      List<String> toolNamesThisTurn = pending.stream().map(p -> p.name).toList();
+      logger.atInfo().log(
+          "AI turn=%d, model=%s, prevMaxComplexity=%s, tools=%s,"
+              + " inputTokens=%d, outputTokens=%d",
+          turn,
+          turnModelId,
+          prevTurnMaxComplexity,
+          toolNamesThisTurn,
+          result.inputTokens(),
+          result.outputTokens());
 
       if (pending.isEmpty()) {
         // No tool calls this turn — Claude is done.
@@ -112,6 +156,7 @@ public class AiOrchestrator {
       assistantMsg.add("content", result.assistantContent());
       messages.add(assistantMsg);
 
+      AiTool.Complexity turnMax = AiTool.Complexity.EASY;
       // Execute each tool and append a single user message containing all tool_results.
       JsonArray toolResultsContent = new JsonArray();
       for (PendingToolCall p : pending) {
@@ -124,8 +169,10 @@ public class AiOrchestrator {
         if (maybeTool.isEmpty()) {
           toolResult = ToolResult.invalidArgs("Unknown tool: " + p.name);
         } else {
+          AiTool tool = maybeTool.get();
+          turnMax = maxComplexity(turnMax, tool.complexity());
           try {
-            toolResult = maybeTool.get().executeWithStatus(p.args, user);
+            toolResult = tool.executeWithStatus(p.args, user);
           } catch (AiTool.AiToolException e) {
             // Tools should now return a typed ToolResult instead of throwing for user-visible
             // failures (bad args, permission denied, etc.). A throw here is a backstop for
@@ -146,6 +193,7 @@ public class AiOrchestrator {
                 toolResult.diagnostic()));
         toolResultsContent.add(resultBlock);
       }
+      prevTurnMaxComplexity = turnMax;
 
       JsonObject userMsg = new JsonObject();
       userMsg.addProperty("role", "user");
@@ -156,6 +204,31 @@ public class AiOrchestrator {
     // Hit the turn cap. Surface as done.
     sink.accept(new DoneEvent());
     return ImmutableList.copyOf(toolsUsed);
+  }
+
+  /**
+   * Picks the model id for a post-tool synthesis turn given the max complexity of tools just
+   * executed. EASY → haiku family, MEDIUM → sonnet family, COMPLEX → fall through to the
+   * user-selected model. If the routing flag is off, always returns the user-selected model.
+   */
+  private String routeForComplexity(AiTool.Complexity max, String userSelectedModelId) {
+    if (!complexityRoutingEnabled) {
+      return userSelectedModelId;
+    }
+    String shorthand =
+        switch (max) {
+          case EASY -> "haiku";
+          case MEDIUM -> "sonnet";
+          case COMPLEX -> null;
+        };
+    if (shorthand == null) {
+      return userSelectedModelId;
+    }
+    return catalog.resolveModelId(shorthand).orElse(userSelectedModelId);
+  }
+
+  private static AiTool.Complexity maxComplexity(AiTool.Complexity a, AiTool.Complexity b) {
+    return a.ordinal() >= b.ordinal() ? a : b;
   }
 
   // -- Events -------------------------------------------------------------------------------

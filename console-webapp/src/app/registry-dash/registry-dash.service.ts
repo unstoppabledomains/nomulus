@@ -17,6 +17,7 @@ import { Injectable, WritableSignal, computed, signal } from '@angular/core';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { BackendService } from '../shared/services/backend.service';
 import { DateRange } from './explore/explore.models';
+import { AiModelCatalog, AiModelCatalogResponse } from './ai/ai-analysis.models';
 
 export interface OverviewData {
   totalDomains: number;
@@ -103,6 +104,8 @@ export interface SystemInfo {
 export interface AdminData {
   registries: RoRegistry[];
   systemInfo: SystemInfo;
+  aiModelCatalog?: AiModelCatalog;
+  aiModelCatalogFetchedAt?: string;
 }
 
 export interface RevenueDataPoint {
@@ -501,6 +504,13 @@ export class RegistryDashService {
       }),
       catchError((err) => this.handleError<unknown>(err))
     );
+  }
+
+  /** Fetch the per-family list of available Claude models for the chat modal selector. */
+  getAiModelCatalog(): Observable<AiModelCatalogResponse> {
+    return this.backend
+      .getRegistryDashAiCatalog()
+      .pipe(catchError((err) => this.handleError<AiModelCatalogResponse>(err)));
   }
 
   getRevenueBilling(

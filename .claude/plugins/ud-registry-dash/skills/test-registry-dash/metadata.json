@@ -1,6 +1,6 @@
 {
-  "lastReviewedCommit": "272bb82140597986a0512ecc8630b5c342d57773",
+  "lastReviewedCommit": "1f22362d4090e79e4bf4e5be79372386f61eff2d",
   "lastReviewedAt": "2026-05-04",
   "lastReviewer": "torrey@unstoppabledomains.com",
-  "lastReviewerNote": "SRE-1958: Tier 3 result-status disambiguation (chips for non-OK statuses, diagnostic tooltips) and query_registrar_activity registrarIds SQL fix. Adds tests 30-32."
+  "lastReviewerNote": "SRE-1959: dynamic Anthropic model catalog (admin panel + force-refresh) and complexity-based routing for background turns. SRE-1958: Tier 3 result-status disambiguation (chips for non-OK statuses, diagnostic tooltips) and query_registrar_activity registrarIds SQL fix. Adds tests 30-32, 38-41."
 }

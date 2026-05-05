@@ -24,7 +24,9 @@ export interface AiAnalyzeRequest {
   promptType: string;
   /**
    * Free-form context bag forwarded to the backend. Well-known keys:
-   * - `dateRange` (required): `{ start: string; end: string }`.
+   * - `dateRange`: optional `{ start: string; end: string }`. Omit (or leave
+   *   undefined) when no time filter applies — empty strings are NOT sent,
+   *   since they actively mislead the model.
    * - `granularity`: optional bucket size e.g. `'DAY'`.
    * - `filteredTlds` (required): list of TLD names currently selected.
    * - `filteredRegistrars` (required): list of registrar IDs currently selected.
@@ -35,7 +37,7 @@ export interface AiAnalyzeRequest {
    * Additional keys are allowed and silently passed through.
    */
   metadata: {
-    dateRange: { start: string; end: string };
+    dateRange?: { start: string; end: string };
     granularity?: string;
     filteredTlds: string[];
     filteredRegistrars: string[];
@@ -62,7 +64,31 @@ export interface AiPromptOption {
   userMessage: string;
 }
 
+/**
+ * Family shorthand sent to the backend when picking a model. Always one of the three
+ * Claude families, but the per-family list of available dated ids is dynamic — see
+ * {@link AiModelCatalog}.
+ */
 export type AiModelChoice = 'haiku' | 'sonnet' | 'opus';
+
+/** Single resolved model returned by the backend catalog endpoint. */
+export interface AiModelInfo {
+  id: string;
+  displayName?: string | null;
+  createdAt?: string | null;
+}
+
+/** Catalog of available Claude models grouped by family. Empty array = family unavailable. */
+export interface AiModelCatalog {
+  haiku: AiModelInfo[];
+  sonnet: AiModelInfo[];
+  opus: AiModelInfo[];
+}
+
+export interface AiModelCatalogResponse {
+  catalog: AiModelCatalog;
+  fetchedAt: string;
+}
 
 export type ToolStatus =
   | 'OK'
@@ -124,3 +150,4 @@ export const TOOL_LABELS: Record<string, string> = {
   query_expiration_curve: '📉 Mapping expirations',
   run_explore_query: '🔬 Running data query',
 };
+
