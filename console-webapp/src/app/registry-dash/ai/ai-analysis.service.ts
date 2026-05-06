@@ -201,6 +201,15 @@ export class AiAnalysisService {
             }
 
             const typed = frame as AiStreamFrame;
+            console.debug(
+              '[ai-chat] frame',
+              typed.type,
+              typed.type === 'tool_use'
+                ? typed.tool
+                : typed.type === 'tool_result'
+                ? `${typed.tool}/${typed.status ?? typed.ok}`
+                : '',
+            );
             if (typed.type === 'text') {
               accumulated += typed.text;
               this.streamedText.set(accumulated);
@@ -240,8 +249,8 @@ export class AiAnalysisService {
               );
             }
             // 'done' is informational; the [DONE] sentinel still terminates the loop.
-          } catch {
-            // skip malformed chunks
+          } catch (e) {
+            console.warn('[ai-chat] dropped malformed SSE frame', { data, error: e });
           }
         }
       }
