@@ -39,6 +39,7 @@ public class AiToolRegistry {
       QueryRevenueBreakdownTool queryRevenueBreakdown,
       QueryRenewalRatesTool queryRenewalRates,
       QueryExpirationCurveTool queryExpirationCurve,
+      QueryDomainFootprintTool queryDomainFootprint,
       RunExploreQueryTool runExploreQuery) {
     this(
         ImmutableList.of(
@@ -51,6 +52,7 @@ public class AiToolRegistry {
             queryRevenueBreakdown,
             queryRenewalRates,
             queryExpirationCurve,
+            queryDomainFootprint,
             runExploreQuery));
   }
 

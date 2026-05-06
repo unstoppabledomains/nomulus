@@ -79,6 +79,11 @@ public enum ExploreDataSource {
     return allowedDimensions;
   }
 
+  /** Whether this source accepts a {@code dateRange} filter. */
+  public boolean supportsDateRange() {
+    return allowedFilters.contains("dateRange");
+  }
+
   /**
    * Validates the descriptor against this source's allowlist. Throws IllegalArgumentException on
    * unknown fields.

@@ -148,6 +148,7 @@ export const TOOL_LABELS: Record<string, string> = {
   query_revenue_breakdown: '💵 Breaking down revenue',
   query_renewal_rates: '🔄 Checking renewal rates',
   query_expiration_curve: '📉 Mapping expirations',
+  query_domain_footprint: '🌐 Counting registered domains',
   run_explore_query: '🔬 Running data query',
 };
 
