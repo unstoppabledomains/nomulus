@@ -309,6 +309,39 @@ final class ToolJpaHelper {
   record DataExtent(Instant min, Instant max) {}
 
   /**
+   * Returns the total count of currently-registered (non-deleted) domains under management,
+   * scoped to the given TLDs and registrar IDs. Mirrors the WHERE clauses of
+   * {@link google.registry.ui.server.console.registrydash.ExploreQueryBuilder#buildDomainCounts}
+   * but without grouping, so the result is unaffected by row-limit truncation.
+   */
+  static long countActiveDomains(
+      ImmutableSet<String> tlds, ImmutableSet<String> registrarIds) {
+    StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM \"Domain\" d WHERE ");
+    sql.append("d.deletion_time > CURRENT_TIMESTAMP");
+    if (!tlds.isEmpty()) {
+      sql.append(" AND d.tld IN (:tlds)");
+    }
+    if (!registrarIds.isEmpty()) {
+      sql.append(" AND d.current_sponsor_registrar_id IN (:registrarIds)");
+    }
+    return tm().transact(
+        () -> {
+          Query q = tm().getEntityManager().createNativeQuery(sql.toString());
+          if (!tlds.isEmpty()) {
+            q.setParameter("tlds", tlds);
+          }
+          if (!registrarIds.isEmpty()) {
+            q.setParameter("registrarIds", registrarIds);
+          }
+          Object raw = q.getSingleResult();
+          if (raw instanceof Number n) {
+            return n.longValue();
+          }
+          return 0L;
+        });
+  }
+
+  /**
    * Builds an {@link ExploreQueryDescriptor} programmatically by serializing args to JSON and
    * deserializing into the descriptor (whose fields are otherwise private with no setters).
    */

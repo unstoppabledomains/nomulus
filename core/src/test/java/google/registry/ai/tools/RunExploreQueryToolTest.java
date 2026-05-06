@@ -58,14 +58,25 @@ class RunExploreQueryToolTest extends AiToolTestBase {
   @Test
   void inputSchema_hasRequiredFields() {
     JsonObject schema = tool.inputSchema();
-    assertThat(schema.getAsJsonArray("required").toString())
-        .contains("data_source");
-    assertThat(schema.getAsJsonArray("required").toString()).contains("tld");
-    assertThat(schema.getAsJsonArray("required").toString()).contains("start_date");
-    assertThat(schema.getAsJsonArray("required").toString()).contains("end_date");
-    assertThat(schema.getAsJsonArray("required").toString()).contains("metrics");
+    String required = schema.getAsJsonArray("required").toString();
+    assertThat(required).contains("data_source");
+    assertThat(required).contains("tld");
+    assertThat(required).contains("metrics");
+    // Dates are per-source optional (SRE-1962): required for sources that support dateRange,
+    // ignored for current-state sources like DOMAIN_COUNTS.
+    assertThat(required).doesNotContain("start_date");
+    assertThat(required).doesNotContain("end_date");
     assertThat(schema.getAsJsonObject("properties").getAsJsonObject("data_source").has("enum"))
         .isTrue();
+  }
+
+  @Test
+  void description_documentsPerSourceDateRequirement() {
+    String desc = tool.description();
+    // DOMAIN_COUNTS is a current-state snapshot; REVENUE accepts a date range.
+    assertThat(desc).contains("DOMAIN_COUNTS");
+    assertThat(desc).contains("dates=n/a");
+    assertThat(desc).contains("dates=required");
   }
 
   @Test
@@ -160,6 +171,78 @@ class RunExploreQueryToolTest extends AiToolTestBase {
     ToolResult result = tool.executeWithStatus(argsJson, user);
     assertToolResultStatus(result, ToolResult.Status.PERMISSION_DENIED);
     assertThat(result.diagnostic()).ignoringCase().contains("permission denied");
+  }
+
+  @Test
+  void execute_domainCountsWithoutDates_succeeds() {
+    // DOMAIN_COUNTS is a current-state snapshot — dates are not required and should not block.
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("data_source", "DOMAIN_COUNTS");
+    argsJson.addProperty("tld", "tld");
+    com.google.gson.JsonArray metrics = new com.google.gson.JsonArray();
+    metrics.add("count");
+    argsJson.add("metrics", metrics);
+    com.google.gson.JsonArray dims = new com.google.gson.JsonArray();
+    dims.add("registrar");
+    argsJson.add("dimensions", dims);
+
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+
+    // No domains in the test DB → EMPTY_FOR_RANGE, but crucially NOT INVALID_ARGS for missing
+    // dates (the SRE-1962 regression case).
+    assertThat(result.status())
+        .isAnyOf(ToolResult.Status.OK, ToolResult.Status.EMPTY_FOR_RANGE);
+    assertThat(result.data().getAsJsonObject().has("rows")).isTrue();
+    // emptyForRange diagnostic should not mention a date range when none was supplied.
+    if (result.status() == ToolResult.Status.EMPTY_FOR_RANGE) {
+      assertThat(result.diagnostic()).doesNotContain("between");
+    }
+  }
+
+  @Test
+  void execute_domainCountsWithDates_stripsDatesAndAttachesNote() {
+    // SRE-1962: when dates are supplied to a source that doesn't accept them, the tool must
+    // silently strip the dates and surface a note instead of returning INVALID_ARGS.
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("data_source", "DOMAIN_COUNTS");
+    argsJson.addProperty("tld", "tld");
+    argsJson.addProperty("start_date", "2026-01-01");
+    argsJson.addProperty("end_date", "2026-04-29");
+    com.google.gson.JsonArray metrics = new com.google.gson.JsonArray();
+    metrics.add("count");
+    argsJson.add("metrics", metrics);
+
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+
+    assertThat(result.status())
+        .isAnyOf(ToolResult.Status.OK, ToolResult.Status.EMPTY_FOR_RANGE);
+    JsonObject payload = result.data().getAsJsonObject();
+    assertThat(payload.has("notes")).isTrue();
+    assertThat(payload.getAsJsonArray("notes").get(0).getAsString())
+        .ignoringCase()
+        .contains("ignored");
+    assertThat(payload.getAsJsonArray("notes").get(0).getAsString())
+        .contains("DOMAIN_COUNTS");
+  }
+
+  @Test
+  void execute_revenueWithoutDates_returnsInvalidArgs() {
+    // REVENUE supports dateRange; dates remain required for it.
+    User user = createFteUser("admin@example.com");
+    JsonObject argsJson = new JsonObject();
+    argsJson.addProperty("data_source", "REVENUE");
+    argsJson.addProperty("tld", "tld");
+    com.google.gson.JsonArray metrics = new com.google.gson.JsonArray();
+    metrics.add("amount");
+    argsJson.add("metrics", metrics);
+
+    ToolResult result = tool.executeWithStatus(argsJson, user);
+
+    assertToolResultStatus(result, ToolResult.Status.INVALID_ARGS);
+    assertThat(result.diagnostic()).contains("REVENUE");
+    assertThat(result.diagnostic()).ignoringCase().contains("required");
   }
 
   /** Minimal valid args for DOMAIN_ACTIVITY. */

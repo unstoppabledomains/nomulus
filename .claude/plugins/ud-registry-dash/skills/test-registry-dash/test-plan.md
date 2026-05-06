@@ -1496,7 +1496,111 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 ---
 
-## Test 68: Tier 3 Tool Use - Multi-tool persistence + cross-turn survival (SRE-1963)
+## Test 68: Tier 3 — query_domain_footprint "largest registrar" (SRE-1962 acceptance)
+
+**Goal:** Confirm the SRE-1962 acceptance criterion: "who is the largest registrar by registered domain footprint?" returns a real answer in one tool call via the new `query_domain_footprint` tool, not the old generic-blocked path.
+**Tier:** full
+
+### Prerequisites:
+- Local-dev or alpha. At least two TLDs and two registrars with seeded `Domain` rows (current sponsorship), so the count breakdown is non-trivial.
+
+### Steps:
+1. Open the analysis modal on **Overview** (or any page).
+2. Ask: `Who is the largest registrar across all of our TLDs?`
+3. Watch for the inline indicator `🌐 Counting registered domains`.
+4. Read the final assistant text.
+5. Tail the server log for `RegistryDashAiAction` and the `query_domain_footprint:` descriptor line.
+
+### Expected:
+- Indicator `🌐 Counting registered domains` (NOT `🔬 Running data query`) appears mid-stream.
+- Single tool call: `toolsUsed=[query_domain_footprint]`. No `run_explore_query` retry.
+- Final assistant text names a single registrar and a count (e.g. "registrar X with N domains").
+- Server log line includes `tlds=[]`, `registrarIds=[]`, `groupBy=registrar` (or `both` if the LLM picked the default), and `limit=100` (or whatever default is applied).
+- Tool payload includes a `totalDomains` rollup field.
+
+---
+
+## Test 69: Tier 3 — query_domain_footprint by TLD and registrar
+
+**Goal:** Confirm the breakdown variant works and that filtering + grouping return the expected shape.
+**Tier:** full
+
+### Steps:
+1. Open the modal on Overview.
+2. Ask: `Show me a breakdown of registered domains by registrar and TLD.`
+3. Watch indicator and DevTools → Network → most recent `analyze` request → EventStream tab.
+4. Confirm the `tool_result` frame for `query_domain_footprint`.
+
+### Expected:
+- Indicator `🌐 Counting registered domains`.
+- `tool_result` data has `rows` array with `tld`, `registrar`, and `count` fields per row, sorted descending by `count`.
+- `rowCount`, `totalDomains`, and `truncated` fields are present on the payload.
+- Final assistant text presents a table-like or itemized breakdown.
+
+---
+
+## Test 70: Tier 3 — run_explore_query with DOMAIN_COUNTS without dates (SRE-1962 regression)
+
+**Goal:** Confirm the SRE-1962 fix: `run_explore_query` with `DOMAIN_COUNTS` and no date params succeeds, instead of failing with `INVALID_ARGS` for missing dates (the original symptom).
+**Tier:** full
+
+### Prerequisites:
+- Local-dev preferred (server log inspection required to confirm the descriptor line).
+
+### Steps:
+1. Open the modal. Ask a question subtle enough that Claude reaches for the generic tool against DOMAIN_COUNTS rather than `query_domain_footprint` (e.g. ask for an unusual dimension combo only the generic supports). If the LLM keeps picking `query_domain_footprint`, force the path by injecting via DevTools or direct API call:
+   ```
+   curl -s -X POST .../console-api/registry-dash/ai/analyze \
+     -H 'Content-Type: application/json' \
+     --data '{"data_source":"DOMAIN_COUNTS","tld":"example","metrics":["count"],"dimensions":["registrar"]}'
+   ```
+   (Adapt to whatever the actual tool-call path is.)
+2. Tail the server log for `AI tool run_explore_query:` and the corresponding `tool_result` `status`.
+
+### Expected:
+- Tool returns `status: "OK"` (or `"EMPTY_FOR_RANGE"` if no data for the TLD), NOT `INVALID_ARGS`.
+- Server log line shows `startDate=null endDate=null`.
+- The descriptor line does not include the "Filter 'dateRange' not supported" message.
+
+---
+
+## Test 71: Tier 3 — run_explore_query DOMAIN_COUNTS with dates is silently stripped + noted
+
+**Goal:** Confirm that when the LLM (or a manual caller) passes start_date/end_date with DOMAIN_COUNTS, the tool silently strips the dates, runs the query anyway, and surfaces a `notes[]` advisory in the OK payload — instead of returning INVALID_ARGS and blocking.
+**Tier:** full
+
+### Prerequisites:
+- Local-dev preferred.
+
+### Steps:
+1. Force a `run_explore_query` call with `data_source=DOMAIN_COUNTS`, dimensions `[tld, registrar]`, metrics `[count]`, AND `start_date`/`end_date` populated. The simplest path: temporarily prompt-inject in the chat ("Run explore query against DOMAIN_COUNTS for tld example with start_date 2026-01-01, end_date 2026-04-30, dimensions [tld, registrar], metric count") or call the API directly.
+2. Tail the server log for the descriptor line.
+3. Inspect the `tool_result` frame in DevTools EventStream.
+
+### Expected:
+- Tool returns `status: "OK"` (or `"EMPTY_FOR_RANGE"`), NOT `INVALID_ARGS`.
+- Server log shows `startDate=null endDate=null` (the dates were stripped before the descriptor was built).
+- Tool payload includes a top-level `notes` array containing a string like: *"start_date/end_date were ignored: DOMAIN_COUNTS is a current-state snapshot and does not support date filtering."*
+- Assistant final text either echoes the advisory ("note: dates aren't applicable here…") or just answers the question; it does NOT report a tool failure.
+
+---
+
+## Test 72: Tier 3 — Tool descriptions document per-source date requirement
+
+**Goal:** Lightweight smoke that the AI tool registry surfaces the new per-source `dates=required|n/a` documentation. Protects against accidental regressions of the SRE-1962 description string.
+**Tier:** smoke
+
+### Steps:
+1. Hit the local AI tool catalog endpoint (or the orchestrator log line that emits the Anthropic tool definitions).
+2. Find the `run_explore_query` definition.
+
+### Expected:
+- The `description` text contains both `dates=required` (for sources like REVENUE, DOMAIN_ACTIVITY, RENEWAL_RATES, EXPIRATION_CURVE, TRANSACTIONS) and `dates=n/a` (for DOMAIN_COUNTS and PRICING_RULES).
+- The `input_schema.required` array does NOT contain `start_date` or `end_date`.
+
+---
+
+## Test 73: Tier 3 Tool Use - Multi-tool persistence + cross-turn survival (SRE-1963)
 
 **Goal:** Confirm every tool call gets its own persistent pill in chronological order, pills survive across follow-up turns, and tool entries are NOT replayed back to the backend on subsequent turns.
 
@@ -1516,5 +1620,5 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 - Step 5: prior turn's pills are still visible after the response completes.
 - Step 6: the new turn's pill appears below the prior turn's pills; the prior turn's pills survive.
 - Step 8: `conversationHistory` in the wire payload contains ONLY `{role: "user"|"assistant", content: ...}` entries — **no `role: "tool"` entries** are sent back to the backend.
-- Step 9: cancelled IN_FLIGHT pills resolve to a non-spinning terminal state (e.g., red "Tool error" chip with diagnostic "Cancelled").
+- Step 9: cancelled IN_FLIGHT pills resolve to a non-spinning terminal state (e.g., red "Tool error" chip with diagnostic "Cancelled" or "Interrupted" depending on whether the abort was user-initiated).
 - No regression on auto-scroll, queue, resize (PR #134) or stale-state-on-reopen (PR #127).
