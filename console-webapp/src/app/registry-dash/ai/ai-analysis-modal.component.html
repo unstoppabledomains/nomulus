@@ -51,29 +51,37 @@
           <mat-icon class="message-icon">auto_awesome</mat-icon>
           <div class="message-content markdown-body" [innerHTML]="msg.content | markdown"></div>
         </div>
+        <!-- Persistent tool pill (SRE-1963). Shows pulsing dots while
+             IN_FLIGHT, a status chip suffix on non-OK terminal statuses,
+             and just the label for OK — its mere presence confirms the
+             tool ran. Diagnostic, when present, is the matTooltip. -->
+        <div *ngIf="msg.role === 'tool'"
+             class="tool-pill"
+             [class.tool-pill--in-flight]="msg.status === 'IN_FLIGHT'"
+             [class.tool-pill--ok]="msg.status === 'OK'"
+             [class.tool-pill--warn]="chipFor(msg)?.tone === 'warn'"
+             [class.tool-pill--error]="chipFor(msg)?.tone === 'error'"
+             [matTooltip]="msg.diagnostic || ''"
+             [attr.data-tool]="msg.tool"
+             [attr.data-status]="msg.status"
+             tabindex="0"
+             role="status"
+             [attr.aria-label]="ariaLabelFor(msg)">
+          <span class="tool-pill-label">{{ msg.label }}</span>
+          <span *ngIf="msg.status === 'IN_FLIGHT'" class="tool-pill-dots">…</span>
+          <span *ngIf="chipFor(msg) as chip" class="tool-pill-chip"
+                [class.tool-pill-chip--warn]="chip.tone === 'warn'"
+                [class.tool-pill-chip--error]="chip.tone === 'error'">{{ chip.text }}</span>
+        </div>
       </ng-container>
 
-      <!-- Streaming response -->
+      <!-- Streaming response. Tool pills now render in the persistent
+           timeline above (SRE-1963), so this block carries only the
+           streamed text and progress bar. -->
       <div *ngIf="streaming()" class="message assistant-message streaming">
         <mat-icon class="message-icon">auto_awesome</mat-icon>
         <div class="message-content markdown-body">
           <div [innerHTML]="streamedText() | markdown"></div>
-          <ng-container *ngFor="let t of toolsCompleted()">
-            <div *ngIf="chipFor(t) as chip" class="tool-status-chip"
-                 [class.tool-status-chip--warn]="chip.tone === 'warn'"
-                 [class.tool-status-chip--error]="chip.tone === 'error'"
-                 [matTooltip]="t.diagnostic || ''"
-                 [attr.data-tool]="t.tool"
-                 [attr.data-status]="t.status"
-                 tabindex="0"
-                 role="status"
-                 [attr.aria-label]="t.label + ' — ' + chip.text + (t.diagnostic ? ': ' + t.diagnostic : '')">
-              {{ t.label }} — {{ chip.text }}
-            </div>
-          </ng-container>
-          <div *ngFor="let t of toolsInFlight()" class="tool-indicator">
-            {{ t.label }}<span class="tool-indicator-dots">…</span>
-          </div>
           <mat-progress-bar mode="indeterminate" class="stream-progress"></mat-progress-bar>
         </div>
       </div>

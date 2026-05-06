@@ -418,9 +418,9 @@
 
 ---
 
-## Test 18: Tier 3 Tool Use — Indicator UX
+## Test 18: Tier 3 Tool Use — Persistent Tool Pill (SRE-1963)
 
-**Goal:** Verify the analysis modal shows transient tool indicators when Claude calls a tool.
+**Goal:** Verify the analysis modal shows a tool pill when Claude calls a tool, and the pill **stays visible in the chat scrollback after execution** so the user can see what tools ran.
 **Tier:** full
 
 ### Steps:
@@ -428,14 +428,19 @@
 2. Click sparkle → open the analysis modal.
 3. Wait for the initial analysis to finish.
 4. In the follow-up box, type: `What specific domains transferred in the last 30 days for the example tld?` (substitute a TLD with seeded transfer data).
-5. Watch for an inline indicator below the streaming text: `🔍 Searching transfers…` (italic, slight pulse animation).
-6. The indicator should appear when the tool is in flight and disappear once the tool result arrives.
-7. The final assistant text should reference specific domain names that came from the tool.
+5. Watch for an inline tool pill: `🔍 Searching transfers…` (italic with pulsing dots while in flight).
+6. When the tool completes, the pill **must remain visible** — the dots and italic styling go away, but the pill itself stays in the timeline at the chronological position the tool fired.
+7. The final assistant text streams in **below** the pill (not above, not replacing it).
+8. After the response finishes, scroll up — the pill is still there.
+9. Send a follow-up question that triggers a different tool (e.g. `Look up registrar TheRegistrar`). The new pill appears below the prior turn; the old pill from turn 1 is still visible.
 
 ### Expected:
-- Indicator appears mid-stream and is replaced by the next text chunk.
-- Final answer contains specific domain names, not just chart-level summaries.
-- Modal does not crash or hang.
+- A tool pill appears for every `tool_use` event and persists through and past the response.
+- IN_FLIGHT pill: italic, pulsing `…` indicator.
+- OK terminal: solid pill, no chip suffix (the pill's mere presence confirms success).
+- Non-OK terminal: solid pill with a colored chip suffix (see Test 65 for status-specific coverage).
+- Final answer contains specific domain names from the tool result.
+- Modal does not crash or hang; no pills disappear or become orphaned.
 
 ---
 
@@ -1429,25 +1434,26 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 
 ---
 
-## Test 65: Tier 3 Tool Use - Result-status chips (SRE-1958)
+## Test 65: Tier 3 Tool Use - Result-status chips (SRE-1958, updated for SRE-1963)
 
-**Goal:** Verify the modal renders disambiguated status chips next to tool-call indicators when a tool returns a non-OK status, with the diagnostic visible on hover.
+**Goal:** Verify the persistent tool pill (SRE-1963) carries a disambiguated status-chip suffix when a tool returns a non-OK status, with the diagnostic visible on hover.
 
 ### Steps:
 1. Navigate to **Domain Activity** and open the analysis modal (any prompt).
 2. Wait for the initial analysis to finish.
 3. Trigger an `EMPTY_FOR_RANGE` case: ask "Show transfers for tld example between 2025-01-01 and 2025-01-02." (adjust dates to a known-empty window in the target env).
-4. Watch the tool indicator - when it resolves, a yellow/muted chip should appear with text "No data". Hover the chip; the tooltip must contain a diagnostic naming the active filter and data extent.
-5. Trigger an `INVALID_ARGS` case: via DevTools issue an analyze request with `tld=""` or omit a required arg. The chip should be red, text "Invalid args", tooltip naming the offending arg.
-6. Trigger a `PERMISSION_DENIED` case: while logged in as a non-FTE user with limited scope, ask about a TLD outside the scope. The chip should be red, text "No access".
+4. When the tool resolves, the pill stays in the scrollback with a yellow/muted **chip suffix** "No data". Hover the pill; the tooltip must contain a diagnostic naming the active filter and data extent.
+5. Trigger an `INVALID_ARGS` case: via DevTools issue an analyze request with `tld=""` or omit a required arg. The chip suffix should be red, text "Invalid args", tooltip naming the offending arg.
+6. Trigger a `PERMISSION_DENIED` case: while logged in as a non-FTE user with limited scope, ask about a TLD outside the scope. The chip suffix should be red, text "No access".
 
 ### Expected:
-- For `OK`: no chip, current silent green-checkmark behavior preserved.
-- For `EMPTY_FOR_RANGE`: yellow/muted chip "No data" + diagnostic in `matTooltip`.
-- For `OUT_OF_RANGE`: yellow chip "Out of range" + diagnostic.
-- For `INVALID_ARGS`: red chip "Invalid args" + diagnostic.
-- For `PERMISSION_DENIED`: red chip "No access" + diagnostic.
-- For `INTERNAL_ERROR`: red chip "Tool error" + sanitized diagnostic.
+- For `OK`: pill stays in the scrollback with **no chip suffix** — its presence alone confirms the tool ran (SRE-1963).
+- For `EMPTY_FOR_RANGE`: pill with yellow/muted "No data" chip suffix + diagnostic in `matTooltip`.
+- For `OUT_OF_RANGE`: pill with yellow "Out of range" chip suffix + diagnostic.
+- For `INVALID_ARGS`: pill with red "Invalid args" chip suffix + diagnostic.
+- For `PERMISSION_DENIED`: pill with red "No access" chip suffix + diagnostic.
+- For `INTERNAL_ERROR`: pill with red "Tool error" chip suffix + sanitized diagnostic.
+- All pills persist in scrollback after the response completes.
 - The streamed `tool_result` frame in the network tab carries `{type: "tool_result", tool, status, diagnostic?, ok}`.
 
 ---
@@ -1591,3 +1597,28 @@ Steps: open modal on Financials > Forecasting, ask "How many domains in tld exam
 ### Expected:
 - The `description` text contains both `dates=required` (for sources like REVENUE, DOMAIN_ACTIVITY, RENEWAL_RATES, EXPIRATION_CURVE, TRANSACTIONS) and `dates=n/a` (for DOMAIN_COUNTS and PRICING_RULES).
 - The `input_schema.required` array does NOT contain `start_date` or `end_date`.
+
+---
+
+## Test 73: Tier 3 Tool Use - Multi-tool persistence + cross-turn survival (SRE-1963)
+
+**Goal:** Confirm every tool call gets its own persistent pill in chronological order, pills survive across follow-up turns, and tool entries are NOT replayed back to the backend on subsequent turns.
+
+### Steps:
+1. Navigate to **Domain Activity** and open the analysis modal.
+2. Wait for the initial analysis to finish.
+3. Ask a multi-tool prompt: `Do a quick test of each tool — check transfers, pricing rules, and registrar activity for tld example.`
+4. Watch the timeline: a separate pill should appear for **each** tool that fires, in the order it fires.
+5. After the response completes, scroll up — every pill is still there.
+6. Send a follow-up: `Now look up registrar TheRegistrar.` Watch the new pill appear in the new turn.
+7. Open DevTools → Network → click the second `/console-api/registry-dash/ai/analyze` request → Payload tab.
+8. Inspect the `conversationHistory` array in the request body.
+9. (Optional) Click Stop mid-response on a long multi-tool prompt. Verify any IN_FLIGHT pill resolves to a terminal state (no spinner stuck pulsing forever).
+
+### Expected:
+- Step 3-4: every `tool_use` event produces a distinct pill; multiple sequential pills render in chronological order interleaved correctly with assistant text chunks.
+- Step 5: prior turn's pills are still visible after the response completes.
+- Step 6: the new turn's pill appears below the prior turn's pills; the prior turn's pills survive.
+- Step 8: `conversationHistory` in the wire payload contains ONLY `{role: "user"|"assistant", content: ...}` entries — **no `role: "tool"` entries** are sent back to the backend.
+- Step 9: cancelled IN_FLIGHT pills resolve to a non-spinning terminal state (e.g., red "Tool error" chip with diagnostic "Cancelled" or "Interrupted" depending on whether the abort was user-initiated).
+- No regression on auto-scroll, queue, resize (PR #134) or stale-state-on-reopen (PR #127).
